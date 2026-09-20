@@ -8,7 +8,10 @@
     "scheme": "bitfit",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow 128BIT FIT to scan food barcodes."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +20,10 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -34,7 +40,15 @@
           "backgroundColor": "#0d0f12"
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow 128BIT FIT to scan food barcodes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

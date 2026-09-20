@@ -148,6 +148,15 @@ export default function SettingsScreen() {
           context for prompt wiring.
         </Text>
       </View>
+
+      <View style={styles.aiCard}>
+        <Text style={styles.aiTitle}>About / data licenses</Text>
+        <Text style={styles.muted}>
+          USDA FoodData Central powers the offline food database. Barcode products may also come
+          from Open Food Facts and are available under the Open Database License (ODbL). Cached
+          barcode results stay on-device only — no bulk OFF import.
+        </Text>
+      </View>
     </ScrollView>
   );
 }

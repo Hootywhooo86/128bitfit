@@ -1,4 +1,4 @@
-import { count, eq } from 'drizzle-orm';
+import { count, eq, sql } from 'drizzle-orm';
 import { DATA_MANIFEST } from './data-manifest';
 import { db, sqlite } from './client';
 import { exercises, foods, meta } from './schema';
@@ -65,7 +65,11 @@ async function setMeta(key: string, value: string): Promise<void> {
 
 export async function getCounts(): Promise<{ exercises: number; foods: number }> {
   const [ex] = await db.select({ n: count() }).from(exercises);
-  const [fo] = await db.select({ n: count() }).from(foods);
+  // Exclude runtime OFF cache + custom foods so re-import checksums stay stable.
+  const [fo] = await db
+    .select({ n: count() })
+    .from(foods)
+    .where(sql`coalesce(${foods.source}, '') not in ('open_food_facts', 'custom')`);
   return { exercises: ex?.n ?? 0, foods: fo?.n ?? 0 };
 }
 
@@ -136,7 +140,10 @@ export async function importBundledData(
   try {
     // Clear previous rows outside the heavy insert loop
     await db.delete(exercises);
-    await db.delete(foods);
+    // Keep Open Food Facts cache rows + user custom foods across USDA re-import.
+    await db.delete(foods).where(
+      sql`coalesce(${foods.source}, '') not in ('open_food_facts', 'custom')`
+    );
 
     const exBatches = chunk(exerciseData, 50);
     let exDone = 0;
@@ -235,6 +242,8 @@ export function ensureIndexes(): void {
   sqlite.execSync(
     `CREATE INDEX IF NOT EXISTS idx_exercises_name ON exercises(name);
      CREATE INDEX IF NOT EXISTS idx_exercises_equipment ON exercises(equipment);
-     CREATE INDEX IF NOT EXISTS idx_foods_name ON foods(name);`
+     CREATE INDEX IF NOT EXISTS idx_foods_name ON foods(name);
+     CREATE INDEX IF NOT EXISTS idx_foods_barcode ON foods(barcode);
+     CREATE INDEX IF NOT EXISTS idx_foods_gtin ON foods(gtin);`
   );
 }

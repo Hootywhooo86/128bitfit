@@ -68,7 +68,10 @@ npm run build:foods -- --debug
 - Schema: `food_logs`, `water_logs`, `settings` (calorie/protein/water targets)
 - Queries: `db/food-queries.ts`; macros helper: `lib/nutrition.ts` (respects `nutrition_basis`)
 - Screens: `app/(tabs)/fuel.tsx`, `app/fuel/add.tsx`, `app/fuel/edit/[id].tsx`
-- Out of scope for this slice: barcode, AI meal photo, recipes, Open Food Facts
+- Barcode: `app/fuel/scan.tsx` + `app/fuel/custom.tsx`; lookup `db/barcode-queries.ts`
+- Open Food Facts: `lib/open-food-facts.ts` (per-barcode v2 API + ODbL note); cache table `off_food_cache`
+- Lookup order: local USDA barcode/gtin → OFF cache → OFF API → custom food form
+- Out of scope: bulk OFF import, AI meal photo, recipes
 
 ### Home + Coach stub
 
@@ -77,5 +80,5 @@ npm run build:foods -- --debug
 - Home: calorie ring + water, last workout / Train CTA, weight latest + log screen, optional training week strip
 - Coach: stub cards → local SQLite context summary + placeholder reply (no AI API keys yet)
 - Settings: calorie / protein / water targets, units (kg/lb), display name
-- Out of scope: real Anthropic/OpenAI calls, Health Connect, barcode, pixel avatar, subscriptions
+- Out of scope: real Anthropic/OpenAI calls, Health Connect, pixel avatar, subscriptions
 

@@ -131,7 +131,26 @@ export const weightEntries = sqliteTable('weight_entries', {
   note: text('note'),
 });
 
+
+/** Runtime Open Food Facts cache (per-barcode; survives USDA re-import). */
+export const offFoodCache = sqliteTable('off_food_cache', {
+  barcode: text('barcode').primaryKey(),
+  sourceId: text('source_id'),
+  name: text('name').notNull(),
+  brand: text('brand'),
+  servingSize: real('serving_size'),
+  servingUnit: text('serving_unit'),
+  nutritionBasis: text('nutrition_basis'),
+  /** JSON map of nutrient key → number | null */
+  nutrients: text('nutrients').notNull().default('{}'),
+  cachedAt: integer('cached_at', { mode: 'timestamp' }).notNull(),
+  productUrl: text('product_url'),
+  /** JSON: which nutrient keys were present in the OFF payload */
+  nutrientKeysPresent: text('nutrient_keys_present').notNull().default('[]'),
+});
+
 export type Exercise = typeof exercises.$inferSelect;
+export type OffFoodCache = typeof offFoodCache.$inferSelect;
 export type Food = typeof foods.$inferSelect;
 export type Routine = typeof routines.$inferSelect;
 export type RoutineExercise = typeof routineExercises.$inferSelect;
