@@ -85,12 +85,13 @@ npm run build:foods -- --debug
 - Lookup order: local USDA barcode/gtin → OFF cache → OFF API → custom food form
 - Out of scope: bulk OFF import, AI meal photo, recipes
 
-### Home + Coach stub
+### Home + Coach (BYO key)
 
-- Schema: `weight_entries` (id, kg_or_lb, unit, logged_at, note); settings keys also cover `display_name` + `units`
-- Queries: `db/weight-queries.ts`, `db/settings-queries.ts`, `db/coach-context.ts`; workout helpers `getLastCompletedWorkoutSummary` / `getTrainingWeekStrip`
+- Schema: `weight_entries`; `coach_threads` / `coach_messages`; settings keys for goals + AI prefs (`ai_provider`, `ai_model`, `ai_base_url`)
+- Queries: `db/weight-queries.ts`, `db/settings-queries.ts`, `db/coach-context.ts`, `db/ai-settings.ts`, `db/coach-chat.ts`
+- AI client: `lib/ai-coach.ts` (Anthropic / OpenAI / Gemini / OpenRouter / custom OpenAI-compatible); keys in `lib/ai-secure.ts` via expo-secure-store
 - Home: calorie ring + water, last workout / Train CTA, weight latest + log screen, optional training week strip
-- Coach: stub cards → local SQLite context summary + placeholder reply (no AI API keys yet)
-- Settings: calorie / protein / water targets, units (kg/lb), display name
-- Out of scope: real Anthropic/OpenAI calls, Health Connect, pixel avatar, subscriptions
+- Coach: post-workout / ask / weekly check-in — builds SQLite context pack, calls selected provider (real responses only; stub UX if no key)
+- Settings: goals + AI provider picker, model, optional base URL, BYO API key; barcode data licenses note
+- Out of scope: on-device LLM weights, Health Connect, avatar, subscriptions
 

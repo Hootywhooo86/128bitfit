@@ -161,3 +161,22 @@ export type FoodLog = typeof foodLogs.$inferSelect;
 export type WaterLog = typeof waterLogs.$inferSelect;
 export type WeightEntry = typeof weightEntries.$inferSelect;
 export type Setting = typeof settings.$inferSelect;
+
+export const coachThreads = sqliteTable('coach_threads', {
+  id: text('id').primaryKey(),
+  mode: text('mode').notNull(),
+  title: text('title').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+
+export const coachMessages = sqliteTable('coach_messages', {
+  id: text('id').primaryKey(),
+  threadId: text('thread_id').notNull(),
+  role: text('role').notNull(),
+  content: text('content').notNull(),
+  createdAt: integer('created_at', { mode: 'timestamp' }).notNull(),
+});
+
+export type CoachThread = typeof coachThreads.$inferSelect;
+export type CoachMessage = typeof coachMessages.$inferSelect;

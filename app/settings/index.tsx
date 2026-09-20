@@ -9,6 +9,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {
+  AI_PROVIDERS,
+  getAiSettings,
+  updateAiSettings,
+  type AiSettings,
+} from '@/db/ai-settings';
 import { useDb } from '@/db/DatabaseProvider';
 import {
   getAppSettings,
@@ -16,6 +22,7 @@ import {
   type AppSettings,
   type WeightUnit,
 } from '@/db/settings-queries';
+import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
 import { colors, spacing } from '@/lib/theme';
 
 export default function SettingsScreen() {
@@ -29,7 +36,14 @@ export default function SettingsScreen() {
   const [waterTarget, setWaterTarget] = useState('2500');
   const [units, setUnits] = useState<WeightUnit>('lb');
 
-  const apply = (s: AppSettings) => {
+  const [aiProvider, setAiProvider] = useState<AiProviderId>('anthropic');
+  const [aiModel, setAiModel] = useState('');
+  const [aiBaseUrl, setAiBaseUrl] = useState('');
+  const [aiKeyDraft, setAiKeyDraft] = useState('');
+  const [aiHasKey, setAiHasKey] = useState(false);
+  const [clearKeyConfirm, setClearKeyConfirm] = useState(false);
+
+  const applyApp = (s: AppSettings) => {
     setDisplayName(s.displayName);
     setCalorieTarget(String(s.calorieTarget));
     setProteinTarget(String(s.proteinTarget));
@@ -37,11 +51,22 @@ export default function SettingsScreen() {
     setUnits(s.units);
   };
 
+  const applyAi = (s: AiSettings) => {
+    setAiProvider(s.provider);
+    setAiModel(s.model);
+    setAiBaseUrl(s.baseUrl);
+    setAiHasKey(s.hasKey);
+    setAiKeyDraft('');
+    setClearKeyConfirm(false);
+  };
+
   const refresh = useCallback(async () => {
     if (!ready) return;
     setLoading(true);
     try {
-      apply(await getAppSettings());
+      const [app, ai] = await Promise.all([getAppSettings(), getAiSettings()]);
+      applyApp(app);
+      applyAi(ai);
     } finally {
       setLoading(false);
     }
@@ -53,20 +78,54 @@ export default function SettingsScreen() {
     }, [refresh])
   );
 
+  const onSelectProvider = (id: AiProviderId) => {
+    setAiProvider(id);
+    const meta = getProviderMeta(id);
+    setAiModel(meta.defaultModel);
+    if (meta.defaultBaseUrl) setAiBaseUrl(meta.defaultBaseUrl);
+    else if (!meta.needsBaseUrl) setAiBaseUrl('');
+  };
+
   const onSave = async () => {
     if (saving) return;
     setSaving(true);
     try {
-      const next = await updateAppSettings({
+      const nextApp = await updateAppSettings({
         displayName,
         calorieTarget: Number(calorieTarget) || 2200,
         proteinTarget: Number(proteinTarget) || 150,
         waterTargetMl: Number(waterTarget) || 2500,
         units,
       });
-      apply(next);
+      applyApp(nextApp);
+
+      const aiPatch: Parameters<typeof updateAiSettings>[0] = {
+        provider: aiProvider,
+        model: aiModel,
+        baseUrl: aiBaseUrl,
+      };
+      if (aiKeyDraft.trim()) {
+        aiPatch.apiKey = aiKeyDraft;
+      }
+      const nextAi = await updateAiSettings(aiPatch);
+      applyAi(nextAi);
+
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1500);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onClearKey = async () => {
+    if (!clearKeyConfirm) {
+      setClearKeyConfirm(true);
+      return;
+    }
+    setSaving(true);
+    try {
+      const nextAi = await updateAiSettings({ apiKey: '' });
+      applyAi(nextAi);
     } finally {
       setSaving(false);
     }
@@ -80,11 +139,13 @@ export default function SettingsScreen() {
     );
   }
 
+  const providerMeta = getProviderMeta(aiProvider);
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
       <Text style={styles.muted}>
-        Goals and preferences persist in the local settings table. AI provider keys are out of
-        scope for this slice.
+        Goals persist in local SQLite. AI keys use Secure Store on device — never committed or
+        logged.
       </Text>
 
       <Text style={styles.label}>Display name</Text>
@@ -137,17 +198,95 @@ export default function SettingsScreen() {
         ))}
       </View>
 
+      <View style={styles.aiCard}>
+        <Text style={styles.aiTitle}>AI Coach — Bring your own key</Text>
+        <Text style={styles.muted}>
+          128BIT FIT does not sell AI subscriptions. Paste a key from Anthropic, OpenAI, Gemini,
+          OpenRouter, or point at a custom OpenAI-compatible endpoint (e.g. Ollama). Your key stays
+          on this device.
+        </Text>
+
+        <Text style={styles.label}>Provider</Text>
+        <View style={styles.providerWrap}>
+          {AI_PROVIDERS.map((p) => (
+            <Pressable
+              key={p.id}
+              style={[styles.providerChip, aiProvider === p.id && styles.providerChipOn]}
+              onPress={() => onSelectProvider(p.id)}
+            >
+              <Text
+                style={[styles.providerText, aiProvider === p.id && styles.providerTextOn]}
+              >
+                {p.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.hint}>{providerMeta.hint}</Text>
+
+        <Text style={styles.label}>Model</Text>
+        <TextInput
+          style={styles.input}
+          value={aiModel}
+          onChangeText={setAiModel}
+          placeholder={providerMeta.defaultModel}
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+
+        {(providerMeta.needsBaseUrl ||
+          aiProvider === 'openai' ||
+          aiProvider === 'openrouter' ||
+          aiProvider === 'custom') && (
+          <>
+            <Text style={styles.label}>
+              Base URL{providerMeta.needsBaseUrl ? ' (required)' : ' (optional override)'}
+            </Text>
+            <TextInput
+              style={styles.input}
+              value={aiBaseUrl}
+              onChangeText={setAiBaseUrl}
+              placeholder={providerMeta.defaultBaseUrl ?? 'https://…'}
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </>
+        )}
+
+        <Text style={styles.label}>API key</Text>
+        <TextInput
+          style={styles.input}
+          value={aiKeyDraft}
+          onChangeText={setAiKeyDraft}
+          placeholder={aiHasKey ? '••••••••  (leave blank to keep)' : 'Paste key — never shared'}
+          placeholderTextColor={colors.textMuted}
+          autoCapitalize="none"
+          autoCorrect={false}
+          secureTextEntry
+          textContentType="password"
+        />
+        <Text style={styles.hint}>
+          Status: {aiHasKey ? 'Key saved on device' : 'No key configured — Coach stays in stub mode'}
+        </Text>
+
+        {aiHasKey ? (
+          <Pressable
+            style={[styles.clearKey, clearKeyConfirm && styles.clearKeyConfirm]}
+            onPress={() => void onClearKey()}
+          >
+            <Text style={styles.clearKeyText}>
+              {clearKeyConfirm ? 'Tap again to clear key' : 'Clear saved API key'}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
       <Pressable style={[styles.save, saving && { opacity: 0.6 }]} onPress={() => void onSave()}>
         <Text style={styles.saveText}>{saving ? 'Saving…' : savedFlash ? 'Saved' : 'Save'}</Text>
       </Pressable>
 
-      <View style={styles.aiCard}>
-        <Text style={styles.aiTitle}>AI provider</Text>
-        <Text style={styles.muted}>
-          Connect Anthropic / OpenAI in a later slice. Coach screens already assemble local
-          context for prompt wiring.
-        </Text>
-      </View>
 
       <View style={styles.aiCard}>
         <Text style={styles.aiTitle}>About / data licenses</Text>
@@ -217,5 +356,28 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  aiTitle: { color: colors.text, fontWeight: '800', marginBottom: 6 },
+  aiTitle: { color: colors.text, fontWeight: '800', marginBottom: 6, fontSize: 16 },
+  providerWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  providerChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceAlt,
+  },
+  providerChipOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  providerText: { color: colors.textMuted, fontWeight: '700', fontSize: 12 },
+  providerTextOn: { color: colors.accent },
+  hint: { color: colors.textMuted, fontSize: 12, marginTop: 8, lineHeight: 16 },
+  clearKey: {
+    marginTop: spacing.md,
+    paddingVertical: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  clearKeyConfirm: { borderColor: colors.danger },
+  clearKeyText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
 });

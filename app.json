@@ -59,7 +59,8 @@
           "color": "#3dffa8",
           "defaultChannel": "rest_timer"
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
     "experiments": {
       "typedRoutes": true

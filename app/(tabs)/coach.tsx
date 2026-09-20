@@ -1,6 +1,8 @@
-import { useRouter } from 'expo-router';
-import React from 'react';
+import { useFocusEffect, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { getAiSettings } from '@/db/ai-settings';
+import { useDb } from '@/db/DatabaseProvider';
 import { colors, spacing } from '@/lib/theme';
 
 const CARDS = [
@@ -17,12 +19,26 @@ const CARDS = [
   {
     mode: 'checkin' as const,
     title: 'Weekly check-in',
-    blurb: 'Assemble a week-ready summary from SQLite for coaching later.',
+    blurb: 'Week-ready summary from SQLite for priorities and course-correction.',
   },
 ];
 
 export default function CoachScreen() {
   const router = useRouter();
+  const { ready } = useDb();
+  const [hasKey, setHasKey] = useState(false);
+  const [providerLine, setProviderLine] = useState('');
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!ready) return;
+      void (async () => {
+        const ai = await getAiSettings();
+        setHasKey(ai.hasKey);
+        setProviderLine(ai.hasKey ? `${ai.provider} · ${ai.model}` : '');
+      })();
+    }, [ready])
+  );
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
@@ -30,14 +46,26 @@ export default function CoachScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>Coach</Text>
           <Text style={styles.muted}>
-            Local stubs for now — context is built from your SQLite data. AI replies need a
-            provider in Settings (coming later).
+            {hasKey
+              ? `Bring your own key · ${providerLine}. Context is built from local SQLite before each request.`
+              : 'Bring your own key — add a provider + API key in Settings. Until then, sessions show local context only.'}
           </Text>
         </View>
         <Pressable style={styles.gear} onPress={() => router.push('/settings')}>
           <Text style={styles.gearText}>Settings</Text>
         </Pressable>
       </View>
+
+      {!hasKey ? (
+        <Pressable style={styles.byoCard} onPress={() => router.push('/settings')}>
+          <Text style={styles.byoTitle}>Bring your own key</Text>
+          <Text style={styles.blurb}>
+            Anthropic, OpenAI, Gemini, OpenRouter, or a custom OpenAI-compatible endpoint. Keys
+            stay on device via Secure Store.
+          </Text>
+          <Text style={styles.cta}>Configure in Settings →</Text>
+        </Pressable>
+      ) : null}
 
       {CARDS.map((c) => (
         <Pressable
@@ -69,6 +97,16 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   gearText: { color: colors.text, fontWeight: '700', fontSize: 12 },
+  byoCard: {
+    backgroundColor: colors.accentDim,
+    borderRadius: 12,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    marginBottom: spacing.md,
+    gap: 6,
+  },
+  byoTitle: { color: colors.accent, fontSize: 16, fontWeight: '800' },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 12,

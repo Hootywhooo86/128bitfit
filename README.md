@@ -69,7 +69,9 @@ npm run verify:import
 
 Rest timer uses `expo-notifications` so alerts fire when the screen is locked.
 
-Not yet: barcode / AI meal photo, Open Food Facts, Health Connect, Coach AI, Wear OS.
+Coach: BYO-key AI (Anthropic / OpenAI / Gemini / OpenRouter / custom). Barcode scan via Open Food Facts + local cache.
+
+Not yet: AI meal photo, Health Connect, Wear OS.
 
 ## Platforms
 

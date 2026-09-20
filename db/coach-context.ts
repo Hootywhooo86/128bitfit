@@ -26,13 +26,21 @@ export type CoachContextSummary = {
     setCount: number;
     exerciseCount: number;
     exerciseNames: string[];
+    /** Compact per-exercise set counts for the prompt. */
+    setsSummary: string;
   } | null;
   recentWeight: {
     value: string;
     loggedAt: string;
     note: string | null;
   } | null;
-  /** Plain-text block ready to paste into an AI system/user prompt later. */
+  goals: {
+    calorieTarget: number;
+    proteinTarget: number;
+    waterTargetMl: number;
+    units: string;
+  };
+  /** Plain-text block for the user/context portion of the AI prompt. */
   promptBlock: string;
 };
 
@@ -73,6 +81,9 @@ export async function buildCoachContext(mode: CoachMode): Promise<CoachContextSu
         setCount: lastWorkout.completedSets,
         exerciseCount: lastWorkout.exerciseCount,
         exerciseNames: lastWorkout.exercises.map((e) => e.name),
+        setsSummary: lastWorkout.exercises
+          .map((e) => `${e.name}: ${e.setCount} set${e.setCount === 1 ? '' : 's'}`)
+          .join('; '),
       }
     : null;
 
@@ -84,10 +95,22 @@ export async function buildCoachContext(mode: CoachMode): Promise<CoachContextSu
       }
     : null;
 
+  const goals = {
+    calorieTarget: settings.calorieTarget,
+    proteinTarget: settings.proteinTarget,
+    waterTargetMl: settings.waterTargetMl,
+    units: settings.units,
+  };
+
   const lines: string[] = [
     `Mode: ${MODE_LABELS[mode]}`,
     `User: ${settings.displayName}`,
     `Units: ${settings.units}`,
+    '',
+    'Goals:',
+    `- Calories: ${goals.calorieTarget} kcal/day`,
+    `- Protein: ${goals.proteinTarget} g/day`,
+    `- Water: ${goals.waterTargetMl} ml/day`,
     '',
     'Today nutrition:',
     `- Calories: ${today.calories} / ${today.calorieTarget} kcal`,
@@ -104,7 +127,8 @@ export async function buildCoachContext(mode: CoachMode): Promise<CoachContextSu
       `- When: ${lastWorkoutBlock.date}`,
       `- Duration: ${lastWorkoutBlock.durationMin} min`,
       `- Sets completed: ${lastWorkoutBlock.setCount}`,
-      `- Exercises (${lastWorkoutBlock.exerciseCount}): ${lastWorkoutBlock.exerciseNames.join(', ') || '—'}`
+      `- Exercises (${lastWorkoutBlock.exerciseCount}): ${lastWorkoutBlock.exerciseNames.join(', ') || '—'}`,
+      `- Sets summary: ${lastWorkoutBlock.setsSummary || '—'}`
     );
   } else {
     lines.push('', 'Last workout: none logged yet');
@@ -130,9 +154,10 @@ export async function buildCoachContext(mode: CoachMode): Promise<CoachContextSu
     today,
     lastWorkout: lastWorkoutBlock,
     recentWeight,
+    goals,
     promptBlock,
   };
 }
 
 export const COACH_PLACEHOLDER_REPLY =
-  'Connect an AI provider in Settings to enable coaching. Context below is assembled locally from SQLite so wiring is ready when you add a key.';
+  'Bring your own key: add an AI provider + API key in Settings to enable coaching. Context below is assembled locally from SQLite — nothing is sent until you ask.';
