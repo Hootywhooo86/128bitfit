@@ -11,7 +11,7 @@ npx expo start
 
 Then open in Expo Go (iOS/Android) or press `w` for web.
 
-First launch shows import progress, then the tab shell: **Home / Train / Fuel / Coach**. Exercise Library is under Train (or Home).
+First launch shows import progress, then **onboarding** (name, avatar, goals), then the tab shell: **Home / Train / Fuel / Coach**. Exercise Library is under Train (or Home). Pixel avatar sits on Home (toggle in Settings → Character).
 
 ## Offline databases
 

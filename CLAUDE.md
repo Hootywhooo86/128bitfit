@@ -92,6 +92,15 @@ npm run build:foods -- --debug
 - AI client: `lib/ai-coach.ts` (Anthropic / OpenAI / Gemini / OpenRouter / custom OpenAI-compatible); keys in `lib/ai-secure.ts` via expo-secure-store
 - Home: calorie ring + water, last workout / Train CTA, weight latest + log screen, optional training week strip
 - Coach: post-workout / ask / weekly check-in — builds SQLite context pack, calls selected provider (real responses only; stub UX if no key)
-- Settings: goals + AI provider picker, model, optional base URL, BYO API key; barcode data licenses note
-- Out of scope: on-device LLM weights, Health Connect, avatar, subscriptions
+- Settings: goals + AI provider picker, model, optional base URL, BYO API key; barcode data licenses note; Character editor
+- Out of scope: on-device LLM weights, Health Connect, paid themes, subscriptions
+
+### Pixel avatar + onboarding
+
+- Settings keys: `onboarding_complete`, `avatar_config` (JSON), `show_avatar_on_home`, `sex`, `birthday`, `height_cm`
+- `lib/avatar.ts` (palettes + Mifflin–St Jeor helpers), `components/PixelAvatar.tsx` (layered Views), `components/AvatarCreator.tsx`
+- Gate: `components/OnboardingGate.tsx` → `app/onboarding/index.tsx` (Basics → Avatar → Goals → Done)
+- Home: small idle avatar (Settings show/hide); re-edit via Settings → Character
+- Poses supported on renderer (`idle` / `curl` / `eat` / `think`); Home uses idle
+- Out of scope: hand-drawn 28×44 asset pipeline, clothing shop, Health Connect
 

@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -22,10 +22,14 @@ import {
   type AppSettings,
   type WeightUnit,
 } from '@/db/settings-queries';
+import { PixelAvatar } from '@/components/PixelAvatar';
+import type { AvatarConfig } from '@/lib/avatar';
+import { DEFAULT_AVATAR } from '@/lib/avatar';
 import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
 import { colors, spacing } from '@/lib/theme';
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { ready } = useDb();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -35,6 +39,8 @@ export default function SettingsScreen() {
   const [proteinTarget, setProteinTarget] = useState('150');
   const [waterTarget, setWaterTarget] = useState('2500');
   const [units, setUnits] = useState<WeightUnit>('lb');
+  const [showAvatarOnHome, setShowAvatarOnHome] = useState(true);
+  const [avatar, setAvatar] = useState<AvatarConfig>({ ...DEFAULT_AVATAR });
 
   const [aiProvider, setAiProvider] = useState<AiProviderId>('anthropic');
   const [aiModel, setAiModel] = useState('');
@@ -49,6 +55,8 @@ export default function SettingsScreen() {
     setProteinTarget(String(s.proteinTarget));
     setWaterTarget(String(s.waterTargetMl));
     setUnits(s.units);
+    setShowAvatarOnHome(s.showAvatarOnHome);
+    setAvatar(s.avatar);
   };
 
   const applyAi = (s: AiSettings) => {
@@ -96,6 +104,7 @@ export default function SettingsScreen() {
         proteinTarget: Number(proteinTarget) || 150,
         waterTargetMl: Number(waterTarget) || 2500,
         units,
+        showAvatarOnHome,
       });
       applyApp(nextApp);
 
@@ -144,9 +153,32 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
       <Text style={styles.muted}>
-        Goals persist in local SQLite. AI keys use Secure Store on device — never committed or
-        logged.
+        Goals, character, and preferences persist in the local settings table. AI keys use
+        Secure Store on device — never committed or logged.
       </Text>
+
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/character')}>
+        <PixelAvatar config={avatar} pose="idle" size={56} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Character</Text>
+          <Text style={styles.muted}>Edit your pixel avatar →</Text>
+        </View>
+      </Pressable>
+
+      <Text style={styles.label}>Show avatar on Home</Text>
+      <View style={styles.unitRow}>
+        {([true, false] as const).map((v) => (
+          <Pressable
+            key={String(v)}
+            style={[styles.unitChip, showAvatarOnHome === v && styles.unitChipOn]}
+            onPress={() => setShowAvatarOnHome(v)}
+          >
+            <Text style={[styles.unitText, showAvatarOnHome === v && styles.unitTextOn]}>
+              {v ? 'Show' : 'Hide'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
 
       <Text style={styles.label}>Display name</Text>
       <TextInput
@@ -357,6 +389,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   aiTitle: { color: colors.text, fontWeight: '800', marginBottom: 6, fontSize: 16 },
+  charCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    marginBottom: spacing.md,
+  },
   providerWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   providerChip: {
     paddingHorizontal: 10,

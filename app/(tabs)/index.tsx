@@ -9,11 +9,13 @@ import {
   View,
 } from 'react-native';
 import { CalorieProgress } from '@/components/CalorieProgress';
+import { PixelAvatar } from '@/components/PixelAvatar';
 import { WaterProgress } from '@/components/WaterProgress';
 import { WeekStrip } from '@/components/WeekStrip';
 import { useDb } from '@/db/DatabaseProvider';
 import { getDayFuelSummary } from '@/db/food-queries';
 import { getAppSettings } from '@/db/settings-queries';
+import type { AvatarConfig } from '@/lib/avatar';
 import { formatWeight, getLatestWeightEntry } from '@/db/weight-queries';
 import {
   getLastCompletedWorkoutSummary,
@@ -54,6 +56,8 @@ export default function HomeScreen() {
   const [lastWorkout, setLastWorkout] = useState<WorkoutSummary | null>(null);
   const [latestWeight, setLatestWeight] = useState<WeightEntry | null>(null);
   const [week, setWeek] = useState<TrainingDayDot[]>([]);
+  const [avatar, setAvatar] = useState<AvatarConfig | null>(null);
+  const [showAvatar, setShowAvatar] = useState(true);
 
   const refresh = useCallback(async () => {
     if (!ready) return;
@@ -67,6 +71,8 @@ export default function HomeScreen() {
         getTrainingWeekStrip(new Date()),
       ]);
       setDisplayName(settings.displayName);
+      setAvatar(settings.avatar);
+      setShowAvatar(settings.showAvatarOnHome);
       setCalories(fuel.totals.calories);
       setCalorieTarget(fuel.goals.calorieTarget);
       setWaterMl(fuel.waterMl);
@@ -96,6 +102,11 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
       <View style={styles.headerRow}>
+        {showAvatar && avatar ? (
+          <Pressable onPress={() => router.push('/settings/character')} style={styles.avatarWrap}>
+            <PixelAvatar config={avatar} pose="idle" size={64} />
+          </Pressable>
+        ) : null}
         <View style={{ flex: 1 }}>
           <Text style={styles.brand}>128BIT FIT</Text>
           <Text style={styles.sub}>Hey, {displayName}</Text>
@@ -196,6 +207,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   gearText: { color: colors.text, fontWeight: '700', fontSize: 12 },
+  avatarWrap: {
+    marginRight: spacing.xs,
+    padding: 4,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   section: {
     color: colors.textMuted,
     fontWeight: '700',

@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import { DarkTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
+import { OnboardingGate } from '@/components/OnboardingGate';
 import { DatabaseProvider } from '@/db/DatabaseProvider';
 import { RestTimerProvider } from '@/lib/rest-timer';
 import { colors } from '@/lib/theme';
@@ -23,9 +24,14 @@ export default function RootLayout() {
     <ThemeProvider value={navTheme}>
       <DatabaseProvider>
         <RestTimerProvider>
+          <OnboardingGate>
           <StatusBar style="light" />
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="onboarding/index"
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
             <Stack.Screen
               name="exercise/index"
               options={{ title: 'Exercise Library', headerStyle: { backgroundColor: colors.surface } }}
@@ -71,10 +77,15 @@ export default function RootLayout() {
               options={{ title: 'Settings', headerStyle: { backgroundColor: colors.surface } }}
             />
             <Stack.Screen
+              name="settings/character"
+              options={{ title: 'Character', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
               name="home/weight"
               options={{ title: 'Weight', headerStyle: { backgroundColor: colors.surface } }}
             />
           </Stack>
+          </OnboardingGate>
         </RestTimerProvider>
       </DatabaseProvider>
     </ThemeProvider>

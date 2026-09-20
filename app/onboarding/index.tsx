@@ -1,0 +1,428 @@
+import { useRouter } from 'expo-router';
+import React, { useMemo, useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { AvatarCreator } from '@/components/AvatarCreator';
+import { PixelAvatar } from '@/components/PixelAvatar';
+import { useDb } from '@/db/DatabaseProvider';
+import { updateAppSettings } from '@/db/settings-queries';
+import { addWeightEntry } from '@/db/weight-queries';
+import {
+  DEFAULT_AVATAR,
+  ageFromBirthday,
+  suggestCalorieTarget,
+  suggestProteinTarget,
+  suggestWaterTargetMl,
+  toMetric,
+  type AvatarConfig,
+  type SexOption,
+} from '@/lib/avatar';
+import { colors, spacing } from '@/lib/theme';
+
+const STEPS = ['Basics', 'Avatar', 'Goals', 'Done'] as const;
+type Step = (typeof STEPS)[number];
+
+const SEX_OPTIONS: { id: SexOption; label: string }[] = [
+  { id: 'female', label: 'Female' },
+  { id: 'male', label: 'Male' },
+  { id: 'other', label: 'Other' },
+  { id: 'prefer_not', label: 'Prefer not' },
+];
+
+export default function OnboardingScreen() {
+  const router = useRouter();
+  const { ready } = useDb();
+  const [stepIdx, setStepIdx] = useState(0);
+  const step = STEPS[stepIdx];
+  const [saving, setSaving] = useState(false);
+
+  const [displayName, setDisplayName] = useState('');
+  const [units, setUnits] = useState<'lb' | 'kg'>('lb');
+  const [sex, setSex] = useState<SexOption | null>(null);
+  const [birthday, setBirthday] = useState(''); // YYYY-MM-DD
+  const [heightCm, setHeightCm] = useState('');
+  const [weight, setWeight] = useState('');
+  const [avatar, setAvatar] = useState<AvatarConfig>({ ...DEFAULT_AVATAR });
+  const [calorieTarget, setCalorieTarget] = useState('2200');
+  const [proteinTarget, setProteinTarget] = useState('150');
+  const [waterTarget, setWaterTarget] = useState('2500');
+  const [goalsSeeded, setGoalsSeeded] = useState(false);
+
+  const weightNum = Number(weight);
+  const heightNum = Number(heightCm);
+  const metric = useMemo(
+    () =>
+      toMetric({
+        heightCm: Number.isFinite(heightNum) && heightNum > 0 ? heightNum : null,
+        weightValue: Number.isFinite(weightNum) && weightNum > 0 ? weightNum : null,
+        units,
+      }),
+    [heightNum, weightNum, units]
+  );
+
+  const applySuggestedGoals = () => {
+    const age = ageFromBirthday(birthday.trim() || null);
+    const cal = suggestCalorieTarget({
+      sex,
+      age,
+      weightKg: metric.kg,
+      heightCm: metric.cm,
+    });
+    const pro = suggestProteinTarget(metric.kg);
+    const water = suggestWaterTargetMl(metric.kg);
+    setCalorieTarget(String(cal));
+    setProteinTarget(String(pro));
+    setWaterTarget(String(water));
+    setGoalsSeeded(true);
+  };
+
+  const seedGoalsIfNeeded = () => {
+    if (goalsSeeded) return;
+    applySuggestedGoals();
+  };
+
+  const goNext = () => {
+    if (step === 'Avatar') seedGoalsIfNeeded();
+    if (stepIdx < STEPS.length - 1) setStepIdx((i) => i + 1);
+  };
+
+  const goBack = () => {
+    if (stepIdx > 0) setStepIdx((i) => i - 1);
+  };
+
+  const finish = async () => {
+    if (saving || !ready) return;
+    setSaving(true);
+    try {
+      await updateAppSettings({
+        displayName: displayName.trim() || 'Athlete',
+        units,
+        sex,
+        birthday: birthday.trim() || null,
+        heightCm: Number.isFinite(heightNum) && heightNum > 0 ? heightNum : null,
+        avatar,
+        calorieTarget: Number(calorieTarget) || 2200,
+        proteinTarget: Number(proteinTarget) || 150,
+        waterTargetMl: Number(waterTarget) || 2500,
+        showAvatarOnHome: true,
+        onboardingComplete: true,
+      });
+      if (Number.isFinite(weightNum) && weightNum > 0) {
+        await addWeightEntry({ value: weightNum, unit: units, note: 'Onboarding' });
+      }
+      router.replace('/(tabs)');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!ready) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.muted}>Loading…</Text>
+      </View>
+    );
+  }
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 48 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.brand}>128BIT FIT</Text>
+        <Text style={styles.title}>Welcome</Text>
+        <View style={styles.stepRow}>
+          {STEPS.map((s, i) => (
+            <View key={s} style={[styles.stepDot, i <= stepIdx && styles.stepDotOn]}>
+              <Text style={[styles.stepDotText, i <= stepIdx && styles.stepDotTextOn]}>
+                {i + 1}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <Text style={styles.stepLabel}>{step}</Text>
+
+        {step === 'Basics' && (
+          <View>
+            <Text style={styles.label}>Display name</Text>
+            <TextInput
+              style={styles.input}
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder="Athlete"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="words"
+            />
+
+            <Text style={styles.label}>Units</Text>
+            <View style={styles.row}>
+              {(['lb', 'kg'] as const).map((u) => (
+                <Pressable
+                  key={u}
+                  style={[styles.chip, units === u && styles.chipOn]}
+                  onPress={() => setUnits(u)}
+                >
+                  <Text style={[styles.chipText, units === u && styles.chipTextOn]}>{u}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Sex (optional)</Text>
+            <View style={styles.wrapRow}>
+              {SEX_OPTIONS.map((o) => (
+                <Pressable
+                  key={o.id}
+                  style={[styles.chip, sex === o.id && styles.chipOn]}
+                  onPress={() => setSex(o.id)}
+                >
+                  <Text style={[styles.chipText, sex === o.id && styles.chipTextOn]}>
+                    {o.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>Birthday (YYYY-MM-DD, optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={birthday}
+              onChangeText={setBirthday}
+              placeholder="1995-06-15"
+              placeholderTextColor={colors.textMuted}
+              autoCapitalize="none"
+            />
+
+            <Text style={styles.label}>Height (cm, optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={heightCm}
+              onChangeText={setHeightCm}
+              keyboardType="numeric"
+              placeholder="170"
+              placeholderTextColor={colors.textMuted}
+            />
+
+            <Text style={styles.label}>Weight ({units}, optional)</Text>
+            <TextInput
+              style={styles.input}
+              value={weight}
+              onChangeText={setWeight}
+              keyboardType="numeric"
+              placeholder={units === 'lb' ? '160' : '72'}
+              placeholderTextColor={colors.textMuted}
+            />
+            <Text style={styles.hint}>
+              Height, weight, age & sex feed Mifflin–St Jeor calorie defaults on the next goals
+              step.
+            </Text>
+          </View>
+        )}
+
+        {step === 'Avatar' && (
+          <AvatarCreator value={avatar} onChange={setAvatar} pose="idle" />
+        )}
+
+        {step === 'Goals' && (
+          <View>
+            <Text style={styles.hint}>
+              Suggested from your basics when available. Edit freely — you can change these later
+              in Settings.
+            </Text>
+            <Text style={styles.label}>Calorie target (kcal)</Text>
+            <TextInput
+              style={styles.input}
+              value={calorieTarget}
+              onChangeText={setCalorieTarget}
+              keyboardType="numeric"
+              placeholderTextColor={colors.textMuted}
+            />
+            <Text style={styles.label}>Protein target (g)</Text>
+            <TextInput
+              style={styles.input}
+              value={proteinTarget}
+              onChangeText={setProteinTarget}
+              keyboardType="numeric"
+              placeholderTextColor={colors.textMuted}
+            />
+            <Text style={styles.label}>Water target (ml)</Text>
+            <TextInput
+              style={styles.input}
+              value={waterTarget}
+              onChangeText={setWaterTarget}
+              keyboardType="numeric"
+              placeholderTextColor={colors.textMuted}
+            />
+            <Pressable
+              style={styles.secondary}
+              onPress={applySuggestedGoals}
+            >
+              <Text style={styles.secondaryText}>Recalculate suggestions</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {step === 'Done' && (
+          <View style={styles.doneCard}>
+            <PixelAvatar config={avatar} pose="idle" size={110} />
+            <Text style={styles.doneTitle}>You&apos;re set, {displayName.trim() || 'Athlete'}!</Text>
+            <Text style={styles.hint}>
+              {calorieTarget} kcal · {proteinTarget} g protein · {waterTarget} ml water
+            </Text>
+            <Text style={styles.hint}>
+              Your pixel character lives on Home (toggle in Settings). Edit anytime under Settings
+              → Character.
+            </Text>
+          </View>
+        )}
+
+        <View style={styles.navRow}>
+          {stepIdx > 0 ? (
+            <Pressable style={styles.backBtn} onPress={goBack}>
+              <Text style={styles.backText}>Back</Text>
+            </Pressable>
+          ) : (
+            <View style={{ flex: 1 }} />
+          )}
+          {step === 'Done' ? (
+            <Pressable
+              style={[styles.nextBtn, saving && { opacity: 0.6 }]}
+              onPress={() => void finish()}
+            >
+              <Text style={styles.nextText}>{saving ? 'Saving…' : 'Start training'}</Text>
+            </Pressable>
+          ) : (
+            <Pressable style={styles.nextBtn} onPress={goNext}>
+              <Text style={styles.nextText}>Continue</Text>
+            </Pressable>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.bg },
+  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  center: {
+    flex: 1,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  brand: {
+    color: colors.accent,
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 2,
+    marginTop: spacing.md,
+  },
+  title: { color: colors.text, fontSize: 28, fontWeight: '900', marginTop: 4 },
+  stepRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  stepDot: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
+  stepDotOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  stepDotText: { color: colors.textMuted, fontWeight: '800', fontSize: 12 },
+  stepDotTextOn: { color: colors.accent },
+  stepLabel: {
+    color: colors.textMuted,
+    fontWeight: '700',
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    fontSize: 12,
+  },
+  label: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    marginTop: spacing.sm,
+  },
+  input: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    color: colors.text,
+    fontSize: 16,
+  },
+  row: { flexDirection: 'row', gap: spacing.sm },
+  wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  chipOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  chipText: { color: colors.textMuted, fontWeight: '700' },
+  chipTextOn: { color: colors.accent },
+  hint: { color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: spacing.sm },
+  secondary: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  secondaryText: { color: colors.accent, fontWeight: '700' },
+  doneCard: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  doneTitle: { color: colors.text, fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  navRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+  backBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  backText: { color: colors.text, fontWeight: '700' },
+  nextBtn: {
+    flex: 1.4,
+    paddingVertical: 14,
+    borderRadius: 10,
+    backgroundColor: colors.accent,
+    alignItems: 'center',
+  },
+  nextText: { color: colors.chipActiveText, fontWeight: '900', fontSize: 16 },
+  muted: { color: colors.textMuted },
+});
