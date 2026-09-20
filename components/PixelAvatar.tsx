@@ -79,7 +79,7 @@ export function PixelAvatar({ config, pose = 'idle', size = 80, style }: Props) 
             alignSelf: 'center',
             width: head * 1.15,
             height: head * 0.35,
-            backgroundColor: '#e74c3c',
+            backgroundColor: '#c8c8c8',
             borderRadius: 1,
             zIndex: 5,
             left: (stageW - head * 1.15) / 2,
@@ -392,7 +392,7 @@ export function PixelAvatar({ config, pose = 'idle', size = 80, style }: Props) 
             left: (stageW - torsoW) / 2 - 6 * u,
             width: 5 * u,
             height: 5 * u,
-            backgroundColor: '#e67e22',
+            backgroundColor: '#a0a0a0',
             borderRadius: 1,
             zIndex: 3,
           }}
