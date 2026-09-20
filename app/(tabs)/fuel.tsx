@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
-  waterFill: { height: '100%', backgroundColor: '#4db8ff', borderRadius: 4 },
+  waterFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
   waterBtns: { flexDirection: 'row', gap: 8 },
   waterBtn: {
     flex: 1,

@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   stats: { flex: 1 },
   consumed: { color: colors.accent, fontSize: 28, fontWeight: '900' },
   remaining: { color: colors.text, fontSize: 15, fontWeight: '700', marginTop: 6 },
-  over: { color: colors.danger },
+  over: { color: colors.danger, fontWeight: '900', textDecorationLine: 'underline' },
   label: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   track: {
     height: 8,

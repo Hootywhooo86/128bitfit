@@ -153,7 +153,7 @@ export async function scheduleRestEndNotification(
         ? {
             priority: Notifications.AndroidNotificationPriority.HIGH,
             vibrate: [0, 250, 150, 250],
-            color: '#3dffa8',
+            color: '#ffffff',
           }
         : {
             interruptionLevel: 'timeSensitive' as const,

@@ -39,32 +39,32 @@ export type AvatarConfig = {
 };
 
 export const SKIN_TONES = [
-  '#f6d7b0',
-  '#e8b98a',
-  '#c68642',
-  '#8d5524',
-  '#5c3317',
-  '#3b2212',
+  '#e8e8e8',
+  '#c8c8c8',
+  '#a0a0a0',
+  '#787878',
+  '#505050',
+  '#2e2e2e',
 ] as const;
 
 export const EYE_COLORS = [
-  '#3d2b1f',
-  '#4a7c59',
-  '#3b6ea5',
-  '#6b4c9a',
-  '#c4a35a',
   '#1a1a1a',
+  '#4a4a4a',
+  '#6e6e6e',
+  '#909090',
+  '#b8b8b8',
+  '#e0e0e0',
 ] as const;
 
 export const HAIR_COLORS = [
-  '#1a1a1a',
-  '#3b2314',
-  '#6b4423',
-  '#b5651d',
-  '#d4a017',
-  '#c0c0c0',
-  '#e8e0d5',
-  '#8b1a1a',
+  '#0f0f0f',
+  '#2a2a2a',
+  '#454545',
+  '#6a6a6a',
+  '#909090',
+  '#b8b8b8',
+  '#dcdcdc',
+  '#f5f5f5',
 ] as const;
 
 export const HAIR_STYLES = [
@@ -84,18 +84,18 @@ export const FACIAL_HAIR = [
 ] as const;
 
 export const TOPS = [
-  { id: 0, label: 'Tee', color: '#3dffa8' },
-  { id: 1, label: 'Tank', color: '#5b8def' },
-  { id: 2, label: 'Hoodie', color: '#9b59b6' },
-  { id: 3, label: 'Crop', color: '#ff6b9d' },
-  { id: 4, label: 'Jersey', color: '#f39c12' },
+  { id: 0, label: 'Tee', color: '#ffffff' },
+  { id: 1, label: 'Tank', color: '#c8c8c8' },
+  { id: 2, label: 'Hoodie', color: '#888888' },
+  { id: 3, label: 'Crop', color: '#555555' },
+  { id: 4, label: 'Jersey', color: '#2a2a2a' },
 ] as const;
 
 export const BOTTOMS = [
-  { id: 0, label: 'Shorts', color: '#2c3e50' },
-  { id: 1, label: 'Joggers', color: '#34495e' },
-  { id: 2, label: 'Leggings', color: '#1a1a2e' },
-  { id: 3, label: 'Jeans', color: '#3d5a80' },
+  { id: 0, label: 'Shorts', color: '#1a1a1a' },
+  { id: 1, label: 'Joggers', color: '#333333' },
+  { id: 2, label: 'Leggings', color: '#4a4a4a' },
+  { id: 3, label: 'Jeans', color: '#6e6e6e' },
 ] as const;
 
 export const ACCESSORIES = [

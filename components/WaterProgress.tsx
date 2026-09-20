@@ -43,6 +43,6 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     overflow: 'hidden',
   },
-  fill: { height: '100%', backgroundColor: '#4db8ff', borderRadius: 4 },
+  fill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
   hint: { color: colors.textMuted, fontSize: 12 },
 });
