@@ -1,0 +1,141 @@
+# Data pipeline and app file map
+
+Reference for the offline databases and where things live. The product brief is
+`CLAUDE.md`; this is the mechanical detail behind it.
+
+## Generated assets (commit these)
+
+| File | Source | Size | Contents |
+|------|--------|------|----------|
+| `assets/data/exercises.json` | [yuhonas/free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain) | ~982 KB | 876 exercises |
+| `assets/data/foods.json` | [USDA FoodData Central](https://fdc.nal.usda.gov/) API (public domain) | ~8.6 MB | 8,114 foods (Foundation + SR Legacy) |
+
+Optional and gitignored: `assets/exercises/` image files (~120 MB). Paths in the
+JSON still reference relative image names, so the app works without them.
+
+Current counts and checksums live in `db/data-manifest.ts`.
+
+## Regenerating
+
+```bash
+cp .env.example .env   # then set FDC_API_KEY
+npm install
+
+npm run build:exercises              # JSON only (default)
+npm run build:exercises:images       # also download images into assets/exercises/
+
+npm run check:usda                   # verify API key + ping FDC
+npm run build:foods                  # Foundation + SR Legacy → foods.json
+npm run build:foods -- --survey      # also FNDDS survey foods
+npm run build:foods -- --branded --max=5000
+npm run build:foods -- --debug
+
+npm run verify:import                # headless: JSON → SQLite with expected counts
+```
+
+After regenerating either JSON, recompute `db/data-manifest.ts` (or bump
+`version`) so devices re-import. `npm run verify:import` uses Node's built-in
+`node:sqlite` and needs no Expo runtime.
+
+## USDA pipeline rules (do not regress)
+
+These are enforced in `scripts/build-food-db.mjs`. They exist because the API
+rejected the obvious approach.
+
+- **Never request more than 25 nutrient IDs in an API filter** — USDA rejects it.
+  Fetch with no nutrient filter and map the ~31 nutrients client-side.
+- **Branded foods: prefer `labelNutrients`** (per serving) over `foodNutrients`,
+  and set `nutrition_basis` to match.
+- **Energy nutrient IDs**: 1008, 2047, 2048 are kcal; 1062 is kJ and converts at
+  `kcal = kJ / 4.184`. When several are present the priority is 1008 > 2048 >
+  2047; kJ is only used when no kcal value was found.
+- **Batches of 12**, with retry backoff 3/6/9/12/15s on 504s, timeouts and 429s.
+- **Skip foods with no usable energy** and report the skip counts at the end.
+
+## Record shapes
+
+### Exercise
+
+`id`, `name`, `force`, `level`, `mechanic`, `equipment`, `primaryMuscles`,
+`secondaryMuscles`, `instructions`, `category`, `images`
+
+### Food
+
+- `id` / `source_id` (fdcId), `name` / `description`, `source`
+  (`foundation` | `sr_legacy` | `survey` | `branded`)
+- `barcode` / `gtin` when present
+- `serving_size`, `serving_unit`, `nutrition_basis` (`per_100g` | `per_serving`)
+- `nutrients` map — 31 keys, nulls allowed: calories, protein, fat, carb, fiber,
+  sugars, saturated_fat, trans_fat, cholesterol, sodium, potassium, calcium,
+  iron, magnesium, phosphorus, zinc, copper, manganese, selenium, vitamin_c,
+  thiamin, riboflavin, niacin, pantothenic_acid, vitamin_b6, folate,
+  vitamin_b12, vitamin_a, vitamin_d, vitamin_e, vitamin_k
+
+Consumers must respect `nutrition_basis` — a branded per-serving record and a
+Foundation per-100g record are not interchangeable. `lib/nutrition.ts` handles
+this; go through it rather than doing the arithmetic inline.
+
+---
+
+## App file map
+
+The Expo app lives at the **repo root** (Expo Router `app/` directory). Data
+pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
+`npm start`).
+
+- SQLite schema: `db/schema.ts`. Migrations in `drizzle/`, generated with
+  `npm run db:generate`.
+- Import: `db/import.ts`, checksum-gated via `db/data-manifest.ts`. Do not parse
+  the JSON into the UI on every launch.
+
+### Train / workouts
+
+- Schema: `routines`, `routine_exercises`, `workout_sessions`,
+  `session_exercises`, `sets`
+- Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` (once, if empty)
+- Rest timer: `lib/rest-timer.tsx` + `lib/rest-timer-notifications.ts`
+- Screens: `app/(tabs)/train.tsx`, `app/train/active.tsx`,
+  `app/train/add-exercise.tsx`, `app/train/summary.tsx`
+
+### Rest timer notifications
+
+- Package: `expo-notifications` (config plugin in `app.json`; Android channel `rest_timer`)
+- On first timed rest: explain, then request notification permission
+- Rest start schedules a local notification for rest end; +15 / Skip / complete
+  cancel or reschedule it
+- Notification category actions `+15s` and `Skip` appear on the delivered alert
+- Tapping the alert opens the active workout when `sessionId` is known
+- **Do not rely on `setTimeout` alone when backgrounded** — the OS schedule is
+  the completion signal
+- iOS Silent / Focus may mute the notification sound
+
+### Fuel / nutrition logging
+
+- Schema: `food_logs`, `water_logs`, `settings` (calorie/protein/water targets)
+- Queries: `db/food-queries.ts`; macros helper: `lib/nutrition.ts`
+- Screens: `app/(tabs)/fuel.tsx`, `app/fuel/add.tsx`, `app/fuel/edit/[id].tsx`
+- Barcode: `app/fuel/scan.tsx` + `app/fuel/custom.tsx`; lookup `db/barcode-queries.ts`
+- Open Food Facts: `lib/open-food-facts.ts` (per-barcode v2 API); cache table
+  `off_food_cache`. ODbL share-alike — per-barcode lookups only, no bulk ingest.
+- Lookup order: local USDA barcode/gtin → OFF cache → OFF API → custom food form
+
+### Home + Coach (BYO key)
+
+- Schema: `weight_entries`, `coach_threads`, `coach_messages`; settings keys for
+  goals and AI prefs (`ai_provider`, `ai_model`, `ai_base_url`)
+- Queries: `db/weight-queries.ts`, `db/settings-queries.ts`, `db/coach-context.ts`,
+  `db/ai-settings.ts`, `db/coach-chat.ts`
+- AI client: `lib/ai-coach.ts` (Anthropic / OpenAI / Gemini / OpenRouter / custom
+  OpenAI-compatible); keys in `lib/ai-secure.ts` via expo-secure-store
+- Coach builds a SQLite context pack and calls the selected provider. Real
+  responses only — if there is no key, show the stub UX, never invented output.
+
+### Pixel avatar + onboarding
+
+- Settings keys: `onboarding_complete`, `avatar_config` (JSON),
+  `show_avatar_on_home`, `sex`, `birthday`, `height_cm`
+- `lib/avatar.ts` (palettes + Mifflin–St Jeor helpers),
+  `components/PixelAvatar.tsx`, `components/AvatarCreator.tsx`
+- Gate: `components/OnboardingGate.tsx` → `app/onboarding/index.tsx`
+  (Basics → Avatar → Goals → Done)
+- Renderer poses: `idle` / `curl` / `eat` / `think`; Home uses idle

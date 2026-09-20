@@ -93,6 +93,10 @@ iOS HealthKit implementation slots in behind it later.
 
 ## Data sources
 
+Build commands, generated-asset sizes, record shapes, the USDA API constraints
+that must not regress, and the app file map live in
+[`docs/data-pipeline.md`](docs/data-pipeline.md).
+
 **Exercises — done, free, public domain**
 - `free-exercise-db` (yuhonas). 876 exercises, name / primary + secondary muscles /
   equipment / category / level / instructions / image paths.
