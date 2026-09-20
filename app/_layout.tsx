@@ -46,6 +46,14 @@ export default function RootLayout() {
               name="train/summary"
               options={{ title: 'Summary', headerStyle: { backgroundColor: colors.surface } }}
             />
+            <Stack.Screen
+              name="fuel/add"
+              options={{ title: 'Add food', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
+              name="fuel/edit/[id]"
+              options={{ title: 'Edit food', headerStyle: { backgroundColor: colors.surface } }}
+            />
           </Stack>
         </RestTimerProvider>
       </DatabaseProvider>

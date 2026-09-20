@@ -1,15 +1,45 @@
-import { Link } from 'expo-router';
+import { Link, useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useDb } from '@/db/DatabaseProvider';
+import { getDayFuelSummary } from '@/db/food-queries';
+import { formatKcal } from '@/lib/nutrition';
 import { colors, spacing } from '@/lib/theme';
 
 export default function HomeScreen() {
-  const { exerciseCount, foodCount } = useDb();
+  const { exerciseCount, foodCount, ready } = useDb();
+  const [calories, setCalories] = useState<number | null>(null);
+  const [calorieTarget, setCalorieTarget] = useState(2200);
+
+  const refresh = useCallback(async () => {
+    if (!ready) return;
+    try {
+      const s = await getDayFuelSummary(new Date());
+      setCalories(s.totals.calories);
+      setCalorieTarget(s.goals.calorieTarget);
+    } catch {
+      /* ignore */
+    }
+  }, [ready]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refresh();
+    }, [refresh])
+  );
 
   return (
     <View style={styles.container}>
       <Text style={styles.brand}>128BIT FIT</Text>
       <Text style={styles.sub}>Offline-first fitness + nutrition</Text>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Today</Text>
+        <Text style={styles.stat}>
+          {calories == null ? '—' : formatKcal(calories)} / {formatKcal(calorieTarget)} kcal
+        </Text>
+        <Text style={styles.hint}>Steps — coming soon (Health Connect)</Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Offline database</Text>
@@ -23,7 +53,7 @@ export default function HomeScreen() {
       </Link>
 
       <Text style={styles.muted}>
-        Workout logging, nutrition logging, AI coach, and Health Connect come in later slices.
+        Train + Fuel logging work offline. Coach AI and Health Connect come later.
       </Text>
     </View>
   );

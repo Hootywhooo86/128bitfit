@@ -1,0 +1,93 @@
+import type { Food } from '@/db/schema';
+
+export type Nutrients = {
+  calories: number;
+  protein: number;
+  fat: number;
+  carb: number;
+};
+
+export type ParsedFoodNutrients = Record<string, number | null>;
+
+export function parseNutrients(raw: string | null | undefined): ParsedFoodNutrients {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw) as ParsedFoodNutrients;
+  } catch {
+    return {};
+  }
+}
+
+function num(v: number | null | undefined): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+}
+
+/**
+ * Nutrients for one "serving" of the food as stored (serving_size + unit).
+ * - per_100g: scale nutrients by serving_size / 100
+ * - per_serving: nutrients already apply to one serving
+ */
+export function nutrientsPerServing(food: Pick<Food, 'servingSize' | 'nutritionBasis' | 'nutrients'>): Nutrients {
+  const n = parseNutrients(food.nutrients);
+  const base: Nutrients = {
+    calories: num(n.calories),
+    protein: num(n.protein),
+    fat: num(n.fat),
+    carb: num(n.carb),
+  };
+  const basis = food.nutritionBasis ?? 'per_100g';
+  if (basis === 'per_serving') {
+    return base;
+  }
+  // per_100g (default): nutrients are per 100g; scale by serving size
+  const size = food.servingSize && food.servingSize > 0 ? food.servingSize : 100;
+  const factor = size / 100;
+  return {
+    calories: base.calories * factor,
+    protein: base.protein * factor,
+    fat: base.fat * factor,
+    carb: base.carb * factor,
+  };
+}
+
+/** Total nutrients for `servings` of the food (respecting nutrition_basis). */
+export function nutrientsForServings(
+  food: Pick<Food, 'servingSize' | 'nutritionBasis' | 'nutrients'>,
+  servings: number
+): Nutrients {
+  const one = nutrientsPerServing(food);
+  const s = Number.isFinite(servings) && servings > 0 ? servings : 0;
+  return {
+    calories: one.calories * s,
+    protein: one.protein * s,
+    fat: one.fat * s,
+    carb: one.carb * s,
+  };
+}
+
+export function roundNutrient(n: number, digits = 1): number {
+  const f = 10 ** digits;
+  return Math.round(n * f) / f;
+}
+
+export function formatKcal(n: number): string {
+  return `${Math.round(n)}`;
+}
+
+export function formatGrams(n: number): string {
+  return `${roundNutrient(n, 1)}g`;
+}
+
+/** Local calendar day bounds as Date objects (start inclusive, end exclusive). */
+export function dayBounds(day: Date = new Date()): { start: Date; end: Date } {
+  const start = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0, 0);
+  const end = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1, 0, 0, 0, 0);
+  return { start, end };
+}
+
+export function defaultMealTypeForHour(hour: number): 'breakfast' | 'lunch' | 'dinner' | 'snack' {
+  if (hour < 11) return 'breakfast';
+  if (hour < 15) return 'lunch';
+  if (hour < 21) return 'dinner';
+  return 'snack';
+}

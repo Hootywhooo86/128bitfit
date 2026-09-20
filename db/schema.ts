@@ -91,14 +91,32 @@ export const sets = sqliteTable('sets', {
   rpe: real('rpe'),
 });
 
+export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;
+export type MealType = (typeof MEAL_TYPES)[number];
+
 export const foodLogs = sqliteTable('food_logs', {
   id: text('id').primaryKey(),
   foodId: text('food_id'),
-  loggedAt: integer('logged_at', { mode: 'timestamp' }),
-  servings: real('servings'),
-  meal: text('meal'),
+  customName: text('custom_name'),
+  mealType: text('meal_type').notNull().default('snack'),
+  loggedAt: integer('logged_at', { mode: 'timestamp' }).notNull(),
+  servings: real('servings').notNull().default(1),
+  servingSize: real('serving_size'),
+  servingUnit: text('serving_unit'),
+  calories: real('calories').notNull().default(0),
+  protein: real('protein').notNull().default(0),
+  fat: real('fat').notNull().default(0),
+  carb: real('carb').notNull().default(0),
+  notes: text('notes'),
 });
 
+export const waterLogs = sqliteTable('water_logs', {
+  id: text('id').primaryKey(),
+  ml: integer('ml').notNull(),
+  loggedAt: integer('logged_at', { mode: 'timestamp' }).notNull(),
+});
+
+/** App settings key/value (daily goals, preferences). */
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
@@ -111,3 +129,5 @@ export type RoutineExercise = typeof routineExercises.$inferSelect;
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type SessionExercise = typeof sessionExercises.$inferSelect;
 export type WorkoutSet = typeof sets.$inferSelect;
+export type FoodLog = typeof foodLogs.$inferSelect;
+export type WaterLog = typeof waterLogs.$inferSelect;

@@ -65,8 +65,9 @@ npm run verify:import
 - Idempotent import of exercises + foods
 - Exercise Library (search, equipment/muscle filters, detail)
 - **Train workout logger**: freestyle + starter routines, sets, rest timer, offline persistence, summary
+- **Fuel food logging**: search offline foods, log meals, calorie/macro progress, water quick-add
 
-Not yet: AI workout builder, nutrition logging, Health Connect, Coach AI.
+Not yet: barcode / AI meal photo, Open Food Facts, Health Connect, Coach AI.
 
 ## Platforms
 

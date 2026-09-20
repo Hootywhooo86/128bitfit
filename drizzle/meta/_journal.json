@@ -15,6 +15,13 @@
       "when": 1789880996554,
       "tag": "0001_busy_lenny_balinger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1789882000000,
+      "tag": "0002_fuel_food_logging",
+      "breakpoints": true
     }
   ]
 }

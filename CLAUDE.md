@@ -62,3 +62,11 @@ npm run build:foods -- --debug
 - Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` (once if empty)
 - Rest timer: `lib/rest-timer.tsx` (JS countdown; engine swappable for OS notifications later)
 - Screens: `app/(tabs)/train.tsx`, `app/train/active.tsx`, `app/train/add-exercise.tsx`, `app/train/summary.tsx`
+
+### Fuel / nutrition logging
+
+- Schema: `food_logs`, `water_logs`, `settings` (calorie/protein/water targets)
+- Queries: `db/food-queries.ts`; macros helper: `lib/nutrition.ts` (respects `nutrition_basis`)
+- Screens: `app/(tabs)/fuel.tsx`, `app/fuel/add.tsx`, `app/fuel/edit/[id].tsx`
+- Out of scope for this slice: barcode, AI meal photo, recipes, Open Food Facts
+
