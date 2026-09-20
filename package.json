@@ -21,6 +21,7 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.44.7",
     "expo": "~57.0.24",
+    "expo-camera": "~57.0.5",
     "expo-constants": "~57.0.19",
     "expo-font": "~57.0.4",
     "expo-linking": "~57.0.10",

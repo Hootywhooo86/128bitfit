@@ -21,9 +21,14 @@ import {
   defaultMealTypeForHour,
   formatGrams,
   formatKcal,
+  formatOptionalGrams,
+  formatOptionalKcal,
+  isCaloriesMissing,
   nutrientsForServings,
   nutrientsPerServing,
+  parseNutrients,
 } from '@/lib/nutrition';
+import { OFF_LICENSE_NOTE } from '@/lib/open-food-facts';
 import { colors, spacing } from '@/lib/theme';
 
 const MEAL_LABELS: Record<MealType, string> = {
@@ -44,7 +49,7 @@ type RecentItem = {
 
 export default function AddFoodScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ meal?: string }>();
+  const params = useLocalSearchParams<{ meal?: string; foodId?: string }>();
   const initialMeal = (MEAL_TYPES as readonly string[]).includes(params.meal ?? '')
     ? (params.meal as MealType)
     : defaultMealTypeForHour(new Date().getHours());
@@ -61,6 +66,17 @@ export default function AddFoodScreen() {
   useEffect(() => {
     void listRecentFoods(15).then(setRecent);
   }, []);
+
+  useEffect(() => {
+    const id = typeof params.foodId === 'string' ? params.foodId : null;
+    if (!id) return;
+    void getFoodById(id).then((food) => {
+      if (food) {
+        setSelected(food);
+        setServings('1');
+      }
+    });
+  }, [params.foodId]);
 
   const runSearch = useCallback(async () => {
     const q = search.trim();
@@ -106,6 +122,7 @@ export default function AddFoodScreen() {
 
   const save = async () => {
     if (!selected || saving || servingsNum <= 0) return;
+    if (isCaloriesMissing(selected)) return;
     setSaving(true);
     try {
       await logFoodFromCatalog(selected, { servings: servingsNum, mealType });
@@ -130,6 +147,16 @@ export default function AddFoodScreen() {
           {formatKcal(per.calories)} kcal per {unitLabel}
           {selected.nutritionBasis === 'per_100g' ? ' (from per 100g)' : ''}
         </Text>
+        {selected.brand ? <Text style={styles.muted}>{selected.brand}</Text> : null}
+        {selected.source === 'open_food_facts' ? (
+          <Text style={styles.license}>{OFF_LICENSE_NOTE}</Text>
+        ) : null}
+        {isCaloriesMissing(selected) ? (
+          <Text style={styles.warn}>
+            Calories are missing for this product — logging is blocked until you use a custom food
+            with calories filled in.
+          </Text>
+        ) : null}
 
         <Text style={styles.section}>Servings</Text>
         <View style={styles.servingRow}>
@@ -182,7 +209,7 @@ export default function AddFoodScreen() {
         ) : null}
 
         <Pressable
-          style={[styles.saveBtn, (saving || servingsNum <= 0) && styles.saveBtnDisabled]}
+          style={[styles.saveBtn, (saving || servingsNum <= 0 || isCaloriesMissing(selected)) && styles.saveBtnDisabled]}
           onPress={save}
           disabled={saving || servingsNum <= 0}
         >
@@ -299,6 +326,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   muted: { color: colors.textMuted, lineHeight: 20 },
+  license: { color: colors.textMuted, fontSize: 12, lineHeight: 18, marginTop: 8 },
+  warn: { color: colors.danger, fontSize: 13, lineHeight: 18, marginTop: 8 },
   count: { color: colors.textMuted, fontSize: 12, marginBottom: 8 },
   row: {
     flexDirection: 'row',

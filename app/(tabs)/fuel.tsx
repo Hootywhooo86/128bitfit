@@ -99,9 +99,14 @@ export default function FuelScreen() {
           <Text style={styles.title}>Fuel</Text>
           <Text style={styles.muted}>Today</Text>
         </View>
-        <Pressable style={styles.addBtn} onPress={() => router.push('/fuel/add')}>
-          <Text style={styles.addBtnText}>+ Add food</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable style={styles.scanBtn} onPress={() => router.push('/fuel/scan')}>
+            <Text style={styles.scanBtnText}>Scan barcode</Text>
+          </Pressable>
+          <Pressable style={styles.addBtn} onPress={() => router.push('/fuel/add')}>
+            <Text style={styles.addBtnText}>+ Add food</Text>
+          </Pressable>
+        </View>
       </View>
 
       <CalorieProgress consumed={totals.calories} target={goals.calorieTarget} />
@@ -189,6 +194,16 @@ const styles = StyleSheet.create({
   },
   title: { color: colors.text, fontSize: 24, fontWeight: '800' },
   muted: { color: colors.textMuted, marginTop: 2 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  scanBtn: {
+    backgroundColor: colors.surfaceAlt,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  scanBtnText: { color: colors.text, fontWeight: '700' },
   addBtn: {
     backgroundColor: colors.accent,
     paddingHorizontal: 14,

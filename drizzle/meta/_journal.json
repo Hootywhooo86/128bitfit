@@ -29,6 +29,13 @@
       "when": 1789881394350,
       "tag": "0003_sharp_bromley",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1789882107388,
+      "tag": "0004_public_garia",
+      "breakpoints": true
     }
   ]
 }

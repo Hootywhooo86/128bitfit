@@ -51,6 +51,14 @@ export default function RootLayout() {
               options={{ title: 'Add food', headerStyle: { backgroundColor: colors.surface } }}
             />
             <Stack.Screen
+              name="fuel/scan"
+              options={{ title: 'Scan barcode', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
+              name="fuel/custom"
+              options={{ title: 'Custom food', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
               name="fuel/edit/[id]"
               options={{ title: 'Edit food', headerStyle: { backgroundColor: colors.surface } }}
             />

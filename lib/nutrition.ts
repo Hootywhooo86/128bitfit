@@ -91,3 +91,21 @@ export function defaultMealTypeForHour(hour: number): 'breakfast' | 'lunch' | 'd
   if (hour < 21) return 'dinner';
   return 'snack';
 }
+
+/** Display helper: never present missing nutrients as zero. */
+export function formatOptionalKcal(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—';
+  return formatKcal(n);
+}
+
+export function formatOptionalGrams(n: number | null | undefined): string {
+  if (n == null || !Number.isFinite(n)) return '—';
+  return formatGrams(n);
+}
+
+/** True when a catalog food is missing calorie data (do not log silently as 0). */
+export function isCaloriesMissing(food: Pick<Food, 'nutrients'>): boolean {
+  const n = parseNutrients(food.nutrients);
+  return n.calories == null || !Number.isFinite(n.calories);
+}
+
