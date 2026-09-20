@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
 import {
@@ -321,6 +321,70 @@ export async function findExerciseByNameLike(fragment: string): Promise<Exercise
     .orderBy(asc(exercises.name))
     .limit(1);
   return rows[0] ?? null;
+}
+
+
+
+export async function getLastCompletedWorkoutSummary(): Promise<WorkoutSummary | null> {
+  const rows = await db
+    .select()
+    .from(workoutSessions)
+    .where(eq(workoutSessions.status, 'completed'))
+    .orderBy(desc(workoutSessions.endedAt), desc(workoutSessions.startedAt))
+    .limit(1);
+  const session = rows[0];
+  if (!session) return null;
+  return getWorkoutSummary(session.id);
+}
+
+export type TrainingDayDot = {
+  /** Local YYYY-MM-DD */
+  dayKey: string;
+  /** Short weekday label e.g. M */
+  label: string;
+  hasWorkout: boolean;
+};
+
+/** Last 7 local calendar days (oldest → newest), workout yes/no. */
+export async function getTrainingWeekStrip(now: Date = new Date()): Promise<TrainingDayDot[]> {
+  const labels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+  const days: { start: Date; end: Date; dayKey: string; label: string }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const start = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+    const end = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 0, 0, 0);
+    const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    days.push({ start, end, dayKey, label: labels[d.getDay()] });
+  }
+
+  const rangeStart = days[0].start;
+  const rangeEnd = days[days.length - 1].end;
+  const sessions = await db
+    .select({
+      startedAt: workoutSessions.startedAt,
+    })
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.status, 'completed'),
+        gte(workoutSessions.startedAt, rangeStart),
+        lt(workoutSessions.startedAt, rangeEnd)
+      )
+    );
+
+  const hit = new Set<string>();
+  for (const s of sessions) {
+    if (!s.startedAt) continue;
+    const d = new Date(s.startedAt);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    hit.add(key);
+  }
+
+  return days.map((d) => ({
+    dayKey: d.dayKey,
+    label: d.label,
+    hasWorkout: hit.has(d.dayKey),
+  }));
 }
 
 export { and, asc, desc, eq };

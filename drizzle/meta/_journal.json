@@ -22,6 +22,13 @@
       "when": 1789882000000,
       "tag": "0002_fuel_food_logging",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1789881394350,
+      "tag": "0003_sharp_bromley",
+      "breakpoints": true
     }
   ]
 }

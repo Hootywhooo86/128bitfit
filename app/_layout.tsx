@@ -54,6 +54,18 @@ export default function RootLayout() {
               name="fuel/edit/[id]"
               options={{ title: 'Edit food', headerStyle: { backgroundColor: colors.surface } }}
             />
+            <Stack.Screen
+              name="coach/[mode]"
+              options={{ title: 'Coach', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
+              name="settings/index"
+              options={{ title: 'Settings', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
+              name="home/weight"
+              options={{ title: 'Weight', headerStyle: { backgroundColor: colors.surface } }}
+            />
           </Stack>
         </RestTimerProvider>
       </DatabaseProvider>

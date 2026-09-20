@@ -1,0 +1,138 @@
+import { getDayFuelSummary } from './food-queries';
+import { getAppSettings } from './settings-queries';
+import { getLatestWeightEntry, formatWeight } from './weight-queries';
+import { getLastCompletedWorkoutSummary } from './workout-queries';
+
+export type CoachMode = 'debrief' | 'ask' | 'checkin';
+
+export type CoachContextSummary = {
+  mode: CoachMode;
+  assembledAt: string;
+  displayName: string;
+  today: {
+    calories: number;
+    calorieTarget: number;
+    protein: number;
+    proteinTarget: number;
+    fat: number;
+    carb: number;
+    waterMl: number;
+    waterTargetMl: number;
+    mealCount: number;
+  };
+  lastWorkout: {
+    date: string;
+    durationMin: number;
+    setCount: number;
+    exerciseCount: number;
+    exerciseNames: string[];
+  } | null;
+  recentWeight: {
+    value: string;
+    loggedAt: string;
+    note: string | null;
+  } | null;
+  /** Plain-text block ready to paste into an AI system/user prompt later. */
+  promptBlock: string;
+};
+
+const MODE_LABELS: Record<CoachMode, string> = {
+  debrief: 'Post-workout debrief',
+  ask: 'Ask anything',
+  checkin: 'Weekly check-in',
+};
+
+export function coachModeLabel(mode: CoachMode): string {
+  return MODE_LABELS[mode] ?? mode;
+}
+
+export async function buildCoachContext(mode: CoachMode): Promise<CoachContextSummary> {
+  const [settings, fuel, lastWorkout, weight] = await Promise.all([
+    getAppSettings(),
+    getDayFuelSummary(new Date()),
+    getLastCompletedWorkoutSummary(),
+    getLatestWeightEntry(),
+  ]);
+
+  const today = {
+    calories: Math.round(fuel.totals.calories),
+    calorieTarget: settings.calorieTarget,
+    protein: Math.round(fuel.totals.protein * 10) / 10,
+    proteinTarget: settings.proteinTarget,
+    fat: Math.round(fuel.totals.fat * 10) / 10,
+    carb: Math.round(fuel.totals.carb * 10) / 10,
+    waterMl: fuel.waterMl,
+    waterTargetMl: settings.waterTargetMl,
+    mealCount: fuel.logs.length,
+  };
+
+  const lastWorkoutBlock = lastWorkout
+    ? {
+        date: new Date(lastWorkout.session.startedAt!).toISOString(),
+        durationMin: Math.round(lastWorkout.durationMs / 60000),
+        setCount: lastWorkout.completedSets,
+        exerciseCount: lastWorkout.exerciseCount,
+        exerciseNames: lastWorkout.exercises.map((e) => e.name),
+      }
+    : null;
+
+  const recentWeight = weight
+    ? {
+        value: formatWeight(weight),
+        loggedAt: new Date(weight.loggedAt!).toISOString(),
+        note: weight.note,
+      }
+    : null;
+
+  const lines: string[] = [
+    `Mode: ${MODE_LABELS[mode]}`,
+    `User: ${settings.displayName}`,
+    `Units: ${settings.units}`,
+    '',
+    'Today nutrition:',
+    `- Calories: ${today.calories} / ${today.calorieTarget} kcal`,
+    `- Protein: ${today.protein} / ${today.proteinTarget} g`,
+    `- Fat: ${today.fat} g · Carb: ${today.carb} g`,
+    `- Water: ${today.waterMl} / ${today.waterTargetMl} ml`,
+    `- Logged meals/items: ${today.mealCount}`,
+  ];
+
+  if (lastWorkoutBlock) {
+    lines.push(
+      '',
+      'Last workout:',
+      `- When: ${lastWorkoutBlock.date}`,
+      `- Duration: ${lastWorkoutBlock.durationMin} min`,
+      `- Sets completed: ${lastWorkoutBlock.setCount}`,
+      `- Exercises (${lastWorkoutBlock.exerciseCount}): ${lastWorkoutBlock.exerciseNames.join(', ') || '—'}`
+    );
+  } else {
+    lines.push('', 'Last workout: none logged yet');
+  }
+
+  if (recentWeight) {
+    lines.push(
+      '',
+      'Recent weight:',
+      `- ${recentWeight.value} (logged ${recentWeight.loggedAt})`,
+      recentWeight.note ? `- Note: ${recentWeight.note}` : ''
+    );
+  } else {
+    lines.push('', 'Recent weight: none logged yet');
+  }
+
+  const promptBlock = lines.filter((l) => l !== undefined).join('\n').trim();
+
+  return {
+    mode,
+    assembledAt: new Date().toISOString(),
+    displayName: settings.displayName,
+    today,
+    lastWorkout: lastWorkoutBlock,
+    recentWeight,
+    promptBlock,
+  };
+}
+
+export const COACH_PLACEHOLDER_REPLY =
+  'Connect an AI provider in Settings to enable coaching. Context below is assembled locally from SQLite so wiring is ready when you add a key.';

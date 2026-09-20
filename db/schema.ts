@@ -122,6 +122,15 @@ export const settings = sqliteTable('settings', {
   value: text('value').notNull(),
 });
 
+export const weightEntries = sqliteTable('weight_entries', {
+  id: text('id').primaryKey(),
+  /** Numeric value as entered (kg or lb depending on unit). */
+  kgOrLb: real('kg_or_lb').notNull(),
+  unit: text('unit').notNull().default('lb'),
+  loggedAt: integer('logged_at', { mode: 'timestamp' }).notNull(),
+  note: text('note'),
+});
+
 export type Exercise = typeof exercises.$inferSelect;
 export type Food = typeof foods.$inferSelect;
 export type Routine = typeof routines.$inferSelect;
@@ -131,3 +140,5 @@ export type SessionExercise = typeof sessionExercises.$inferSelect;
 export type WorkoutSet = typeof sets.$inferSelect;
 export type FoodLog = typeof foodLogs.$inferSelect;
 export type WaterLog = typeof waterLogs.$inferSelect;
+export type WeightEntry = typeof weightEntries.$inferSelect;
+export type Setting = typeof settings.$inferSelect;
