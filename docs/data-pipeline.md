@@ -34,8 +34,13 @@ npm run verify:import                # headless: JSON → SQLite with expected c
 ```
 
 After regenerating either JSON, recompute `db/data-manifest.ts` (or bump
-`version`) so devices re-import. `npm run verify:import` uses Node's built-in
-`node:sqlite` and needs no Expo runtime.
+`version`) so devices re-import. That manifest is the single source for the
+expected counts: `npm run verify:import` reads them from it and fails on a
+mismatch, so there is no second place to update. It uses Node's built-in
+`node:sqlite` (Node 22+) and needs no Expo runtime.
+
+Both `npm run typecheck` and `npm run verify:import` run in CI on every push and
+pull request — see `.github/workflows/ci.yml`.
 
 ## USDA pipeline rules (do not regress)
 
