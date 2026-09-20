@@ -60,8 +60,20 @@ npm run build:foods -- --debug
 
 - Schema: `routines`, `routine_exercises`, `workout_sessions`, `session_exercises`, `sets`
 - Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` (once if empty)
-- Rest timer: `lib/rest-timer.tsx` (JS countdown; engine swappable for OS notifications later)
+- Rest timer: `lib/rest-timer.tsx` + `lib/rest-timer-notifications.ts` (in-app countdown synced to OS local notifications via `expo-notifications`; +15/Skip actions; lock-screen alert)
 - Screens: `app/(tabs)/train.tsx`, `app/train/active.tsx`, `app/train/add-exercise.tsx`, `app/train/summary.tsx`
+
+
+### Rest timer notifications
+
+- Package: `expo-notifications` (config plugin in `app.json`; Android channel `rest_timer`)
+- On first timed rest: explain + request notification permission
+- Rest start schedules a local notification for rest end; +15 / Skip / complete cancel or reschedule it
+- Notification category actions: `+15s` and `Skip` (appear on the delivered rest-end alert)
+- Tapping the alert opens Train / active workout when `sessionId` is known
+- Do not rely on `setTimeout` alone when backgrounded; OS schedule is the completion signal
+- Out of scope: Wear OS, custom arcade sound library, Health Connect
+- iOS Silent / Focus may mute notification sound
 
 ### Fuel / nutrition logging
 

@@ -77,7 +77,7 @@ export default function ActiveWorkoutScreen() {
       weight: values?.weight !== undefined ? values.weight : set.weight,
     });
     const rest = se.restSeconds ?? DEFAULT_REST_SECONDS;
-    timer.start(rest, se.id);
+    timer.start(rest, se.id, sessionId);
     await refresh();
   };
 

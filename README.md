@@ -64,10 +64,12 @@ npm run verify:import
 - expo-sqlite + Drizzle
 - Idempotent import of exercises + foods
 - Exercise Library (search, equipment/muscle filters, detail)
-- **Train workout logger**: freestyle + starter routines, sets, rest timer, offline persistence, summary
+- **Train workout logger**: freestyle + starter routines, sets, rest timer (OS local notifications), offline persistence, summary
 - **Fuel food logging**: search offline foods, log meals, calorie/macro progress, water quick-add
 
-Not yet: barcode / AI meal photo, Open Food Facts, Health Connect, Coach AI.
+Rest timer uses `expo-notifications` so alerts fire when the screen is locked.
+
+Not yet: barcode / AI meal photo, Open Food Facts, Health Connect, Coach AI, Wear OS.
 
 ## Platforms
 
