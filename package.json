@@ -1,0 +1,19 @@
+{
+  "name": "128bitfit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Fitness + nutrition offline databases and pipelines",
+  "scripts": {
+    "build:exercises": "node scripts/build-exercise-db.mjs",
+    "build:exercises:images": "node scripts/build-exercise-db.mjs --images",
+    "build:foods": "node scripts/build-food-db.mjs",
+    "check:usda": "node scripts/check-usda.mjs"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
