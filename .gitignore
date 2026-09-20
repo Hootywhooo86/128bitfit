@@ -21,3 +21,28 @@ Thumbs.db
 *.log
 tmp/
 .cache/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android

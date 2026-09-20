@@ -45,3 +45,13 @@ npm run build:foods -- --debug
 - Energy nutrient IDs: 1008, 2047, 2048 (kcal); 1062 (kJ → kcal / 4.184).
 - Small batches (~12) with retry backoff 3/6/9/12/15s on 504 / timeouts.
 - Skip foods with no usable energy; report skip counts.
+
+---
+
+## Expo app (foundation)
+
+- App lives at **repo root** (Expo Router `app/` directory). Data pipelines stay in `scripts/` + `assets/data/`.
+- Run: `npx expo start` (or `npm start`).
+- SQLite schema: `db/schema.ts`. Migrations: `drizzle/` (generate with `npm run db:generate`).
+- Import: `db/import.ts` — checksum-gated via `db/data-manifest.ts`. Do not parse JSON into UI every launch.
+- After regenerating `exercises.json` / `foods.json`, recompute `db/data-manifest.ts` (or bump `version`) so devices re-import.
