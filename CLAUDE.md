@@ -104,3 +104,12 @@ npm run build:foods -- --debug
 - Poses supported on renderer (`idle` / `curl` / `eat` / `think`); Home uses idle
 - Out of scope: hand-drawn 28×44 asset pipeline, clothing shop, Health Connect
 
+## Visual source of truth
+
+The Claude HTML prototype at `prototype/app-shell.html` is the **look to match** (from Daniel's Claude/Claude Code work):
+
+- Fonts: **Silkscreen** (pixel labels) + **Inter** (body)
+- Chrome: pure black background, dark cards, **white** accent buttons
+- Muscle heat intensity may use yellow / orange / red (`#ffd95e` / `#ff9a3d` / `#ff4d6d`) — data colours, not neon UI chrome
+- Expo UI should track this shell; Daniel may still upload fuller Claude Code project files into the repo
+
