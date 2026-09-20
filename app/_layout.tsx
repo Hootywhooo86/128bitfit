@@ -3,6 +3,7 @@ import { DarkTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
 import { DatabaseProvider } from '@/db/DatabaseProvider';
+import { RestTimerProvider } from '@/lib/rest-timer';
 import { colors } from '@/lib/theme';
 
 const navTheme = {
@@ -21,18 +22,32 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={navTheme}>
       <DatabaseProvider>
-        <StatusBar style="light" />
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="exercise/index"
-            options={{ title: 'Exercise Library', headerStyle: { backgroundColor: colors.surface } }}
-          />
-          <Stack.Screen
-            name="exercise/[id]"
-            options={{ title: 'Exercise', headerStyle: { backgroundColor: colors.surface } }}
-          />
-        </Stack>
+        <RestTimerProvider>
+          <StatusBar style="light" />
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="exercise/index"
+              options={{ title: 'Exercise Library', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
+              name="exercise/[id]"
+              options={{ title: 'Exercise', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
+              name="train/active"
+              options={{ title: 'Workout', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
+              name="train/add-exercise"
+              options={{ title: 'Add exercise', headerStyle: { backgroundColor: colors.surface } }}
+            />
+            <Stack.Screen
+              name="train/summary"
+              options={{ title: 'Summary', headerStyle: { backgroundColor: colors.surface } }}
+            />
+          </Stack>
+        </RestTimerProvider>
       </DatabaseProvider>
     </ThemeProvider>
   );

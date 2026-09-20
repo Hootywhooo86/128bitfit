@@ -40,19 +40,55 @@ export const foods = sqliteTable('foods', {
   nutrients: text('nutrients').notNull().default('{}'),
 });
 
-/** Stub tables for later slices — empty for now. */
 export const routines = sqliteTable('routines', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
+  notes: text('notes'),
   createdAt: integer('created_at', { mode: 'timestamp' }),
 });
+
+export const routineExercises = sqliteTable('routine_exercises', {
+  id: text('id').primaryKey(),
+  routineId: text('routine_id').notNull(),
+  exerciseId: text('exercise_id').notNull(),
+  position: integer('position').notNull().default(0),
+  targetSets: integer('target_sets'),
+  targetReps: integer('target_reps'),
+  restSeconds: integer('rest_seconds').default(60),
+  notes: text('notes'),
+});
+
+export const SESSION_STATUSES = ['in_progress', 'completed', 'discarded'] as const;
+export type SessionStatus = (typeof SESSION_STATUSES)[number];
 
 export const workoutSessions = sqliteTable('workout_sessions', {
   id: text('id').primaryKey(),
   routineId: text('routine_id'),
-  startedAt: integer('started_at', { mode: 'timestamp' }),
+  startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
   endedAt: integer('ended_at', { mode: 'timestamp' }),
+  status: text('status').notNull().default('in_progress'),
   notes: text('notes'),
+});
+
+export const sessionExercises = sqliteTable('session_exercises', {
+  id: text('id').primaryKey(),
+  sessionId: text('session_id').notNull(),
+  exerciseId: text('exercise_id').notNull(),
+  position: integer('position').notNull().default(0),
+  restSeconds: integer('rest_seconds').default(60),
+  notes: text('notes'),
+});
+
+export const sets = sqliteTable('sets', {
+  id: text('id').primaryKey(),
+  sessionExerciseId: text('session_exercise_id').notNull(),
+  setIndex: integer('set_index').notNull(),
+  reps: integer('reps'),
+  weight: real('weight'),
+  weightUnit: text('weight_unit').default('lb'),
+  completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
+  isWarmup: integer('is_warmup', { mode: 'boolean' }).notNull().default(false),
+  rpe: real('rpe'),
 });
 
 export const foodLogs = sqliteTable('food_logs', {
@@ -70,3 +106,8 @@ export const settings = sqliteTable('settings', {
 
 export type Exercise = typeof exercises.$inferSelect;
 export type Food = typeof foods.$inferSelect;
+export type Routine = typeof routines.$inferSelect;
+export type RoutineExercise = typeof routineExercises.$inferSelect;
+export type WorkoutSession = typeof workoutSessions.$inferSelect;
+export type SessionExercise = typeof sessionExercises.$inferSelect;
+export type WorkoutSet = typeof sets.$inferSelect;

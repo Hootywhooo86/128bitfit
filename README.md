@@ -64,8 +64,9 @@ npm run verify:import
 - expo-sqlite + Drizzle
 - Idempotent import of exercises + foods
 - Exercise Library (search, equipment/muscle filters, detail)
+- **Train workout logger**: freestyle + starter routines, sets, rest timer, offline persistence, summary
 
-Not yet: workout logging, nutrition logging, AI coach, Health Connect.
+Not yet: AI workout builder, nutrition logging, Health Connect, Coach AI.
 
 ## Platforms
 

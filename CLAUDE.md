@@ -55,3 +55,10 @@ npm run build:foods -- --debug
 - SQLite schema: `db/schema.ts`. Migrations: `drizzle/` (generate with `npm run db:generate`).
 - Import: `db/import.ts` — checksum-gated via `db/data-manifest.ts`. Do not parse JSON into UI every launch.
 - After regenerating `exercises.json` / `foods.json`, recompute `db/data-manifest.ts` (or bump `version`) so devices re-import.
+
+### Train / workouts
+
+- Schema: `routines`, `routine_exercises`, `workout_sessions`, `session_exercises`, `sets`
+- Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` (once if empty)
+- Rest timer: `lib/rest-timer.tsx` (JS countdown; engine swappable for OS notifications later)
+- Screens: `app/(tabs)/train.tsx`, `app/train/active.tsx`, `app/train/add-exercise.tsx`, `app/train/summary.tsx`
