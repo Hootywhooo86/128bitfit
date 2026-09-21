@@ -26,7 +26,9 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.VIBRATE",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.WRITE_EXERCISE"
       ]
     },
     "web": {
@@ -60,7 +62,8 @@
           "defaultChannel": "rest_timer"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "react-native-health-connect"
     ],
     "experiments": {
       "typedRoutes": true

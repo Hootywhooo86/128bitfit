@@ -135,6 +135,27 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### Health (Health Connect)
+
+- Entry point: `lib/health/` — import `health` from `lib/health`, never a platform SDK
+- `types.ts` is the `HealthProvider` interface (`readDays()` / `writeEntries()`);
+  `health-connect.ts` is the Android implementation, `unavailable.ts` the fallback
+  for iOS and web until HealthKit lands
+- `index.ts` requires the Android module **lazily**. `react-native-health-connect`
+  resolves its native module with `TurboModuleRegistry.getEnforcing` at import
+  time, which throws on iOS, web and Expo Go — a static import crashes the app at
+  launch. Keep the lazy require and its try/catch.
+- `app.json` needs both the `react-native-health-connect` plugin **and** the
+  `android.permission.health.*` entries. The config plugin only adds the
+  permission-rationale intent filters; it does not declare permissions, so reads
+  fail silently at runtime without them. Adding a record type means adding its
+  permission here too.
+- A day's metric is `number | null`: `null` means no reading was taken, `0` means
+  it was read and was zero. `components/StepsCard.tsx` renders those differently
+  and must keep doing so — see the empty-state table in `CLAUDE.md`.
+- Local calendar days come from `lib/health/dates.ts`. Use it rather than
+  `toISOString()`, which is UTC and shifts the day boundary west of Greenwich.
+
 ### Pixel avatar + onboarding
 
 - Settings keys: `onboarding_complete`, `avatar_config` (JSON),
