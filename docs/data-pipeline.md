@@ -135,6 +135,26 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### Calorie floor
+
+- `lib/calorie-floor.ts` (pure) + `lib/avatar.ts` for the Mifflin–St Jeor BMR
+- Floor is the highest of: an absolute minimum (1200 kcal, 1500 for male
+  profiles), the user's BMR, and 75% of TDEE (the 25% deficit cap)
+- When TDEE is known the deficit cap always dominates BMR — TDEE is BMR × 1.375,
+  so 75% of it is ~1.03 × BMR. Both bounds stay explicit so the rule survives a
+  change to the activity multiplier.
+- **Enforced in `db/settings-queries.ts` `updateAppSettings()`**, the single path
+  into the `calorie_target` setting. Do not clamp in a screen instead — the other
+  screens would be a way around it.
+- Screens call `previewCalorieTarget()` only to explain the change; enforcement
+  does not depend on them doing so
+- Onboarding logs the weigh-in *before* saving goals, so the floor computes
+  against a profile that has a weight in it
+- `ensureDefaultGoals()` in `db/food-queries.ts` seeds 2200 unclamped; that runs
+  before any profile exists, where the floor is at most 1500, so it cannot land
+  below it. Known gap: a stored target is not re-clamped if the body profile
+  changes later — it is corrected on the next save.
+
 ### Data export
 
 - `lib/export/` — `csv.ts` and `json.ts` are pure (no db, no filesystem) and carry

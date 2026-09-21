@@ -194,27 +194,42 @@ export function toMetric(opts: {
   return { kg, cm };
 }
 
-/**
- * Mifflin-St Jeor BMR (kcal/day). Sex 'other' / prefer_not uses average of M/F.
- * Activity multiplier 1.375 (lightly active) for a sensible calorie default.
- */
-export function suggestCalorieTarget(input: {
+/** Lightly active. The one place this multiplier is defined. */
+export const ACTIVITY_MULTIPLIER = 1.375;
+
+export type CalorieProfile = {
   sex: SexOption | null;
   age: number | null;
   weightKg: number | null;
   heightCm: number | null;
-}): number {
+};
+
+/**
+ * Mifflin-St Jeor BMR (kcal/day), or null when the profile is too incomplete
+ * to compute one. Sex 'other' / 'prefer_not' uses the average of the male and
+ * female equations.
+ */
+export function basalMetabolicRate(input: CalorieProfile): number | null {
   const { sex, age, weightKg, heightCm } = input;
-  if (weightKg == null || heightCm == null || age == null) {
-    return 2200;
-  }
+  if (weightKg == null || heightCm == null || age == null) return null;
+  if (weightKg <= 0 || heightCm <= 0 || age <= 0) return null;
   const bmrM = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
   const bmrF = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
-  let bmr: number;
-  if (sex === 'male') bmr = bmrM;
-  else if (sex === 'female') bmr = bmrF;
-  else bmr = (bmrM + bmrF) / 2;
-  const tdee = bmr * 1.375;
+  if (sex === 'male') return bmrM;
+  if (sex === 'female') return bmrF;
+  return (bmrM + bmrF) / 2;
+}
+
+/** Maintenance calories, or null when BMR is unknown. */
+export function totalDailyEnergy(input: CalorieProfile): number | null {
+  const bmr = basalMetabolicRate(input);
+  return bmr == null ? null : bmr * ACTIVITY_MULTIPLIER;
+}
+
+/** A sensible starting target: maintenance, rounded to 50 kcal. */
+export function suggestCalorieTarget(input: CalorieProfile): number {
+  const tdee = totalDailyEnergy(input);
+  if (tdee == null) return 2200;
   return Math.round(tdee / 50) * 50;
 }
 
