@@ -1,6 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import {
+  BACK_RECTS,
+  FRONT_RECTS,
+  GRID_H,
+  GRID_W,
+  type Rect,
+} from '@/lib/muscle-figure';
+import {
   MUSCLE_LABELS,
   loadLevel,
   type MuscleGroup,
@@ -16,67 +23,12 @@ import { colors, muscleHeat, spacing } from '@/lib/theme';
  * Colour here is load and nothing else — see lib/theme.ts.
  */
 
-const GRID_W = 20;
-const GRID_H = 30;
-
-type Block = { m: MuscleGroup | null; x: number; y: number; w: number; h: number };
-
-/** `m: null` is structure — head, hands, feet. Never coloured. */
-const FRONT: Block[] = [
-  { m: null, x: 8, y: 0, w: 4, h: 3 },
-  { m: 'neck', x: 9, y: 3, w: 2, h: 1 },
-  { m: 'shoulders', x: 5, y: 4, w: 2, h: 3 },
-  { m: 'shoulders', x: 13, y: 4, w: 2, h: 3 },
-  { m: 'chest', x: 7, y: 4, w: 6, h: 4 },
-  { m: 'biceps', x: 4, y: 7, w: 2, h: 4 },
-  { m: 'biceps', x: 14, y: 7, w: 2, h: 4 },
-  { m: 'forearms', x: 3, y: 11, w: 2, h: 5 },
-  { m: 'forearms', x: 15, y: 11, w: 2, h: 5 },
-  { m: null, x: 3, y: 16, w: 2, h: 1 },
-  { m: null, x: 15, y: 16, w: 2, h: 1 },
-  { m: 'abdominals', x: 8, y: 8, w: 4, h: 6 },
-  { m: 'abductors', x: 6, y: 14, w: 1, h: 3 },
-  { m: 'abductors', x: 13, y: 14, w: 1, h: 3 },
-  { m: 'adductors', x: 9, y: 14, w: 2, h: 4 },
-  { m: 'quadriceps', x: 7, y: 14, w: 2, h: 7 },
-  { m: 'quadriceps', x: 11, y: 14, w: 2, h: 7 },
-  { m: 'calves', x: 7, y: 22, w: 2, h: 6 },
-  { m: 'calves', x: 11, y: 22, w: 2, h: 6 },
-  { m: null, x: 7, y: 28, w: 2, h: 1 },
-  { m: null, x: 11, y: 28, w: 2, h: 1 },
-];
-
-const BACK: Block[] = [
-  { m: null, x: 8, y: 0, w: 4, h: 3 },
-  { m: 'neck', x: 9, y: 3, w: 2, h: 1 },
-  { m: 'traps', x: 7, y: 4, w: 6, h: 3 },
-  { m: 'shoulders', x: 5, y: 4, w: 2, h: 3 },
-  { m: 'shoulders', x: 13, y: 4, w: 2, h: 3 },
-  { m: 'lats', x: 6, y: 7, w: 2, h: 5 },
-  { m: 'lats', x: 12, y: 7, w: 2, h: 5 },
-  { m: 'middle back', x: 8, y: 7, w: 4, h: 4 },
-  { m: 'lower back', x: 8, y: 11, w: 4, h: 3 },
-  { m: 'triceps', x: 4, y: 7, w: 2, h: 4 },
-  { m: 'triceps', x: 14, y: 7, w: 2, h: 4 },
-  { m: 'forearms', x: 3, y: 11, w: 2, h: 5 },
-  { m: 'forearms', x: 15, y: 11, w: 2, h: 5 },
-  { m: null, x: 3, y: 16, w: 2, h: 1 },
-  { m: null, x: 15, y: 16, w: 2, h: 1 },
-  { m: 'glutes', x: 7, y: 14, w: 6, h: 3 },
-  { m: 'hamstrings', x: 7, y: 17, w: 2, h: 5 },
-  { m: 'hamstrings', x: 11, y: 17, w: 2, h: 5 },
-  { m: 'calves', x: 7, y: 22, w: 2, h: 6 },
-  { m: 'calves', x: 11, y: 22, w: 2, h: 6 },
-  { m: null, x: 7, y: 28, w: 2, h: 1 },
-  { m: null, x: 11, y: 28, w: 2, h: 1 },
-];
-
 function colourFor(tally: MuscleTally, m: MuscleGroup | null): string {
   if (m == null) return colors.accentDim;
   return muscleHeat[loadLevel(tally[m])];
 }
 
-function Figure({ blocks, tally, width }: { blocks: Block[]; tally: MuscleTally; width: number }) {
+function Figure({ blocks, tally, width }: { blocks: Rect[]; tally: MuscleTally; width: number }) {
   const cell = width / GRID_W;
   return (
     <View style={{ width, height: cell * GRID_H }}>
@@ -90,8 +42,6 @@ function Figure({ blocks, tally, width }: { blocks: Block[]; tally: MuscleTally;
             width: b.w * cell,
             height: b.h * cell,
             backgroundColor: colourFor(tally, b.m),
-            borderWidth: StyleSheet.hairlineWidth,
-            borderColor: colors.bg,
           }}
         />
       ))}
@@ -101,7 +51,7 @@ function Figure({ blocks, tally, width }: { blocks: Block[]; tally: MuscleTally;
 
 export function MuscleMap({
   tally,
-  width = 130,
+  width = 128,
   showLegend = true,
 }: {
   tally: MuscleTally;
@@ -112,11 +62,11 @@ export function MuscleMap({
     <View style={styles.wrap}>
       <View style={styles.figures}>
         <View style={styles.figureCol}>
-          <Figure blocks={FRONT} tally={tally} width={width} />
+          <Figure blocks={FRONT_RECTS} tally={tally} width={width} />
           <Text style={styles.caption}>Front</Text>
         </View>
         <View style={styles.figureCol}>
-          <Figure blocks={BACK} tally={tally} width={width} />
+          <Figure blocks={BACK_RECTS} tally={tally} width={width} />
           <Text style={styles.caption}>Back</Text>
         </View>
       </View>

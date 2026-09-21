@@ -292,9 +292,19 @@ Two things about web, both load-bearing:
   never happened.
 - Unknown muscle names are ignored rather than guessed at, so a typo in the data
   shows up as a missing muscle instead of load on the wrong one.
-- `components/MuscleMap.tsx` is pixel blocks, not anatomical SVG: it matches the
-  app's aesthetic, needs no artwork, and a realistic figure reads as mush at this
-  size.
+- `lib/muscle-figure.ts` holds the geometry as tapered quads — a top edge, a
+  bottom edge, and the renderer interpolates the rows between. That buys curved
+  silhouettes (deltoid caps, the lat V, sweeping quads) from a handful of
+  numbers. Equal-width rows are merged back into one rect, so a straight section
+  costs one View and only curves cost extra — ~65 rects per figure rather than
+  several hundred.
+- **Coverage is closed, not best-effort.** `lib/muscle-figure.test.ts` asserts
+  that every muscle in the shipped exercise data is a known group, that every
+  group is drawn somewhere on the figure, and that the figure draws nothing that
+  is not a known group. A muscle with nowhere to go is a failing test, not a
+  silent drop at runtime.
+- Glutes are drawn on the back only; on the front that region is hip structure.
+  Colouring it there merged the hips and quads into one mass.
 
 ### Privacy & Health Connect compliance
 
