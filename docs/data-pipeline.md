@@ -272,6 +272,34 @@ Two things about web, both load-bearing:
   a spreadsheet would otherwise execute them. Numbers skip that guard, so a
   negative value stays `-5` rather than becoming text. JSON is the lossless copy.
 
+### Privacy & Health Connect compliance
+
+- Policy: `docs/privacy-policy.md`. In-app screen: `app/settings/privacy.tsx`,
+  linked from Settings and from the Steps card's connect prompt.
+- Keep the policy true to the code. It states there is no backend, no analytics
+  and no telemetry, and that the only outbound calls are Open Food Facts
+  (barcode only), the AI provider the user configured, and GitHub for exercise
+  images. Adding a network call means updating that document.
+- `components/StepsCard.tsx` explains before requesting, the same pattern the
+  rest timer uses for notifications. A permission sheet with no preamble gets
+  declined.
+
+**Still outstanding for Google Play.** Health Connect access on Play needs a
+data-access declaration, which requires a *publicly hosted* privacy policy URL
+and a working in-app rationale screen:
+
+1. Host `docs/privacy-policy.md` at a public URL and point `POLICY_URL` in
+   `app/settings/privacy.tsx` at it. It currently links to the file on GitHub,
+   which works but is not a proper policy page.
+2. The `androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE` intent filter is
+   declared by the library's config plugin and points at MainActivity, but
+   **nothing handles the intent** — tapping "privacy policy" inside the Health
+   Connect dialog opens the app on Home. Routing it to `/settings/privacy` needs
+   native work: the intent carries an action and no URI, so Expo Router cannot
+   see it. A small config plugin or native module is required.
+3. Check Google's current Health Connect policy for the declaration form and
+   review process before submitting.
+
 ### Health (Health Connect)
 
 - Entry point: `lib/health/` — import `health` from `lib/health`, never a platform SDK
