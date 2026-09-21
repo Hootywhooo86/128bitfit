@@ -95,7 +95,7 @@ export const FRONT_QUADS: Quad[] = [
   // Torso: abs narrow to the waist, hips flare back out.
   { m: 'abdominals', y0: 25, y1: 35, l0: 16, r0: 28, l1: 17, r1: 27 },
   ...pair({ m: 'abductors', y0: 33, y1: 41, l0: 14, r0: 17, l1: 14, r1: 17 }),
-  { m: null, y0: 35, y1: 41, l0: 17, r0: 27, l1: 16, r1: 28 },
+  { m: null, y0: 35, y1: 41, l0: 17, r0: 27, l1: 17, r1: 27 },
 
   // Legs: quads sweep wide then taper to the knee; adductors run inside.
   ...pair({ m: 'quadriceps', y0: 41, y1: 55, l0: 14, r0: 21, l1: 16, r1: 21 }),
@@ -118,14 +118,14 @@ export const BACK_QUADS: Quad[] = [
   // Lats: flare wide under the arm, tuck into the waist — the V.
   ...pair({ m: 'lats', y0: 17, y1: 30, l0: 13, r0: 20, l1: 17, r1: 21 }),
   { m: 'middle back', y0: 24, y1: 30, l0: 20, r0: 24, l1: 20, r1: 24 },
-  { m: 'lower back', y0: 30, y1: 35, l0: 17, r0: 27, l1: 16, r1: 28 },
+  { m: 'lower back', y0: 30, y1: 35, l0: 17, r0: 27, l1: 17, r1: 27 },
 
   ...pair({ m: 'triceps', y0: 19, y1: 30, l0: 9, r0: 15, l1: 10, r1: 14 }),
   ...pair({ m: 'forearms', y0: 30, y1: 41, l0: 10, r0: 14, l1: 11, r1: 14 }),
   ...pair({ m: null, y0: 41, y1: 45, l0: 11, r0: 14, l1: 11, r1: 14 }),
 
-  { m: 'glutes', y0: 35, y1: 41, l0: 17, r0: 27, l1: 16, r1: 28 },
-  ...pair({ m: 'hamstrings', y0: 41, y1: 55, l0: 15, r0: 21, l1: 16, r1: 21 }),
+  { m: 'glutes', y0: 35, y1: 40, l0: 17, r0: 27, l1: 18, r1: 26 },
+  ...pair({ m: 'hamstrings', y0: 40, y1: 55, l0: 16, r0: 21, l1: 16, r1: 21 }),
   ...pair({ m: 'calves', y0: 55, y1: 66, l0: 16, r0: 21, l1: 17, r1: 20 }),
   ...pair({ m: null, y0: 66, y1: 68, l0: 15, r0: 21, l1: 14, r1: 22 }),
 ];
