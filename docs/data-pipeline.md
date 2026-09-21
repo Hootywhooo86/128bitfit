@@ -186,6 +186,38 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - `app/train/active.tsx` shows `Last: 135×8, ...` above the sets so a pre-filled
   number reads as last week's rather than as something already logged.
 
+### Building an Android APK
+
+```bash
+npx eas build -p android --profile preview   # cloud, needs an Expo login
+```
+
+Or locally, with the Android SDK installed and `ANDROID_HOME` set:
+
+```bash
+npx expo prebuild --platform android --clean
+cd android && ./gradlew assembleRelease
+# -> android/app/build/outputs/apk/release/app-release.apk
+```
+
+`android/` is generated and gitignored — configure the build through `app.json`,
+never by editing that directory, or `prebuild` will discard the change.
+
+Two things the build depends on:
+
+- **`minSdkVersion` is 26**, set via the `expo-build-properties` plugin.
+  Health Connect's `androidx.health.connect:connect-client` declares
+  `minSdk 26`; Expo defaults to 24, and the manifest merge fails outright
+  without this. Nothing in typecheck or the test suite catches it — only a real
+  build does.
+- **`android.package`** is `com.hootywhooo86.bit128fit`. Package segments cannot
+  begin with a digit, so `128bitfit` cannot be one. This is permanent once
+  published to Play.
+
+The release build is signed with the debug keystore (the React Native template
+default), which is fine for sideloading but must be replaced with a real upload
+key before any Play submission.
+
 ### Running the app
 
 The real target is **Android with a dev build** — Expo Go cannot load the native

@@ -14,6 +14,7 @@
       }
     },
     "android": {
+      "package": "com.hootywhooo86.bit128fit",
       "adaptiveIcon": {
         "backgroundColor": "#0a0a0a",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -37,6 +38,14 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
@@ -64,7 +73,8 @@
       ],
       "expo-secure-store",
       "react-native-health-connect",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true

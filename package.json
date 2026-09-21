@@ -6,8 +6,8 @@
   "description": "Fitness + nutrition offline-first Expo app",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "build:exercises": "node scripts/build-exercise-db.mjs",
     "build:exercises:images": "node scripts/build-exercise-db.mjs --images",
@@ -25,6 +25,7 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.44.7",
     "expo": "~57.0.24",
+    "expo-build-properties": "~57.0.21",
     "expo-camera": "~57.0.5",
     "expo-constants": "~57.0.19",
     "expo-file-system": "~57.0.7",
