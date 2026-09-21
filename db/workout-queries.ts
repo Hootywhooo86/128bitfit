@@ -1,6 +1,7 @@
-import { and, asc, count, desc, eq, gte, lt, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, lt, ne, sql } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
+import { resolveSetSeed, type LastPerformance } from '@/lib/set-prefill';
 import {
   exercises,
   routineExercises,
@@ -20,6 +21,8 @@ import {
 export type SessionExerciseWithMeta = SessionExercise & {
   exerciseName: string;
   sets: WorkoutSet[];
+  /** What was lifted the last time this exercise was completed, for the UI hint. */
+  lastPerformance: LastPerformance | null;
 };
 
 export type ActiveWorkout = {
@@ -110,10 +113,65 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       notes: se.notes,
       exerciseName: se.exerciseName,
       sets: setRows,
+      lastPerformance: await getLastPerformance(se.exerciseId, sessionId),
     });
   }
 
   return { session, exercises: exerciseList };
+}
+
+/**
+ * The most recent completed performance of an exercise, for pre-filling.
+ *
+ * Only completed sets of completed sessions count: an abandoned workout is full
+ * of pre-filled values nobody lifted, and seeding from those would compound a
+ * guess into a record.
+ *
+ * `excludeSessionId` keeps the session being built now out of its own history.
+ */
+export async function getLastPerformance(
+  exerciseId: string,
+  excludeSessionId?: string
+): Promise<LastPerformance | null> {
+  const where = [
+    eq(sessionExercises.exerciseId, exerciseId),
+    eq(sets.completed, true),
+    eq(workoutSessions.status, 'completed'),
+  ];
+  if (excludeSessionId) where.push(ne(workoutSessions.id, excludeSessionId));
+
+  // Identify the exact block, not just the session: an exercise may appear more
+  // than once in one workout, and matching on session + exercise would merge
+  // both blocks into one interleaved list of set indices.
+  const recent = await db
+    .select({
+      sessionExerciseId: sessionExercises.id,
+      startedAt: workoutSessions.startedAt,
+    })
+    .from(sets)
+    .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+    .innerJoin(workoutSessions, eq(sessionExercises.sessionId, workoutSessions.id))
+    .where(and(...where))
+    .orderBy(desc(workoutSessions.startedAt), desc(sessionExercises.position))
+    .limit(1);
+
+  const found = recent[0];
+  if (!found) return null;
+
+  const setRows = await db
+    .select({
+      reps: sets.reps,
+      weight: sets.weight,
+      weightUnit: sets.weightUnit,
+    })
+    .from(sets)
+    .where(
+      and(eq(sets.sessionExerciseId, found.sessionExerciseId), eq(sets.completed, true))
+    )
+    .orderBy(asc(sets.setIndex));
+
+  if (setRows.length === 0) return null;
+  return { performedAt: found.startedAt, sets: setRows };
 }
 
 export async function startFreestyleWorkout(): Promise<string> {
@@ -152,15 +210,19 @@ export async function startRoutineWorkout(routineId: string): Promise<string> {
       restSeconds: rest,
       notes: re.notes,
     });
+    // Non-negotiable #1: start from what was lifted last time, so the first
+    // action of the session is confirming a number rather than typing one.
+    const last = await getLastPerformance(re.exerciseId, id);
     const targetSets = re.targetSets ?? 3;
     for (let s = 0; s < targetSets; s++) {
+      const seed = resolveSetSeed({ last, index: s, targetReps: re.targetReps ?? null });
       await db.insert(sets).values({
         id: newId('set'),
         sessionExerciseId: seId,
         setIndex: s,
-        reps: re.targetReps ?? 10,
-        weight: null,
-        weightUnit: 'lb',
+        reps: seed.reps ?? 10,
+        weight: seed.weight,
+        weightUnit: seed.weightUnit,
         completed: false,
         isWarmup: false,
         rpe: null,
@@ -192,15 +254,17 @@ export async function addExerciseToSession(
     notes: null,
   });
 
+  const last = await getLastPerformance(exerciseId, sessionId);
   const targetSets = opts?.targetSets ?? 1;
   for (let s = 0; s < targetSets; s++) {
+    const seed = resolveSetSeed({ last, index: s, targetReps: opts?.targetReps ?? null });
     await db.insert(sets).values({
       id: newId('set'),
       sessionExerciseId: seId,
       setIndex: s,
-      reps: opts?.targetReps ?? null,
-      weight: null,
-      weightUnit: 'lb',
+      reps: seed.reps,
+      weight: seed.weight,
+      weightUnit: seed.weightUnit,
       completed: false,
       isWarmup: false,
       rpe: null,
@@ -219,15 +283,35 @@ export async function addSet(
     .where(eq(sets.sessionExerciseId, sessionExerciseId))
     .orderBy(desc(sets.setIndex))
     .limit(1);
-  const last = existing[0];
-  const setIndex = last ? last.setIndex + 1 : 0;
+  const previous = existing[0];
+  const setIndex = previous ? previous.setIndex + 1 : 0;
+
+  // Carrying from the set just logged wins; otherwise reach back to the last
+  // session, which is what makes the first set of an exercise pre-filled too.
+  const owner = await db
+    .select({ exerciseId: sessionExercises.exerciseId, sessionId: sessionExercises.sessionId })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.id, sessionExerciseId))
+    .limit(1);
+  const lastPerformance = owner[0]
+    ? await getLastPerformance(owner[0].exerciseId, owner[0].sessionId)
+    : null;
+
+  const seed = resolveSetSeed({
+    last: lastPerformance,
+    index: setIndex,
+    carryFrom: previous
+      ? { reps: previous.reps, weight: previous.weight, weightUnit: previous.weightUnit }
+      : null,
+  });
+
   const row: WorkoutSet = {
     id: newId('set'),
     sessionExerciseId,
     setIndex,
-    reps: defaults?.reps ?? last?.reps ?? null,
-    weight: defaults?.weight ?? last?.weight ?? null,
-    weightUnit: defaults?.weightUnit ?? last?.weightUnit ?? 'lb',
+    reps: defaults?.reps ?? seed.reps,
+    weight: defaults?.weight ?? seed.weight,
+    weightUnit: defaults?.weightUnit ?? seed.weightUnit,
     completed: false,
     isWarmup: false,
     rpe: null,

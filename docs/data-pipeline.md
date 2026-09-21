@@ -135,6 +135,25 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### Set pre-fill
+
+- `lib/set-prefill.ts` (pure) decides what a new set starts with;
+  `getLastPerformance()` in `db/workout-queries.ts` does the lookup
+- Seeds all three creation paths: `startRoutineWorkout`, `addExerciseToSession`
+  and `addSet`. Adding a fourth means seeding it too, or logging silently gets
+  slower again.
+- Precedence is: the previous set in this session > the routine's target reps >
+  last session. Weight always comes from last session, because a routine never
+  carries one.
+- **Only completed sets of completed sessions count.** An abandoned workout is
+  full of pre-filled values nobody lifted; seeding from those would compound a
+  guess into a record.
+- The lookup is scoped to one `session_exercises` row, not to
+  `session_id + exercise_id`. An exercise can appear twice in a workout, and
+  matching on the pair merges both blocks into one interleaved list.
+- `app/train/active.tsx` shows `Last: 135×8, ...` above the sets so a pre-filled
+  number reads as last week's rather than as something already logged.
+
 ### Tests
 
 - `npm test` (vitest, `npm run test:watch` while working). Runs in CI across
