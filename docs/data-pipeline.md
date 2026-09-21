@@ -186,6 +186,37 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - `app/train/active.tsx` shows `Last: 135×8, ...` above the sets so a pre-filled
   number reads as last week's rather than as something already logged.
 
+### Running the app
+
+The real target is **Android with a dev build** — Expo Go cannot load the native
+modules this app uses (SQLite, notifications, camera, secure store, Health
+Connect). `eas.json` has the profiles:
+
+```bash
+npx eas build -p android --profile development   # dev client, hot reload
+npx eas build -p android --profile preview       # standalone APK to sideload
+```
+
+A web build also runs, which is the quickest way to click through the UI:
+
+```bash
+npm run build:web    # expo export -p web
+npm run serve:web    # → http://localhost:8090
+```
+
+Two things about web, both load-bearing:
+
+- `metro.config.js` adds `wasm` to `assetExts`. expo-sqlite's web worker imports
+  `wa-sqlite.wasm`, and without it the bundle cannot resolve the file and the
+  app 500s before rendering.
+- `scripts/serve-web.mjs` sets COOP + COEP. SQLite on web runs in a worker using
+  SharedArrayBuffer, which browsers only expose on a cross-origin-isolated page,
+  so a plain static server is not enough.
+- `npx expo start --web` (dev server) still fails with "Worker chunk not found"
+  — an Expo dev-serializer issue, unrelated to the config above. Use the export.
+- Web needs OPFS `createSyncAccessHandle`. Desktop Chrome has it; some headless
+  browsers do not, and there the worker hangs with "Sync operation timeout".
+
 ### Tests
 
 - `npm test` (vitest, `npm run test:watch` while working). Runs in CI across
