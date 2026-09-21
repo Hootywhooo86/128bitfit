@@ -168,6 +168,13 @@ export default function SettingsScreen() {
         Secure Store on device — never committed or logged.
       </Text>
 
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/privacy')}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Privacy & health data</Text>
+          <Text style={styles.muted}>What is stored, what leaves the device →</Text>
+        </View>
+      </Pressable>
+
       <Pressable style={styles.charCard} onPress={() => router.push('/settings/export')}>
         <View style={{ flex: 1 }}>
           <Text style={styles.aiTitle}>Export data</Text>

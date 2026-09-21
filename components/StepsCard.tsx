@@ -1,5 +1,6 @@
+import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTodaySteps } from '@/lib/health/use-health';
 import { colors, spacing } from '@/lib/theme';
 
@@ -11,7 +12,25 @@ import { colors, spacing } from '@/lib/theme';
  * "not connected" or "no provider", which get their own copy.
  */
 export function StepsCard() {
+  const router = useRouter();
   const { state, connect, openSettings } = useTodaySteps();
+
+  /**
+   * Explain before asking, the same way the rest timer does for notifications.
+   * Health Connect also expects an app to be able to say why it wants access,
+   * and a permission sheet with no preamble is a good way to get declined.
+   */
+  function onConnect() {
+    Alert.alert(
+      'Connect Health Connect?',
+      'Reads your step count to show on Home, and writes completed workouts back so your other apps can see them.\n\nNothing leaves your phone. You can revoke this any time in Health Connect.',
+      [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'What is read', onPress: () => router.push('/settings/privacy') },
+        { text: 'Connect', onPress: () => void connect() },
+      ]
+    );
+  }
 
   if (state.status === 'checking') {
     return (
@@ -44,7 +63,7 @@ export function StepsCard() {
 
   if (state.status === 'denied') {
     return (
-      <Pressable style={styles.wrap} onPress={connect}>
+      <Pressable style={styles.wrap} onPress={onConnect}>
         <View style={styles.row}>
           <Text style={styles.title}>Steps</Text>
           <Text style={styles.link}>Connect →</Text>
