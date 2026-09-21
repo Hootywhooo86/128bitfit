@@ -135,6 +135,88 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### Zero vs no data
+
+- The rule from CLAUDE.md's empty-state table: `0` claims a measurement was
+  taken and came back zero; absence gets a dash or a prompt. Never conflate them.
+- Where it is enforced: `lib/health/types.ts` (`steps: number | null`),
+  `lib/calorie-ring.ts` (`consumed: number | null`). Both keep the decision in a
+  typed state so it is testable, rather than inside JSX.
+- Callers must opt in — `number` satisfies `number | null`, so typecheck will not
+  catch a screen still passing a filled zero. `app/(tabs)/fuel.tsx` and
+  `app/(tabs)/index.tsx` pass `logs.length > 0 ? totals.calories : null`.
+- A *logged* zero (a 0 kcal drink) is a real reading and keeps the normal
+  display. Only absence gets the empty treatment.
+- `app/(tabs)/coach.tsx` counts completed sessions and says it has nothing to go
+  on rather than inventing encouragement.
+
+### Network deadlines
+
+- `lib/net.ts` — use `fetchWithTimeout`, never bare `fetch`. Every call site has
+  a deadline: `LOOKUP_TIMEOUT_MS` (8s) for a lookup someone is waiting on
+  mid-workout, `AI_TIMEOUT_MS` (60s) for a model reply.
+- **Error handling is not enough on its own.** A hung request never rejects, so
+  the offline paths downstream never run — non-negotiable #4 says the UI never
+  waits on the network, and only a deadline delivers that.
+- A `signal` passed inside `init` is composed with the deadline, not replaced.
+  Overwriting it silently breaks cancel buttons; `lib/ai-coach.ts` passes its
+  signal that way.
+- A deadline breach throws `NetworkTimeoutError`; an outer cancel keeps its own
+  rejection, so a deliberate cancel is never reported as a timeout.
+- Open Food Facts lookups surface `reason: 'timeout'` separately from
+  `'network'`, and `db/barcode-queries.ts` turns it into a message that points
+  at the custom food form.
+
+### Set pre-fill
+
+- `lib/set-prefill.ts` (pure) decides what a new set starts with;
+  `getLastPerformance()` in `db/workout-queries.ts` does the lookup
+- Seeds all three creation paths: `startRoutineWorkout`, `addExerciseToSession`
+  and `addSet`. Adding a fourth means seeding it too, or logging silently gets
+  slower again.
+- Precedence is: the previous set in this session > the routine's target reps >
+  last session. Weight always comes from last session, because a routine never
+  carries one.
+- **Only completed sets of completed sessions count.** An abandoned workout is
+  full of pre-filled values nobody lifted; seeding from those would compound a
+  guess into a record.
+- The lookup is scoped to one `session_exercises` row, not to
+  `session_id + exercise_id`. An exercise can appear twice in a workout, and
+  matching on the pair merges both blocks into one interleaved list.
+- `app/train/active.tsx` shows `Last: 135×8, ...` above the sets so a pre-filled
+  number reads as last week's rather than as something already logged.
+
+### Running the app
+
+The real target is **Android with a dev build** — Expo Go cannot load the native
+modules this app uses (SQLite, notifications, camera, secure store, Health
+Connect). `eas.json` has the profiles:
+
+```bash
+npx eas build -p android --profile development   # dev client, hot reload
+npx eas build -p android --profile preview       # standalone APK to sideload
+```
+
+A web build also runs, which is the quickest way to click through the UI:
+
+```bash
+npm run build:web    # expo export -p web
+npm run serve:web    # → http://localhost:8090
+```
+
+Two things about web, both load-bearing:
+
+- `metro.config.js` adds `wasm` to `assetExts`. expo-sqlite's web worker imports
+  `wa-sqlite.wasm`, and without it the bundle cannot resolve the file and the
+  app 500s before rendering.
+- `scripts/serve-web.mjs` sets COOP + COEP. SQLite on web runs in a worker using
+  SharedArrayBuffer, which browsers only expose on a cross-origin-isolated page,
+  so a plain static server is not enough.
+- `npx expo start --web` (dev server) still fails with "Worker chunk not found"
+  — an Expo dev-serializer issue, unrelated to the config above. Use the export.
+- Web needs OPFS `createSyncAccessHandle`. Desktop Chrome has it; some headless
+  browsers do not, and there the worker hangs with "Sync operation timeout".
+
 ### Tests
 
 - `npm test` (vitest, `npm run test:watch` while working). Runs in CI across

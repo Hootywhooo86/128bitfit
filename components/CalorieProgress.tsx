@@ -1,10 +1,17 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { colors, spacing } from '@/lib/theme';
+import { calorieRingState } from '@/lib/calorie-ring';
 import { formatKcal } from '@/lib/nutrition';
 
 type Props = {
-  consumed: number;
+  /**
+   * Calories eaten today, or null when nothing has been logged yet.
+   *
+   * Null is not zero. "Logged nothing" and "ate nothing" are different claims,
+   * and only one of them is ever true — see the empty-state table in CLAUDE.md.
+   */
+  consumed: number | null;
   target: number;
   /** Compact for Home; default matches Fuel card. */
   compact?: boolean;
@@ -15,10 +22,15 @@ type Props = {
  * No SVG dependency — clear enough for the Home/Fuel dashboards.
  */
 export function CalorieProgress({ consumed, target, compact }: Props) {
-  const pct = target > 0 ? Math.min(1, Math.max(0, consumed / target)) : 0;
+  // The zero-vs-absent rule lives in lib/calorie-ring.ts, where it is tested.
+  const state = calorieRingState(consumed, target);
+  const logged = state.status !== 'empty';
+  const over = state.status === 'over';
+  const eaten = state.status === 'empty' ? 0 : state.eaten;
+  const pct = state.status === 'empty' ? 0 : state.pct;
   const pctLabel = Math.round(pct * 100);
-  const remaining = Math.round(target - consumed);
-  const over = remaining < 0;
+  const remaining =
+    state.status === 'under' ? state.remaining : state.status === 'over' ? state.exceededBy : 0;
   const ringSize = compact ? 72 : 88;
 
   return (
@@ -45,16 +57,28 @@ export function CalorieProgress({ consumed, target, compact }: Props) {
               },
             ]}
           >
-            <Text style={[styles.ringPct, over && styles.over]}>{pctLabel}%</Text>
+            <Text style={[styles.ringPct, over && styles.over]}>
+              {logged ? `${pctLabel}%` : '—'}
+            </Text>
           </View>
         </View>
         <View style={styles.stats}>
-          <Text style={styles.consumed}>{formatKcal(consumed)}</Text>
-          <Text style={styles.label}>kcal eaten</Text>
-          <Text style={[styles.remaining, over && styles.over]}>
-            {over ? `${Math.abs(remaining)} over` : `${remaining} left`}
-          </Text>
-          <Text style={styles.label}>of {formatKcal(target)} goal</Text>
+          {logged ? (
+            <>
+              <Text style={styles.consumed}>{formatKcal(eaten)}</Text>
+              <Text style={styles.label}>kcal eaten</Text>
+              <Text style={[styles.remaining, over && styles.over]}>
+                {over ? `${remaining} over` : `${remaining} left`}
+              </Text>
+              <Text style={styles.label}>of {formatKcal(target)} goal</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.consumed}>{formatKcal(target)}</Text>
+              <Text style={styles.label}>kcal target</Text>
+              <Text style={styles.label}>Nothing logged yet</Text>
+            </>
+          )}
         </View>
       </View>
       <View style={styles.track}>

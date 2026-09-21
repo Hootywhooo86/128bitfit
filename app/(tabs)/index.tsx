@@ -50,7 +50,8 @@ export default function HomeScreen() {
   const { ready } = useDb();
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState('Athlete');
-  const [calories, setCalories] = useState(0);
+  // null until we know: distinguishes an unlogged day from a zero-calorie one.
+  const [calories, setCalories] = useState<number | null>(null);
   const [calorieTarget, setCalorieTarget] = useState(2200);
   const [waterMl, setWaterMl] = useState(0);
   const [waterTarget, setWaterTarget] = useState(2500);
@@ -74,7 +75,7 @@ export default function HomeScreen() {
       setDisplayName(settings.displayName);
       setAvatar(settings.avatar);
       setShowAvatar(settings.showAvatarOnHome);
-      setCalories(fuel.totals.calories);
+      setCalories(fuel.logs.length > 0 ? fuel.totals.calories : null);
       setCalorieTarget(fuel.goals.calorieTarget);
       setWaterMl(fuel.waterMl);
       setWaterTarget(fuel.goals.waterTargetMl);

@@ -17,7 +17,9 @@
     "typecheck": "tsc --noEmit",
     "verify:import": "node scripts/verify-import.mjs",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:web": "expo export -p web",
+    "serve:web": "node scripts/serve-web.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.7",

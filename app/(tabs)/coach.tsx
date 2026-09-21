@@ -3,6 +3,7 @@ import React, { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getAiSettings } from '@/db/ai-settings';
 import { useDb } from '@/db/DatabaseProvider';
+import { countCompletedSessions } from '@/db/workout-queries';
 import { colors, spacing } from '@/lib/theme';
 
 const CARDS = [
@@ -28,6 +29,8 @@ export default function CoachScreen() {
   const { ready } = useDb();
   const [hasKey, setHasKey] = useState(false);
   const [providerLine, setProviderLine] = useState('');
+  // null while unknown — an empty state must not flash before we have counted.
+  const [sessionCount, setSessionCount] = useState<number | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -36,6 +39,7 @@ export default function CoachScreen() {
         const ai = await getAiSettings();
         setHasKey(ai.hasKey);
         setProviderLine(ai.hasKey ? `${ai.provider} · ${ai.model}` : '');
+        setSessionCount(await countCompletedSessions());
       })();
     }, [ready])
   );
@@ -67,6 +71,18 @@ export default function CoachScreen() {
         </Pressable>
       ) : null}
 
+      {sessionCount === 0 ? (
+        // The brief is explicit: say there is nothing useful yet rather than
+        // inventing encouragement from an empty database.
+        <View style={styles.emptyCard}>
+          <Text style={styles.byoTitle}>Nothing to go on yet</Text>
+          <Text style={styles.blurb}>
+            Log a couple of sessions and I&apos;ll have something useful to tell you. Until
+            then there is no training history to read.
+          </Text>
+        </View>
+      ) : null}
+
       {CARDS.map((c) => (
         <Pressable
           key={c.mode}
@@ -84,6 +100,15 @@ export default function CoachScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  emptyCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    gap: spacing.xs,
+  },
   headerRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   title: { color: colors.text, fontSize: 24, fontWeight: '800' },
   muted: { color: colors.textMuted, lineHeight: 20, marginTop: 6 },
