@@ -9,14 +9,17 @@ import {
   View,
 } from 'react-native';
 import { CalorieProgress } from '@/components/CalorieProgress';
+import { MuscleLoadCard } from '@/components/MuscleLoadCard';
 import { PixelAvatar } from '@/components/PixelAvatar';
 import { StepsCard } from '@/components/StepsCard';
 import { WaterProgress } from '@/components/WaterProgress';
 import { WeekStrip } from '@/components/WeekStrip';
 import { useDb } from '@/db/DatabaseProvider';
 import { getDayFuelSummary } from '@/db/food-queries';
+import { getMuscleTally, periodFor } from '@/db/muscle-queries';
 import { getAppSettings } from '@/db/settings-queries';
 import type { AvatarConfig } from '@/lib/avatar';
+import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
 import { formatWeight, getLatestWeightEntry } from '@/db/weight-queries';
 import {
   getLastCompletedWorkoutSummary,
@@ -60,6 +63,7 @@ export default function HomeScreen() {
   const [week, setWeek] = useState<TrainingDayDot[]>([]);
   const [avatar, setAvatar] = useState<AvatarConfig | null>(null);
   const [showAvatar, setShowAvatar] = useState(true);
+  const [muscleTally, setMuscleTally] = useState<MuscleTally>(emptyTally());
 
   const refresh = useCallback(async () => {
     if (!ready) return;
@@ -77,6 +81,7 @@ export default function HomeScreen() {
       setShowAvatar(settings.showAvatarOnHome);
       setCalories(fuel.logs.length > 0 ? fuel.totals.calories : null);
       setCalorieTarget(fuel.goals.calorieTarget);
+      setMuscleTally(await getMuscleTally(periodFor(7).since));
       setWaterMl(fuel.waterMl);
       setWaterTarget(fuel.goals.waterTargetMl);
       setLastWorkout(workout);
@@ -124,6 +129,9 @@ export default function HomeScreen() {
       <WaterProgress ml={waterMl} targetMl={waterTarget} />
       <View style={{ height: spacing.sm }} />
       <StepsCard />
+
+      <Text style={styles.section}>Muscle load</Text>
+      <MuscleLoadCard tally={muscleTally} />
 
       <Text style={styles.section}>Last workout</Text>
       {lastWorkout ? (

@@ -272,6 +272,40 @@ Two things about web, both load-bearing:
   a spreadsheet would otherwise execute them. Numbers skip that guard, so a
   negative value stays `-5` rather than becoming text. JSON is the lossless copy.
 
+### Muscle load (the muscle map)
+
+- `lib/muscle-load.ts` (pure) — the 17 muscle groups the bundled exercise data
+  actually uses, the tally, and the load buckets. `db/muscle-queries.ts` does the
+  aggregation in one grouped query.
+- Screens: `app/progress.tsx` (7/30/90-day windows, ranked list) and
+  `components/MuscleLoadCard.tsx` on Home. The map is the app's signature view,
+  so it sits up front rather than behind a tab.
+- **The scale comes straight from CLAUDE.md**: yellow 1–3 sets, orange 4–7, red
+  8+. Untrained is greyscale, because grey is the absence of load rather than a
+  low amount of it. `muscleHeat` in `lib/theme.ts` is the only colour in the app
+  — a user-selectable accent must never be added to this scale.
+- A set counts fully for the muscle an exercise targets and **half** for the ones
+  it assists (`SECONDARY_SET_WEIGHT`). Counting assists equally would make every
+  pressing day look like a triceps day.
+- Only completed sets of completed sessions count, the same rule set pre-fill
+  uses — colouring a muscle from an abandoned workout would invent training that
+  never happened.
+- Unknown muscle names are ignored rather than guessed at, so a typo in the data
+  shows up as a missing muscle instead of load on the wrong one.
+- `lib/muscle-figure.ts` holds the geometry as tapered quads — a top edge, a
+  bottom edge, and the renderer interpolates the rows between. That buys curved
+  silhouettes (deltoid caps, the lat V, sweeping quads) from a handful of
+  numbers. Equal-width rows are merged back into one rect, so a straight section
+  costs one View and only curves cost extra — ~65 rects per figure rather than
+  several hundred.
+- **Coverage is closed, not best-effort.** `lib/muscle-figure.test.ts` asserts
+  that every muscle in the shipped exercise data is a known group, that every
+  group is drawn somewhere on the figure, and that the figure draws nothing that
+  is not a known group. A muscle with nowhere to go is a failing test, not a
+  silent drop at runtime.
+- Glutes are drawn on the back only; on the front that region is hip structure.
+  Colouring it there merged the hips and quads into one mass.
+
 ### Privacy & Health Connect compliance
 
 - Policy: `docs/privacy-policy.md`. In-app screen: `app/settings/privacy.tsx`,
