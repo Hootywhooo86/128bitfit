@@ -135,6 +135,21 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### Zero vs no data
+
+- The rule from CLAUDE.md's empty-state table: `0` claims a measurement was
+  taken and came back zero; absence gets a dash or a prompt. Never conflate them.
+- Where it is enforced: `lib/health/types.ts` (`steps: number | null`),
+  `lib/calorie-ring.ts` (`consumed: number | null`). Both keep the decision in a
+  typed state so it is testable, rather than inside JSX.
+- Callers must opt in — `number` satisfies `number | null`, so typecheck will not
+  catch a screen still passing a filled zero. `app/(tabs)/fuel.tsx` and
+  `app/(tabs)/index.tsx` pass `logs.length > 0 ? totals.calories : null`.
+- A *logged* zero (a 0 kcal drink) is a real reading and keeps the normal
+  display. Only absence gets the empty treatment.
+- `app/(tabs)/coach.tsx` counts completed sessions and says it has nothing to go
+  on rather than inventing encouragement.
+
 ### Network deadlines
 
 - `lib/net.ts` — use `fetchWithTimeout`, never bare `fetch`. Every call site has

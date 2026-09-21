@@ -387,6 +387,15 @@ export async function getWorkoutSummary(sessionId: string): Promise<WorkoutSumma
   };
 }
 
+/** Completed sessions only — what the coach actually has to work from. */
+export async function countCompletedSessions(): Promise<number> {
+  const rows = await db
+    .select({ n: count() })
+    .from(workoutSessions)
+    .where(eq(workoutSessions.status, 'completed'));
+  return rows[0]?.n ?? 0;
+}
+
 export async function countRoutines(): Promise<number> {
   const [row] = await db.select({ n: count() }).from(routines);
   return row?.n ?? 0;
