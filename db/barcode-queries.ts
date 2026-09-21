@@ -232,7 +232,9 @@ export async function lookupBarcode(rawBarcode: string): Promise<BarcodeLookupRe
       message:
         api.reason === 'not_found'
           ? 'No match in USDA or Open Food Facts. Create a custom food.'
-          : api.message,
+          : api.reason === 'timeout'
+            ? 'Open Food Facts did not respond. Create a custom food, or try again on a better connection.'
+            : api.message,
     };
   }
 

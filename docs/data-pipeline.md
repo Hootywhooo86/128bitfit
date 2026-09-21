@@ -135,6 +135,23 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### Network deadlines
+
+- `lib/net.ts` — use `fetchWithTimeout`, never bare `fetch`. Every call site has
+  a deadline: `LOOKUP_TIMEOUT_MS` (8s) for a lookup someone is waiting on
+  mid-workout, `AI_TIMEOUT_MS` (60s) for a model reply.
+- **Error handling is not enough on its own.** A hung request never rejects, so
+  the offline paths downstream never run — non-negotiable #4 says the UI never
+  waits on the network, and only a deadline delivers that.
+- A `signal` passed inside `init` is composed with the deadline, not replaced.
+  Overwriting it silently breaks cancel buttons; `lib/ai-coach.ts` passes its
+  signal that way.
+- A deadline breach throws `NetworkTimeoutError`; an outer cancel keeps its own
+  rejection, so a deliberate cancel is never reported as a timeout.
+- Open Food Facts lookups surface `reason: 'timeout'` separately from
+  `'network'`, and `db/barcode-queries.ts` turns it into a message that points
+  at the custom food form.
+
 ### Set pre-fill
 
 - `lib/set-prefill.ts` (pure) decides what a new set starts with;

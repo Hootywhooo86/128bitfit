@@ -3,6 +3,7 @@
  * Public API only; per-barcode lookups (no bulk import).
  * Data © Open Food Facts contributors — ODbL.
  */
+import { LOOKUP_TIMEOUT_MS, NetworkTimeoutError, fetchWithTimeout } from './net';
 
 export const OFF_USER_AGENT =
   '128BIT-FIT/0.1 (https://github.com/Hootywhooo86/128bitfit)';
@@ -45,7 +46,7 @@ export type NormalizedOffFood = {
 
 export type OffLookupResult =
   | { ok: true; food: NormalizedOffFood }
-  | { ok: false; reason: 'not_found' | 'network' | 'malformed'; message: string };
+  | { ok: false; reason: 'not_found' | 'network' | 'timeout' | 'malformed'; message: string };
 
 type OffNutriments = Record<string, unknown>;
 
@@ -232,16 +233,22 @@ export async function fetchOpenFoodFactsProduct(barcode: string): Promise<OffLoo
 
   let res: Response;
   try {
-    res = await fetch(OFF_PRODUCT_URL(cleaned), {
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': OFF_USER_AGENT,
+    // A deadline, not just error handling: a hung request never rejects, so
+    // without this the scan screen waits on a dead connection indefinitely.
+    res = await fetchWithTimeout(
+      OFF_PRODUCT_URL(cleaned),
+      {
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': OFF_USER_AGENT,
+        },
       },
-    });
+      { timeoutMs: LOOKUP_TIMEOUT_MS, label: 'Barcode lookup' }
+    );
   } catch (e) {
     return {
       ok: false,
-      reason: 'network',
+      reason: e instanceof NetworkTimeoutError ? 'timeout' : 'network',
       message: e instanceof Error ? e.message : 'Network request failed',
     };
   }
