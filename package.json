@@ -15,7 +15,9 @@
     "check:usda": "node scripts/check-usda.mjs",
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
-    "verify:import": "node scripts/verify-import.mjs"
+    "verify:import": "node scripts/verify-import.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
@@ -49,7 +51,8 @@
     "@types/react": "~19.2.2",
     "babel-plugin-inline-import": "^3.0.0",
     "drizzle-kit": "^0.31.10",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^5.0.1"
   },
   "engines": {
     "node": ">=18"

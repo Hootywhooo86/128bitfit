@@ -135,6 +135,19 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### Tests
+
+- `npm test` (vitest, `npm run test:watch` while working). Runs in CI across
+  UTC, America/Los_Angeles, Pacific/Kiritimati (UTC+14) and Asia/Kathmandu
+  (+05:45) — **the matrix is load-bearing**: replacing `dayKey` with
+  `toISOString()` passes a UTC-only run and fails in Los Angeles.
+- Unit tests cover the pure modules only: `lib/calorie-floor.ts`,
+  `lib/export/csv.ts`, `lib/export/json.ts`, `lib/health/dates.ts`. Those are
+  deliberately free of React Native, database and filesystem imports so they can
+  be tested without a device — keep it that way when extending them.
+- Anything touching SQLite, Health Connect or the filesystem is not covered here
+  and still needs a real build.
+
 ### Calorie floor
 
 - `lib/calorie-floor.ts` (pure) + `lib/avatar.ts` for the Mifflin–St Jeor BMR
