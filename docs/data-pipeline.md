@@ -135,6 +135,28 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### Data export
+
+- `lib/export/` — `csv.ts` and `json.ts` are pure (no db, no filesystem) and carry
+  the logic worth testing; `collect.ts` reads SQLite; `index.ts` writes the files
+- Screen: `app/settings/export.tsx`, linked from Settings
+- Output: a timestamped folder under the document directory holding
+  `128bitfit-export.json` (complete, re-importable) and one CSV per table
+- **Exported:** routines, routine_exercises, workout_sessions, session_exercises,
+  sets, food_logs, water_logs, weight_entries, settings, coach_threads,
+  coach_messages
+- **Not exported, and the JSON says so in an `excluded` block:** `exercises` and
+  `foods` (bundled public-domain reference data, ~9 MB, not the user's),
+  `off_food_cache` (a reconstructible ODbL cache — exporting it would
+  redistribute third-party data), `meta` (internal bookkeeping)
+- API keys are never exported. They live in expo-secure-store; nothing in
+  `lib/export/` reads them. Keep it that way.
+- Rows pointing at bundled tables carry the resolved name (`exercise_name`,
+  `food_name`) so each file stands alone without the reference data
+- CSV text cells starting with `= + - @`, tab or CR are prefixed with `'`, because
+  a spreadsheet would otherwise execute them. Numbers skip that guard, so a
+  negative value stays `-5` rather than becoming text. JSON is the lossless copy.
+
 ### Health (Health Connect)
 
 - Entry point: `lib/health/` — import `health` from `lib/health`, never a platform SDK

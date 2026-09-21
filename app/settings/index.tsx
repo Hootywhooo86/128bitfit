@@ -157,6 +157,13 @@ export default function SettingsScreen() {
         Secure Store on device — never committed or logged.
       </Text>
 
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/export')}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Export data</Text>
+          <Text style={styles.muted}>Download everything as CSV and JSON →</Text>
+        </View>
+      </Pressable>
+
       <Pressable style={styles.charCard} onPress={() => router.push('/settings/character')}>
         <PixelAvatar config={avatar} pose="idle" size={56} />
         <View style={{ flex: 1 }}>
