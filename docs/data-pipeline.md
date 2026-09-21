@@ -272,6 +272,30 @@ Two things about web, both load-bearing:
   a spreadsheet would otherwise execute them. Numbers skip that guard, so a
   negative value stays `-5` rather than becoming text. JSON is the lossless copy.
 
+### Muscle load (the muscle map)
+
+- `lib/muscle-load.ts` (pure) — the 17 muscle groups the bundled exercise data
+  actually uses, the tally, and the load buckets. `db/muscle-queries.ts` does the
+  aggregation in one grouped query.
+- Screens: `app/progress.tsx` (7/30/90-day windows, ranked list) and
+  `components/MuscleLoadCard.tsx` on Home. The map is the app's signature view,
+  so it sits up front rather than behind a tab.
+- **The scale comes straight from CLAUDE.md**: yellow 1–3 sets, orange 4–7, red
+  8+. Untrained is greyscale, because grey is the absence of load rather than a
+  low amount of it. `muscleHeat` in `lib/theme.ts` is the only colour in the app
+  — a user-selectable accent must never be added to this scale.
+- A set counts fully for the muscle an exercise targets and **half** for the ones
+  it assists (`SECONDARY_SET_WEIGHT`). Counting assists equally would make every
+  pressing day look like a triceps day.
+- Only completed sets of completed sessions count, the same rule set pre-fill
+  uses — colouring a muscle from an abandoned workout would invent training that
+  never happened.
+- Unknown muscle names are ignored rather than guessed at, so a typo in the data
+  shows up as a missing muscle instead of load on the wrong one.
+- `components/MuscleMap.tsx` is pixel blocks, not anatomical SVG: it matches the
+  app's aesthetic, needs no artwork, and a realistic figure reads as mush at this
+  size.
+
 ### Privacy & Health Connect compliance
 
 - Policy: `docs/privacy-policy.md`. In-app screen: `app/settings/privacy.tsx`,
