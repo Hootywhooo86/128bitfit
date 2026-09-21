@@ -324,17 +324,36 @@ Two things about web, both load-bearing:
   never happened.
 - Unknown muscle names are ignored rather than guessed at, so a typo in the data
   shows up as a missing muscle instead of load on the wrong one.
-- `lib/muscle-figure.ts` holds the geometry as tapered quads — a top edge, a
-  bottom edge, and the renderer interpolates the rows between. That buys curved
-  silhouettes (deltoid caps, the lat V, sweeping quads) from a handful of
-  numbers. Equal-width rows are merged back into one rect, so a straight section
-  costs one View and only curves cost extra — ~65 rects per figure rather than
-  several hundred.
+- `lib/muscle-figure.ts` holds the geometry as **overlapping ovals**, not boxes.
+  Each muscle belly is an ellipse (or a taper, for the traps and the ab gutters)
+  rasterised onto a 48x76 grid. Shapes paint in order, so a later one sits on top
+  of an earlier one — that is how the pecs overlap the ribcage.
+- The figure is drawn in two passes. A **structure pass** in `null` paint (grey,
+  never coloured) lays down a solid body: skull, jaw, neck, ribcage, waist, hips,
+  arms, fists, legs, feet. The **belly pass** then draws each muscle inset by
+  about one cell. Two things fall out of that: the silhouette has no holes where
+  two muscles fail to meet, and the cell of structure left showing between
+  neighbours is the separation line that makes the groups read as distinct
+  instead of as one blob. The six-pack is the same trick in reverse — a grid of
+  one-cell `null` tapers carved back out of the ab ellipse.
+- Joints get a deliberate one-cell gap (elbow, knee), so limbs read as two
+  segments rather than one slab.
+- `rasterise()` then covers the painted grid with **greedy maximal rectangles**:
+  grow right, then grow down while the whole row still matches. Every rect is a
+  View and both figures are on screen at once, so the count is what matters —
+  ~236 front / ~219 back, against ~1,800 for a View per cell. Merging row runs
+  instead costs about a third more, because a curve rarely repeats the same start
+  and width twice running.
+- The geometry is original. It traces no existing artwork.
 - **Coverage is closed, not best-effort.** `lib/muscle-figure.test.ts` asserts
   that every muscle in the shipped exercise data is a known group, that every
   group is drawn somewhere on the figure, and that the figure draws nothing that
   is not a known group. A muscle with nowhere to go is a failing test, not a
   silent drop at runtime.
+- The same file asserts that `rasterise()` **tiles exactly**: every painted cell
+  is covered once, with no overlap and no gap. An overlap is a wasted View and a
+  wrong colour where the rects cross; a gap is a hole in the figure. Neither is
+  visible in a diff, which is why it is a test.
 - Glutes are drawn on the back only; on the front that region is hip structure.
   Colouring it there merged the hips and quads into one mass.
 
