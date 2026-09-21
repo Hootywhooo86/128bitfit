@@ -1,12 +1,16 @@
-import { eq } from 'drizzle-orm';
+import { desc, eq } from 'drizzle-orm';
 import {
   DEFAULT_AVATAR,
+  ageFromBirthday,
   normalizeAvatar,
+  toMetric,
   type AvatarConfig,
+  type CalorieProfile,
   type SexOption,
 } from '@/lib/avatar';
+import { clampCalorieTarget, type ClampedTarget } from '@/lib/calorie-floor';
 import { db } from './client';
-import { settings } from './schema';
+import { settings, weightEntries } from './schema';
 import {
   DEFAULT_GOALS,
   ensureDefaultGoals,
@@ -122,6 +126,56 @@ export async function getAppSettings(): Promise<AppSettings> {
   };
 }
 
+/**
+ * The body data the calorie floor needs. Weight comes from the most recent
+ * weigh-in; the rest from settings. Any of it may be missing, in which case
+ * the floor falls back to the absolute minimum.
+ *
+ * Queried straight off the table rather than through weight-queries, which
+ * imports from this module — going the other way at runtime would close a
+ * cycle.
+ */
+export async function getCalorieProfile(): Promise<CalorieProfile> {
+  const [sexRaw, birthdayRaw, heightRaw, unitsRaw] = await Promise.all([
+    getSetting('sex'),
+    getSetting('birthday'),
+    getSetting('height_cm'),
+    getSetting('units'),
+  ]);
+
+  const latest = await db
+    .select({ value: weightEntries.kgOrLb, unit: weightEntries.unit })
+    .from(weightEntries)
+    .orderBy(desc(weightEntries.loggedAt))
+    .limit(1);
+
+  const heightN = heightRaw != null ? Number(heightRaw) : NaN;
+  const entry = latest[0];
+  // Each weigh-in stores the unit it was entered in; trust that over the
+  // display preference, which the user may have changed since.
+  const { kg, cm } = toMetric({
+    heightCm: Number.isFinite(heightN) && heightN > 0 ? heightN : null,
+    weightValue: entry ? entry.value : null,
+    units: entry ? (entry.unit === 'kg' ? 'kg' : 'lb') : unitsRaw === 'kg' ? 'kg' : 'lb',
+  });
+
+  return {
+    sex: parseSex(sexRaw),
+    age: ageFromBirthday(birthdayRaw),
+    weightKg: kg,
+    heightCm: cm,
+  };
+}
+
+/**
+ * Applies the calorie floor. Exported so a screen can show what will happen
+ * before saving — but enforcement does not depend on any screen calling it,
+ * because updateAppSettings clamps again on the way to the database.
+ */
+export async function previewCalorieTarget(requested: number): Promise<ClampedTarget> {
+  return clampCalorieTarget(requested, await getCalorieProfile());
+}
+
 export async function updateAppSettings(patch: {
   calorieTarget?: number;
   proteinTarget?: number;
@@ -136,7 +190,10 @@ export async function updateAppSettings(patch: {
   heightCm?: number | null;
 }): Promise<AppSettings> {
   if (patch.calorieTarget != null) {
-    await setSetting('calorie_target', String(Math.round(patch.calorieTarget)));
+    // Non-negotiable #6: the floor is applied here, at the only path into the
+    // database, so no screen and no future caller can write below it.
+    const clamped = clampCalorieTarget(patch.calorieTarget, await getCalorieProfile());
+    await setSetting('calorie_target', String(clamped.value));
   }
   if (patch.proteinTarget != null) {
     await setSetting('protein_target', String(Math.round(patch.proteinTarget)));

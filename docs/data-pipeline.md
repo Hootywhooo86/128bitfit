@@ -135,6 +135,82 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### Tests
+
+- `npm test` (vitest, `npm run test:watch` while working). Runs in CI across
+  UTC, America/Los_Angeles, Pacific/Kiritimati (UTC+14) and Asia/Kathmandu
+  (+05:45) — **the matrix is load-bearing**: replacing `dayKey` with
+  `toISOString()` passes a UTC-only run and fails in Los Angeles.
+- Unit tests cover the pure modules only: `lib/calorie-floor.ts`,
+  `lib/export/csv.ts`, `lib/export/json.ts`, `lib/health/dates.ts`. Those are
+  deliberately free of React Native, database and filesystem imports so they can
+  be tested without a device — keep it that way when extending them.
+- Anything touching SQLite, Health Connect or the filesystem is not covered here
+  and still needs a real build.
+
+### Calorie floor
+
+- `lib/calorie-floor.ts` (pure) + `lib/avatar.ts` for the Mifflin–St Jeor BMR
+- Floor is the highest of: an absolute minimum (1200 kcal, 1500 for male
+  profiles), the user's BMR, and 75% of TDEE (the 25% deficit cap)
+- When TDEE is known the deficit cap always dominates BMR — TDEE is BMR × 1.375,
+  so 75% of it is ~1.03 × BMR. Both bounds stay explicit so the rule survives a
+  change to the activity multiplier.
+- **Enforced in `db/settings-queries.ts` `updateAppSettings()`**, the single path
+  into the `calorie_target` setting. Do not clamp in a screen instead — the other
+  screens would be a way around it.
+- Screens call `previewCalorieTarget()` only to explain the change; enforcement
+  does not depend on them doing so
+- Onboarding logs the weigh-in *before* saving goals, so the floor computes
+  against a profile that has a weight in it
+- `ensureDefaultGoals()` in `db/food-queries.ts` seeds 2200 unclamped; that runs
+  before any profile exists, where the floor is at most 1500, so it cannot land
+  below it. Known gap: a stored target is not re-clamped if the body profile
+  changes later — it is corrected on the next save.
+
+### Data export
+
+- `lib/export/` — `csv.ts` and `json.ts` are pure (no db, no filesystem) and carry
+  the logic worth testing; `collect.ts` reads SQLite; `index.ts` writes the files
+- Screen: `app/settings/export.tsx`, linked from Settings
+- Output: a timestamped folder under the document directory holding
+  `128bitfit-export.json` (complete, re-importable) and one CSV per table
+- **Exported:** routines, routine_exercises, workout_sessions, session_exercises,
+  sets, food_logs, water_logs, weight_entries, settings, coach_threads,
+  coach_messages
+- **Not exported, and the JSON says so in an `excluded` block:** `exercises` and
+  `foods` (bundled public-domain reference data, ~9 MB, not the user's),
+  `off_food_cache` (a reconstructible ODbL cache — exporting it would
+  redistribute third-party data), `meta` (internal bookkeeping)
+- API keys are never exported. They live in expo-secure-store; nothing in
+  `lib/export/` reads them. Keep it that way.
+- Rows pointing at bundled tables carry the resolved name (`exercise_name`,
+  `food_name`) so each file stands alone without the reference data
+- CSV text cells starting with `= + - @`, tab or CR are prefixed with `'`, because
+  a spreadsheet would otherwise execute them. Numbers skip that guard, so a
+  negative value stays `-5` rather than becoming text. JSON is the lossless copy.
+
+### Health (Health Connect)
+
+- Entry point: `lib/health/` — import `health` from `lib/health`, never a platform SDK
+- `types.ts` is the `HealthProvider` interface (`readDays()` / `writeEntries()`);
+  `health-connect.ts` is the Android implementation, `unavailable.ts` the fallback
+  for iOS and web until HealthKit lands
+- `index.ts` requires the Android module **lazily**. `react-native-health-connect`
+  resolves its native module with `TurboModuleRegistry.getEnforcing` at import
+  time, which throws on iOS, web and Expo Go — a static import crashes the app at
+  launch. Keep the lazy require and its try/catch.
+- `app.json` needs both the `react-native-health-connect` plugin **and** the
+  `android.permission.health.*` entries. The config plugin only adds the
+  permission-rationale intent filters; it does not declare permissions, so reads
+  fail silently at runtime without them. Adding a record type means adding its
+  permission here too.
+- A day's metric is `number | null`: `null` means no reading was taken, `0` means
+  it was read and was zero. `components/StepsCard.tsx` renders those differently
+  and must keep doing so — see the empty-state table in `CLAUDE.md`.
+- Local calendar days come from `lib/health/dates.ts`. Use it rather than
+  `toISOString()`, which is UTC and shifts the day boundary west of Greenwich.
+
 ### Pixel avatar + onboarding
 
 - Settings keys: `onboarding_complete`, `avatar_config` (JSON),

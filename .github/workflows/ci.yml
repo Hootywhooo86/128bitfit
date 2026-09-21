@@ -28,6 +28,30 @@ jobs:
 
       - run: npm run typecheck
 
+  test:
+    name: test (${{ matrix.tz }})
+    runs-on: ubuntu-latest
+    strategy:
+      # The date helpers exist to avoid UTC day-boundary bugs, so running only
+      # in UTC would miss exactly what they guard against. Kiritimati is UTC+14
+      # and Kathmandu is a +05:45 half-hour offset.
+      fail-fast: false
+      matrix:
+        tz: [UTC, America/Los_Angeles, Pacific/Kiritimati, Asia/Kathmandu]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm test
+        env:
+          TZ: ${{ matrix.tz }}
+
   verify-import:
     name: verify:import
     runs-on: ubuntu-latest

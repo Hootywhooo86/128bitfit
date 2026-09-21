@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { CalorieProgress } from '@/components/CalorieProgress';
 import { PixelAvatar } from '@/components/PixelAvatar';
+import { StepsCard } from '@/components/StepsCard';
 import { WaterProgress } from '@/components/WaterProgress';
 import { WeekStrip } from '@/components/WeekStrip';
 import { useDb } from '@/db/DatabaseProvider';
@@ -120,6 +121,8 @@ export default function HomeScreen() {
       <CalorieProgress consumed={calories} target={calorieTarget} compact />
       <View style={{ height: spacing.sm }} />
       <WaterProgress ml={waterMl} targetMl={waterTarget} />
+      <View style={{ height: spacing.sm }} />
+      <StepsCard />
 
       <Text style={styles.section}>Last workout</Text>
       {lastWorkout ? (
