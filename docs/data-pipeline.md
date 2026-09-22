@@ -185,7 +185,14 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - API keys: `lib/api-key.ts` sanitises a pasted key (first non-empty line, all
   whitespace and zero-width characters stripped) on both save and read, so a
   key already stored broken is repaired without re-pasting.
-  `describeKeyProblem()` validates before the key reaches a header.
+  `describeKeyProblem()` validates before the key reaches a header, and
+  `sanitizeBaseUrl()` gives a pasted custom endpoint the same treatment — it is
+  the other user-pasted value that reaches the network layer.
+- Transport failures are translated by `lib/net-errors.ts` before they are
+  shown. A native request rejection becomes "paste the key again" rather than
+  `java.lang.IllegalArgumentException: Unexpected char 0x0a at 44`. An error it
+  does not recognise is passed through unchanged — a mysterious message the
+  user can search for beats a friendly one that says nothing.
   `lib/ai-secure.ts` reads the key back after writing it and throws
   `AiKeyStoreError` if it did not stick. It used to swallow the failure, so the
   key lived in memory until the app closed and then vanished silently.

@@ -68,3 +68,14 @@ export function describeKeyProblem(key: string | null | undefined): string | nul
   }
   return null;
 }
+
+/**
+ * The same treatment for a pasted endpoint address.
+ *
+ * A custom base URL is typed or pasted like a key and reaches the network
+ * layer the same way — a newline in it produces the identical native rejection,
+ * on the URL instead of the header. A URL never contains whitespace either.
+ */
+export function sanitizeBaseUrl(raw: string | null | undefined): string {
+  return sanitizeApiKey(raw) ?? '';
+}

@@ -7,6 +7,7 @@
 import { getAiRuntimeConfig } from '@/db/ai-settings';
 import { AiCoachError, getProviderMeta, visionSupport } from './ai-coach';
 import { callWithRotation } from './ai-rotate';
+import { describeNetworkFailure } from './net-errors';
 import {
   EQUIPMENT_PROMPT,
   equipmentSystemPrompt,
@@ -55,10 +56,11 @@ export async function identifyEquipment(
       ], signal);
     return parseIdentifiedExercise(res.content);
   } catch (e) {
-    if (e instanceof AiCoachError) return { status: 'failed', message: e.message };
-    return {
-      status: 'failed',
-      message: e instanceof Error ? e.message : 'The identification failed. Try again, or fill it in by hand.',
-    };
+    // The provider's own words when it answered; a translated sentence when
+    // the request never left the phone.
+    if (e instanceof AiCoachError && e.status != null) {
+      return { status: 'failed', message: e.message };
+    }
+    return { status: 'failed', message: describeNetworkFailure(e, 'the exercise photo') };
   }
 }

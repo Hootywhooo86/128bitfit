@@ -12,6 +12,7 @@
 import { getAiRuntimeConfig } from '@/db/ai-settings';
 import { AiCoachError, getProviderMeta, visionSupport } from './ai-coach';
 import { callWithRotation } from './ai-rotate';
+import { describeNetworkFailure } from './net-errors';
 import {
   PHOTO_PROMPT,
   describePrompt,
@@ -87,12 +88,14 @@ export async function estimateFood(
     return parseAiFood(attempt.content);
   } catch (e) {
     if (e instanceof AiCoachError) {
-      return { status: 'failed', message: e.message };
+      // The provider's own words when it answered; a translated sentence when
+      // the request never left the phone.
+      return {
+        status: 'failed',
+        message: e.status != null ? e.message : describeNetworkFailure(e, 'your food estimate'),
+      };
     }
-    return {
-      status: 'failed',
-      message: e instanceof Error ? e.message : 'The estimate failed. Try again, or add the food by hand.',
-    };
+    return { status: 'failed', message: describeNetworkFailure(e, 'your food estimate') };
   }
 }
 
