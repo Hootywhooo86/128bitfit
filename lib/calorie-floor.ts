@@ -19,7 +19,7 @@
  * db/settings-queries.ts, which every screen goes through — clamping in a
  * screen would leave the other screens as a way around it.
  */
-import { basalMetabolicRate, totalDailyEnergy, type CalorieProfile, type SexOption } from './avatar';
+import { basalMetabolicRate, totalDailyEnergy, type CalorieProfile, type SexOption } from './body';
 
 /**
  * The widely cited absolute daily minimums. Applied when body data is missing,

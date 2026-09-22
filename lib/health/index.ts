@@ -16,9 +16,14 @@ import { unavailableProvider } from './unavailable';
 import type {
   HealthAvailability,
   HealthDay,
+  HealthGrants,
+  HealthHydrationEntry,
+  HealthNutritionEntry,
   HealthPermissionState,
   HealthProvider,
+  HealthWeightEntry,
   HealthWorkoutEntry,
+  HealthWriteResult,
 } from './types';
 
 let resolved: HealthProvider | null = null;
@@ -51,6 +56,9 @@ export const health: HealthProvider = {
   getPermissionState(): Promise<HealthPermissionState> {
     return provider().getPermissionState();
   },
+  getGrants(): Promise<HealthGrants> {
+    return provider().getGrants();
+  },
   requestPermissions(): Promise<HealthPermissionState> {
     return provider().requestPermissions();
   },
@@ -59,6 +67,15 @@ export const health: HealthProvider = {
   },
   writeEntries(entries: HealthWorkoutEntry[]): Promise<number> {
     return provider().writeEntries(entries);
+  },
+  writeNutrition(entries: HealthNutritionEntry[]): Promise<HealthWriteResult> {
+    return provider().writeNutrition(entries);
+  },
+  writeWeight(entries: HealthWeightEntry[]): Promise<HealthWriteResult> {
+    return provider().writeWeight(entries);
+  },
+  writeHydration(entries: HealthHydrationEntry[]): Promise<HealthWriteResult> {
+    return provider().writeHydration(entries);
   },
   openSettings(): void {
     provider().openSettings();

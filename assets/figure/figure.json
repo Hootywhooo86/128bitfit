@@ -1,0 +1,40 @@
+{
+  "front": {
+    "width": 329,
+    "height": 720,
+    "muscles": [
+      "neck",
+      "traps",
+      "shoulders",
+      "abdominals",
+      "biceps",
+      "forearms",
+      "abductors",
+      "quadriceps",
+      "adductors",
+      "calves",
+      "lats",
+      "triceps",
+      "chest"
+    ]
+  },
+  "back": {
+    "width": 308,
+    "height": 720,
+    "muscles": [
+      "neck",
+      "traps",
+      "shoulders",
+      "lats",
+      "middle back",
+      "lower back",
+      "triceps",
+      "forearms",
+      "glutes",
+      "hamstrings",
+      "calves",
+      "abductors",
+      "adductors"
+    ]
+  }
+}

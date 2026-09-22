@@ -1,6 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
+  Image,
   ActivityIndicator,
   Alert,
   Pressable,
@@ -100,13 +101,27 @@ export default function FuelScreen() {
           <Text style={styles.muted}>Today</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable style={styles.scanBtn} onPress={() => router.push('/fuel/scan')}>
-            <Text style={styles.scanBtnText}>Scan barcode</Text>
-          </Pressable>
           <Pressable style={styles.addBtn} onPress={() => router.push('/fuel/add')}>
             <Text style={styles.addBtnText}>+ Add food</Text>
           </Pressable>
         </View>
+      </View>
+
+      {/*
+        Three ways in, because the catalog will not have everything: a barcode
+        for a packaged product, the panel itself when the barcode is unknown,
+        and typing it in when neither works.
+      */}
+      <View style={styles.captureRow}>
+        <Pressable style={styles.captureBtn} onPress={() => router.push('/fuel/scan')}>
+          <Text style={styles.captureText}>Scan barcode</Text>
+        </Pressable>
+        <Pressable style={styles.captureBtn} onPress={() => router.push('/fuel/label')}>
+          <Text style={styles.captureText}>Scan label</Text>
+        </Pressable>
+        <Pressable style={styles.captureBtn} onPress={() => router.push('/fuel/custom')}>
+          <Text style={styles.captureText}>Custom food</Text>
+        </Pressable>
       </View>
 
       {/* null, not 0: an unlogged day is not a day of eating nothing. */}
@@ -152,6 +167,9 @@ export default function FuelScreen() {
                 onPress={() => router.push(`/fuel/edit/${encodeURIComponent(log.id)}`)}
                 onLongPress={() => onRemoveLog(log)}
               >
+                {log.photoUri ? (
+                  <Image source={{ uri: log.photoUri }} style={styles.logPhoto} resizeMode="cover" />
+                ) : null}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.logName}>{log.displayName}</Text>
                   <Text style={styles.logMeta}>
@@ -188,6 +206,24 @@ function MacroChip({
 }
 
 const styles = StyleSheet.create({
+  logPhoto: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    marginRight: 10,
+    backgroundColor: colors.surface,
+  },
+  captureRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
+  captureBtn: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  captureText: { color: colors.text, fontWeight: '700', fontSize: 13 },
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   headerRow: {

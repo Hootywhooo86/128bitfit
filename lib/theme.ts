@@ -30,6 +30,17 @@ export const muscleHeat = {
   heavy: '#d93a3a',
 } as const;
 
+/**
+ * How the muscle map colours a session: red where the muscle was the target of
+ * an exercise, yellow where it only assisted. Same two ends as the load scale
+ * above, so the two never read as different meanings of the same colour.
+ */
+export const muscleRole = {
+  primary: '#d93a3a',
+  secondary: '#e8c547',
+  none: 'transparent',
+} as const;
+
 export const spacing = {
   xs: 4,
   sm: 8,

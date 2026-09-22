@@ -77,10 +77,6 @@ export default function RootLayout() {
               options={{ title: 'Settings', headerStyle: { backgroundColor: colors.surface } }}
             />
             <Stack.Screen
-              name="settings/character"
-              options={{ title: 'Character', headerStyle: { backgroundColor: colors.surface } }}
-            />
-            <Stack.Screen
               name="home/weight"
               options={{ title: 'Weight', headerStyle: { backgroundColor: colors.surface } }}
             />

@@ -344,55 +344,54 @@ Two things about web, both load-bearing:
 ### Muscle load (the muscle map)
 
 - `lib/muscle-load.ts` (pure) — the 17 muscle groups the bundled exercise data
-  actually uses, the tally, and the load buckets. `db/muscle-queries.ts` does the
-  aggregation in one grouped query.
-- Screens: `app/progress.tsx` (7/30/90-day windows, ranked list) and
-  `components/MuscleLoadCard.tsx` on Home. The map is the app's signature view,
-  so it sits up front rather than behind a tab.
-- **The scale comes straight from CLAUDE.md**: yellow 1–3 sets, orange 4–7, red
-  8+. Untrained is greyscale, because grey is the absence of load rather than a
-  low amount of it. `muscleHeat` in `lib/theme.ts` is the only colour in the app
-  — a user-selectable accent must never be added to this scale.
-- A set counts fully for the muscle an exercise targets and **half** for the ones
-  it assists (`SECONDARY_SET_WEIGHT`). Counting assists equally would make every
-  pressing day look like a triceps day.
-- Only completed sets of completed sessions count, the same rule set pre-fill
-  uses — colouring a muscle from an abandoned workout would invent training that
-  never happened.
+  actually uses, the tally, the load buckets, and `muscleRoles()`.
+- `db/muscle-queries.ts` runs one grouped query for completed sets of completed
+  sessions and feeds both. Only completed sets of **completed** sessions count:
+  an abandoned workout is full of values nobody lifted, and colouring a muscle
+  from those would invent training that did not happen.
+- **Red is targeted, yellow is assisted.** `muscleRoles()` classifies each
+  muscle for the window: `primary` if any exercise named it as a target,
+  `secondary` if it only ever assisted, `none` otherwise. A muscle that was both
+  is primary — the harder classification wins, because that is what the training
+  actually was, and the order the exercises were logged in must not change the
+  answer. Both directions are tested.
+- `muscleRole` in `lib/theme.ts` holds the two colours. They are the same two
+  ends as the `muscleHeat` load scale, so the two never read as different
+  meanings of the same colour. Untrained stays untinted — absence of load, not a
+  low amount of it.
 - Unknown muscle names are ignored rather than guessed at, so a typo in the data
   shows up as a missing muscle instead of load on the wrong one.
-- `lib/muscle-figure.ts` holds the geometry as **overlapping ovals**, not boxes.
-  Each muscle belly is an ellipse (or a taper, for the traps and the ab gutters)
-  rasterised onto a 48x76 grid. Shapes paint in order, so a later one sits on top
-  of an earlier one — that is how the pecs overlap the ribcage.
-- The figure is drawn in two passes. A **structure pass** in `null` paint (grey,
-  never coloured) lays down a solid body: skull, jaw, neck, ribcage, waist, hips,
-  arms, fists, legs, feet. The **belly pass** then draws each muscle inset by
-  about one cell. Two things fall out of that: the silhouette has no holes where
-  two muscles fail to meet, and the cell of structure left showing between
-  neighbours is the separation line that makes the groups read as distinct
-  instead of as one blob. The six-pack is the same trick in reverse — a grid of
-  one-cell `null` tapers carved back out of the ab ellipse.
-- Joints get a deliberate one-cell gap (elbow, knee), so limbs read as two
-  segments rather than one slab.
-- `rasterise()` then covers the painted grid with **greedy maximal rectangles**:
-  grow right, then grow down while the whole row still matches. Every rect is a
-  View and both figures are on screen at once, so the count is what matters —
-  ~236 front / ~219 back, against ~1,800 for a View per cell. Merging row runs
-  instead costs about a third more, because a curve rarely repeats the same start
-  and width twice running.
-- The geometry is original. It traces no existing artwork.
-- **Coverage is closed, not best-effort.** `lib/muscle-figure.test.ts` asserts
-  that every muscle in the shipped exercise data is a known group, that every
-  group is drawn somewhere on the figure, and that the figure draws nothing that
-  is not a known group. A muscle with nowhere to go is a failing test, not a
-  silent drop at runtime.
-- The same file asserts that `rasterise()` **tiles exactly**: every painted cell
-  is covered once, with no overlap and no gap. An overlap is a wasted View and a
-  wrong colour where the rects cross; a gap is a hole in the figure. Neither is
-  visible in a diff, which is why it is a test.
-- Glutes are drawn on the back only; on the front that region is hip structure.
-  Colouring it there merged the hips and quads into one mass.
+
+#### The artwork
+
+`assets/figure/` holds a front and a back view of one figure, plus one alpha
+mask per muscle per view — 13 each. `components/MuscleMap.tsx` stacks the masks
+the session actually worked over the base image and tints each with
+`tintColor`. Only trained muscles render, so a typical session costs a handful
+of images rather than 26.
+
+- `lib/figure-assets.ts` `require()`s every mask **statically**. Metro resolves
+  asset paths at build time, so a computed `require` bundles nothing and the map
+  would silently render no colour at all.
+- `assets/figure/figure.json` records which muscles each view carries, and
+  `lib/figure-assets.test.ts` asserts against it: every muscle in the shipped
+  exercise data is a known group, every known group has artwork on at least one
+  view, the artwork names nothing that is not a known group, and each muscle is
+  on the view it is actually visible from — glutes on the back, pecs on the
+  front. Drawing a muscle on the wrong view colours the wrong part of the body,
+  which is worse than not colouring it.
+- Region polygons are authored in fractions of the figure's bounding box,
+  against measured landmarks (chin 0.13, nipple 0.27, navel 0.40, crotch 0.55,
+  knee 0.70, ankle 0.90) rather than guessed. Only the left half is authored;
+  the generator mirrors it.
+- **Provenance:** the base artwork was supplied by the project owner, not
+  generated here. It is third-party work and its licence has not been
+  established — that needs settling before any Play submission.
+
+An earlier version drew the figure procedurally, as overlapping ovals
+rasterised to a 48x76 grid. It is gone. It read as blocks at every size that
+mattered, and no amount of geometry fixed that: the problem was the resolution,
+not the shapes.
 
 ### Privacy & Health Connect compliance
 

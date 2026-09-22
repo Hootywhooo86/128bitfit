@@ -7,7 +7,9 @@
  */
 import { and, eq, gte, sql } from 'drizzle-orm';
 import {
+  muscleRoles,
   tallyMuscleSets,
+  type MuscleRoles,
   type MuscleTally,
   type MuscleWorkEntry,
 } from '@/lib/muscle-load';
@@ -33,7 +35,7 @@ export function periodFor(days: number): MusclePeriod {
  * Completed sets in the window, grouped by exercise, with that exercise's
  * muscles. Grouping in SQL keeps this one query rather than one per exercise.
  */
-export async function getMuscleTally(since: Date): Promise<MuscleTally> {
+async function workEntries(since: Date): Promise<MuscleWorkEntry[]> {
   const rows = await db
     .select({
       completedSets: sql<number>`count(${sets.id})`,
@@ -53,14 +55,21 @@ export async function getMuscleTally(since: Date): Promise<MuscleTally> {
     )
     .groupBy(sessionExercises.exerciseId);
 
-  const entries: MuscleWorkEntry[] = rows.map((r) => ({
+  return rows.map((r) => ({
     completedSets: Number(r.completedSets) || 0,
     // Stored as JSON text columns.
     primaryMuscles: parseList(r.primaryMuscles),
     secondaryMuscles: parseList(r.secondaryMuscles),
   }));
+}
 
-  return tallyMuscleSets(entries);
+export async function getMuscleTally(since: Date): Promise<MuscleTally> {
+  return tallyMuscleSets(await workEntries(since));
+}
+
+/** What the map colours by: targeted in red, assisting in yellow. */
+export async function getMuscleRoles(since: Date): Promise<MuscleRoles> {
+  return muscleRoles(await workEntries(since));
 }
 
 function parseList(raw: string | null): string[] {

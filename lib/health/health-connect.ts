@@ -3,6 +3,10 @@
  *
  * Only lib/health/index.ts should import this; everything else goes through
  * the interface so the HealthKit implementation can slot in later.
+ *
+ * The record types and their Android permissions live in ./scopes, where a test
+ * checks them against app.json — a scope the code requests but the manifest
+ * does not declare is never granted and reads come back empty with no error.
  */
 import {
   SdkAvailabilityStatus,
@@ -15,27 +19,27 @@ import {
   requestPermission,
 } from 'react-native-health-connect';
 import type { Permission } from 'react-native-health-connect';
+import { SCOPE_RECORDS, healthConnectPermissions, type Direction } from './scopes';
 import { dayKey, eachDay, endOfLocalDay, startOfLocalDay } from './dates';
-import type {
-  HealthAvailability,
-  HealthDay,
-  HealthPermissionState,
-  HealthProvider,
-  HealthWorkoutEntry,
+import {
+  HEALTH_SCOPES,
+  emptyHealthDay,
+  type HealthAvailability,
+  type HealthDay,
+  type HealthGrants,
+  type HealthHydrationEntry,
+  type HealthNutritionEntry,
+  type HealthPermissionState,
+  type HealthProvider,
+  type HealthScope,
+  type HealthWeightEntry,
+  type HealthWorkoutEntry,
+  type HealthWriteResult,
 } from './types';
 
-/**
- * Least privilege: steps to show on Home, exercise writes to push finished
- * workouts back. Adding a record type here also means adding the matching
- * `android.permission.health.*` entry to app.json — the config plugin does not
- * declare permissions for you.
- */
-const PERMISSIONS: Permission[] = [
-  { accessType: 'read', recordType: 'Steps' },
-  { accessType: 'write', recordType: 'ExerciseSession' },
-];
+const PERMISSIONS = healthConnectPermissions() as Permission[];
 
-/** Health Connect's generic "other workout" type; we do not classify lifts further. */
+/** Health Connect's strength-training exercise type. */
 const EXERCISE_TYPE_STRENGTH_TRAINING = 70;
 
 let initialized = false;
@@ -50,13 +54,46 @@ async function ensureInitialized(): Promise<boolean> {
   return initialized;
 }
 
-function hasAll(granted: { accessType: string; recordType: string }[]): boolean {
-  return PERMISSIONS.every((want) =>
-    granted.some(
-      (g) => g.accessType === want.accessType && g.recordType === want.recordType
-    )
-  );
+type Granted = { accessType: string; recordType: string }[];
+
+function grantsFrom(granted: Granted): HealthGrants {
+  const has = (dir: Direction, recordType: string) =>
+    granted.some((g) => g.accessType === dir && g.recordType === recordType);
+
+  const read: HealthScope[] = [];
+  const write: HealthScope[] = [];
+  for (const scope of HEALTH_SCOPES) {
+    const spec = SCOPE_RECORDS[scope];
+    if (spec.directions.includes('read') && has('read', spec.recordType)) read.push(scope);
+    if (spec.directions.includes('write') && has('write', spec.recordType)) write.push(scope);
+  }
+  return { read, write };
 }
+
+function stateFrom(granted: Granted): HealthPermissionState {
+  const got = granted.length;
+  if (got === 0) return 'denied';
+  return got >= PERMISSIONS.length ? 'granted' : 'partial';
+}
+
+/** A read that was not granted must not come back as zero. */
+async function tryRead<T>(recordType: string, start: string, end: string): Promise<T[] | null> {
+  try {
+    const { records } = await readRecords(recordType as never, {
+      timeRangeFilter: {
+        operator: 'between',
+        startTime: startOfLocalDay(start).toISOString(),
+        endTime: endOfLocalDay(end).toISOString(),
+      },
+    });
+    return records as T[];
+  } catch {
+    return null;
+  }
+}
+
+const num = (v: unknown): number | null =>
+  typeof v === 'number' && Number.isFinite(v) ? v : null;
 
 export const healthConnectProvider: HealthProvider = {
   name: 'Health Connect',
@@ -77,22 +114,25 @@ export const healthConnectProvider: HealthProvider = {
   async getPermissionState(): Promise<HealthPermissionState> {
     try {
       if (!(await ensureInitialized())) return 'denied';
-      const granted = await getGrantedPermissions();
-      return hasAll(granted as { accessType: string; recordType: string }[])
-        ? 'granted'
-        : 'denied';
+      return stateFrom((await getGrantedPermissions()) as Granted);
     } catch {
       return 'unknown';
+    }
+  },
+
+  async getGrants(): Promise<HealthGrants> {
+    try {
+      if (!(await ensureInitialized())) return { read: [], write: [] };
+      return grantsFrom((await getGrantedPermissions()) as Granted);
+    } catch {
+      return { read: [], write: [] };
     }
   },
 
   async requestPermissions(): Promise<HealthPermissionState> {
     try {
       if (!(await ensureInitialized())) return 'denied';
-      const granted = await requestPermission(PERMISSIONS);
-      return hasAll(granted as { accessType: string; recordType: string }[])
-        ? 'granted'
-        : 'denied';
+      return stateFrom((await requestPermission(PERMISSIONS)) as Granted);
     } catch {
       return 'denied';
     }
@@ -102,39 +142,126 @@ export const healthConnectProvider: HealthProvider = {
     const days = eachDay(startDate, endDate);
     if (days.length === 0) return [];
 
-    // A failed read leaves every day null — "we did not get a reading" — rather
-    // than reporting zero steps, which would be a lie.
-    const blank: HealthDay[] = days.map((date) => ({ date, steps: null }));
+    const blank = days.map(emptyHealthDay);
+    if (!(await ensureInitialized())) return blank;
 
-    try {
-      if (!(await ensureInitialized())) return blank;
+    const byDate = new Map(days.map((d, i) => [d, { ...blank[i] }]));
+    /** Attribute a record to the local day it started in. */
+    const dayOf = (rec: { startTime?: string; time?: string }) => {
+      const t = rec.startTime ?? rec.time;
+      return t ? byDate.get(dayKey(new Date(t))) : undefined;
+    };
 
-      const { records } = await readRecords('Steps', {
-        timeRangeFilter: {
-          operator: 'between',
-          startTime: startOfLocalDay(startDate).toISOString(),
-          endTime: endOfLocalDay(endDate).toISOString(),
-        },
-      });
+    // Each read is independent: one denied scope must not blank the others.
+    const [steps, hr, resting, active, total, distance, sleep, weight, fat, water, spo2, resp] =
+      await Promise.all([
+        tryRead<{ startTime: string; count?: number }>('Steps', startDate, endDate),
+        tryRead<{ startTime: string; samples?: { beatsPerMinute?: number }[] }>('HeartRate', startDate, endDate),
+        tryRead<{ time: string; beatsPerMinute?: number }>('RestingHeartRate', startDate, endDate),
+        tryRead<{ startTime: string; energy?: { inKilocalories?: number } }>('ActiveCaloriesBurned', startDate, endDate),
+        tryRead<{ startTime: string; energy?: { inKilocalories?: number } }>('TotalCaloriesBurned', startDate, endDate),
+        tryRead<{ startTime: string; distance?: { inMeters?: number } }>('Distance', startDate, endDate),
+        tryRead<{ startTime: string; endTime: string }>('SleepSession', startDate, endDate),
+        tryRead<{ time: string; weight?: { inKilograms?: number } }>('Weight', startDate, endDate),
+        tryRead<{ time: string; percentage?: number }>('BodyFat', startDate, endDate),
+        tryRead<{ startTime: string; volume?: { inMilliliters?: number } }>('Hydration', startDate, endDate),
+        tryRead<{ time: string; percentage?: number }>('OxygenSaturation', startDate, endDate),
+        tryRead<{ time: string; rate?: number }>('RespiratoryRate', startDate, endDate),
+      ]);
 
-      // The query succeeded, so every requested day now has a real reading.
-      // Days with no records are genuinely zero.
-      const totals = new Map<string, number>(days.map((d) => [d, 0]));
+    // A successful query means every day in range has a real reading, so days
+    // with no records are genuinely zero. A failed or ungranted one stays null.
+    const zeroAll = (field: keyof HealthDay) => {
+      for (const d of byDate.values()) (d[field] as number | null) = 0;
+    };
+    const addTo = (field: keyof HealthDay, day: HealthDay | undefined, v: number | null) => {
+      if (!day || v == null) return;
+      (day[field] as number | null) = ((day[field] as number | null) ?? 0) + v;
+    };
 
-      for (const rec of records) {
-        // Attribute each record to the local day it started in. Records that
-        // straddle midnight are rare for steps and splitting them would imply
-        // a precision the source does not have.
-        const key = dayKey(new Date(rec.startTime));
-        const prev = totals.get(key);
-        if (prev == null) continue; // outside the requested range
-        totals.set(key, prev + (rec.count ?? 0));
-      }
-
-      return days.map((date) => ({ date, steps: totals.get(date) ?? 0 }));
-    } catch {
-      return blank;
+    if (steps) {
+      zeroAll('steps');
+      for (const r of steps) addTo('steps', dayOf(r), num(r.count));
     }
+    if (active) {
+      zeroAll('activeCalories');
+      for (const r of active) addTo('activeCalories', dayOf(r), num(r.energy?.inKilocalories));
+    }
+    if (total) {
+      zeroAll('totalCalories');
+      for (const r of total) addTo('totalCalories', dayOf(r), num(r.energy?.inKilocalories));
+    }
+    if (distance) {
+      zeroAll('distanceMeters');
+      for (const r of distance) addTo('distanceMeters', dayOf(r), num(r.distance?.inMeters));
+    }
+    if (water) {
+      zeroAll('hydrationMl');
+      for (const r of water) addTo('hydrationMl', dayOf(r), num(r.volume?.inMilliliters));
+    }
+    if (sleep) {
+      zeroAll('sleepMinutes');
+      for (const r of sleep) {
+        const mins = (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 60000;
+        addTo('sleepMinutes', dayOf(r), mins > 0 ? Math.round(mins) : null);
+      }
+    }
+
+    if (hr) {
+      // Averaged across samples, and min/max kept — a mean alone hides the
+      // spike that makes a heart rate interesting.
+      const acc = new Map<string, { sum: number; n: number; min: number; max: number }>();
+      for (const r of hr) {
+        const key = dayKey(new Date(r.startTime));
+        for (const s of r.samples ?? []) {
+          const bpm = num(s.beatsPerMinute);
+          if (bpm == null) continue;
+          const a = acc.get(key) ?? { sum: 0, n: 0, min: bpm, max: bpm };
+          a.sum += bpm;
+          a.n += 1;
+          a.min = Math.min(a.min, bpm);
+          a.max = Math.max(a.max, bpm);
+          acc.set(key, a);
+        }
+      }
+      for (const [key, a] of acc) {
+        const day = byDate.get(key);
+        if (!day || a.n === 0) continue;
+        day.heartRateAvg = Math.round(a.sum / a.n);
+        day.heartRateMin = a.min;
+        day.heartRateMax = a.max;
+      }
+    }
+
+    // Point measurements: the latest reading of the day, never a sum.
+    const latest = (
+      field: keyof HealthDay,
+      records: { time: string }[] | null,
+      value: (r: never) => number | null
+    ) => {
+      if (!records) return;
+      const seen = new Map<string, { at: number; v: number }>();
+      for (const r of records) {
+        const v = value(r as never);
+        if (v == null) continue;
+        const at = new Date(r.time).getTime();
+        const key = dayKey(new Date(r.time));
+        const prev = seen.get(key);
+        if (!prev || at >= prev.at) seen.set(key, { at, v });
+      }
+      for (const [key, best] of seen) {
+        const day = byDate.get(key);
+        if (day) (day[field] as number | null) = best.v;
+      }
+    };
+
+    latest('restingHeartRate', resting, (r: { beatsPerMinute?: number }) => num(r.beatsPerMinute));
+    latest('weightKg', weight, (r: { weight?: { inKilograms?: number } }) => num(r.weight?.inKilograms));
+    latest('bodyFatPercent', fat, (r: { percentage?: number }) => num(r.percentage));
+    latest('oxygenSaturation', spo2, (r: { percentage?: number }) => num(r.percentage));
+    latest('respiratoryRate', resp, (r: { rate?: number }) => num(r.rate));
+
+    return days.map((d) => byDate.get(d)!);
   },
 
   async writeEntries(entries: HealthWorkoutEntry[]): Promise<number> {
@@ -160,7 +287,91 @@ export const healthConnectProvider: HealthProvider = {
     }
   },
 
+  async writeNutrition(entries: HealthNutritionEntry[]): Promise<HealthWriteResult> {
+    if (entries.length === 0) return { written: 0, error: null };
+    try {
+      if (!(await ensureInitialized())) {
+        return { written: 0, error: 'Health Connect is not available on this phone.' };
+      }
+      const g = (v: number | null | undefined) =>
+        v == null ? undefined : { inGrams: v };
+      const records = entries.map((e) => ({
+        recordType: 'Nutrition' as const,
+        startTime: new Date(e.at).toISOString(),
+        // A meal is a point in time for our purposes; Health Connect wants a
+        // span, so give it a one-minute one rather than inventing a duration.
+        endTime: new Date(e.at + 60_000).toISOString(),
+        name: e.name,
+        energy: e.calories == null ? undefined : { inKilocalories: e.calories },
+        protein: g(e.protein),
+        totalFat: g(e.fat),
+        totalCarbohydrate: g(e.carb),
+        dietaryFiber: g(e.fiber),
+        sugar: g(e.sugars),
+        saturatedFat: g(e.saturatedFat),
+        // Labels state sodium in milligrams; Health Connect wants grams.
+        sodium: e.sodium == null ? undefined : { inGrams: e.sodium / 1000 },
+      }));
+      const ids = await insertRecords(records as never);
+      return { written: ids.length, error: null };
+    } catch (e) {
+      return { written: 0, error: writeError(e, 'nutrition') };
+    }
+  },
+
+  async writeWeight(entries: HealthWeightEntry[]): Promise<HealthWriteResult> {
+    if (entries.length === 0) return { written: 0, error: null };
+    try {
+      if (!(await ensureInitialized())) {
+        return { written: 0, error: 'Health Connect is not available on this phone.' };
+      }
+      const records = entries
+        .filter((e) => e.kg > 0)
+        .map((e) => ({
+          recordType: 'Weight' as const,
+          time: new Date(e.at).toISOString(),
+          weight: { value: e.kg, unit: 'kilograms' as const },
+        }));
+      if (records.length === 0) return { written: 0, error: null };
+      const ids = await insertRecords(records as never);
+      return { written: ids.length, error: null };
+    } catch (e) {
+      return { written: 0, error: writeError(e, 'weight') };
+    }
+  },
+
+  async writeHydration(entries: HealthHydrationEntry[]): Promise<HealthWriteResult> {
+    if (entries.length === 0) return { written: 0, error: null };
+    try {
+      if (!(await ensureInitialized())) {
+        return { written: 0, error: 'Health Connect is not available on this phone.' };
+      }
+      const records = entries
+        .filter((e) => e.ml > 0)
+        .map((e) => ({
+          recordType: 'Hydration' as const,
+          startTime: new Date(e.at).toISOString(),
+          endTime: new Date(e.at + 60_000).toISOString(),
+          volume: { value: e.ml, unit: 'milliliters' as const },
+        }));
+      if (records.length === 0) return { written: 0, error: null };
+      const ids = await insertRecords(records as never);
+      return { written: ids.length, error: null };
+    } catch (e) {
+      return { written: 0, error: writeError(e, 'hydration') };
+    }
+  },
+
   openSettings(): void {
     openHealthConnectSettings();
   },
 };
+
+/** One honest sentence. A silent no-op here would look like a successful sync. */
+function writeError(e: unknown, what: string): string {
+  const detail = e instanceof Error ? e.message : String(e);
+  if (/permission/i.test(detail)) {
+    return `Health Connect has not granted permission to write ${what}.`;
+  }
+  return `Could not write ${what} to Health Connect: ${detail}`;
+}

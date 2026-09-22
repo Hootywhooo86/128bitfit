@@ -112,6 +112,43 @@ export function tallyMuscleSets(entries: MuscleWorkEntry[]): MuscleTally {
   return tally;
 }
 
+/**
+ * How a muscle was worked in a session, which is what the map colours by.
+ *
+ * `primary` means at least one exercise named it as a target; `secondary`
+ * means it only ever assisted. A muscle that was both is primary — the harder
+ * classification wins, because that is what the training actually was.
+ */
+export type MuscleRole = 'primary' | 'secondary' | 'none';
+export type MuscleRoles = Record<MuscleGroup, MuscleRole>;
+
+export function emptyRoles(): MuscleRoles {
+  const out = {} as MuscleRoles;
+  for (const m of MUSCLE_GROUPS) out[m] = 'none';
+  return out;
+}
+
+export function muscleRoles(entries: MuscleWorkEntry[]): MuscleRoles {
+  const roles = emptyRoles();
+  for (const entry of entries) {
+    const sets = Number.isFinite(entry.completedSets) ? entry.completedSets : 0;
+    if (sets <= 0) continue;
+
+    for (const raw of entry.secondaryMuscles) {
+      const m = raw?.trim().toLowerCase();
+      // Only promotes from none: a primary claim later must still win.
+      if (m && GROUP_SET.has(m) && roles[m as MuscleGroup] === 'none') {
+        roles[m as MuscleGroup] = 'secondary';
+      }
+    }
+    for (const raw of entry.primaryMuscles) {
+      const m = raw?.trim().toLowerCase();
+      if (m && GROUP_SET.has(m)) roles[m as MuscleGroup] = 'primary';
+    }
+  }
+  return roles;
+}
+
 /** Muscles sorted by load, heaviest first. Ties keep alphabetical order. */
 export function rankMuscles(tally: MuscleTally): { muscle: MuscleGroup; sets: number }[] {
   return MUSCLE_GROUPS.map((muscle) => ({ muscle, sets: tally[muscle] })).sort(

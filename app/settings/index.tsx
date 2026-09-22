@@ -24,9 +24,6 @@ import {
   type AppSettings,
   type WeightUnit,
 } from '@/db/settings-queries';
-import { PixelAvatar } from '@/components/PixelAvatar';
-import type { AvatarConfig } from '@/lib/avatar';
-import { DEFAULT_AVATAR } from '@/lib/avatar';
 import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
 import { explainFloor } from '@/lib/calorie-floor';
 import { colors, spacing } from '@/lib/theme';
@@ -42,8 +39,6 @@ export default function SettingsScreen() {
   const [proteinTarget, setProteinTarget] = useState('150');
   const [waterTarget, setWaterTarget] = useState('2500');
   const [units, setUnits] = useState<WeightUnit>('lb');
-  const [showAvatarOnHome, setShowAvatarOnHome] = useState(true);
-  const [avatar, setAvatar] = useState<AvatarConfig>({ ...DEFAULT_AVATAR });
 
   const [aiProvider, setAiProvider] = useState<AiProviderId>('anthropic');
   const [aiModel, setAiModel] = useState('');
@@ -58,8 +53,6 @@ export default function SettingsScreen() {
     setProteinTarget(String(s.proteinTarget));
     setWaterTarget(String(s.waterTargetMl));
     setUnits(s.units);
-    setShowAvatarOnHome(s.showAvatarOnHome);
-    setAvatar(s.avatar);
   };
 
   const applyAi = (s: AiSettings) => {
@@ -111,7 +104,6 @@ export default function SettingsScreen() {
         proteinTarget: Number(proteinTarget) || 150,
         waterTargetMl: Number(waterTarget) || 2500,
         units,
-        showAvatarOnHome,
       });
       applyApp(nextApp);
       if (floorCheck.clamped) {
@@ -164,7 +156,7 @@ export default function SettingsScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
       <Text style={styles.muted}>
-        Goals, character, and preferences persist in the local settings table. AI keys use
+        Goals and preferences persist in the local settings table. AI keys use
         Secure Store on device — never committed or logged.
       </Text>
 
@@ -181,29 +173,6 @@ export default function SettingsScreen() {
           <Text style={styles.muted}>Download everything as CSV and JSON →</Text>
         </View>
       </Pressable>
-
-      <Pressable style={styles.charCard} onPress={() => router.push('/settings/character')}>
-        <PixelAvatar config={avatar} pose="idle" size={56} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aiTitle}>Character</Text>
-          <Text style={styles.muted}>Edit your pixel avatar →</Text>
-        </View>
-      </Pressable>
-
-      <Text style={styles.label}>Show avatar on Home</Text>
-      <View style={styles.unitRow}>
-        {([true, false] as const).map((v) => (
-          <Pressable
-            key={String(v)}
-            style={[styles.unitChip, showAvatarOnHome === v && styles.unitChipOn]}
-            onPress={() => setShowAvatarOnHome(v)}
-          >
-            <Text style={[styles.unitText, showAvatarOnHome === v && styles.unitTextOn]}>
-              {v ? 'Show' : 'Hide'}
-            </Text>
-          </Pressable>
-        ))}
-      </View>
 
       <Text style={styles.label}>Display name</Text>
       <TextInput

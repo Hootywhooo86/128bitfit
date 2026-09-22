@@ -10,16 +10,14 @@ import {
 } from 'react-native';
 import { CalorieProgress } from '@/components/CalorieProgress';
 import { MuscleLoadCard } from '@/components/MuscleLoadCard';
-import { PixelAvatar } from '@/components/PixelAvatar';
 import { StepsCard } from '@/components/StepsCard';
 import { WaterProgress } from '@/components/WaterProgress';
 import { WeekStrip } from '@/components/WeekStrip';
 import { useDb } from '@/db/DatabaseProvider';
 import { getDayFuelSummary } from '@/db/food-queries';
-import { getMuscleTally, periodFor } from '@/db/muscle-queries';
+import { getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';
 import { getAppSettings } from '@/db/settings-queries';
-import type { AvatarConfig } from '@/lib/avatar';
-import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
+import { emptyTally, type MuscleTally, emptyRoles, type MuscleRoles } from '@/lib/muscle-load';
 import { formatWeight, getLatestWeightEntry } from '@/db/weight-queries';
 import {
   getLastCompletedWorkoutSummary,
@@ -61,9 +59,8 @@ export default function HomeScreen() {
   const [lastWorkout, setLastWorkout] = useState<WorkoutSummary | null>(null);
   const [latestWeight, setLatestWeight] = useState<WeightEntry | null>(null);
   const [week, setWeek] = useState<TrainingDayDot[]>([]);
-  const [avatar, setAvatar] = useState<AvatarConfig | null>(null);
-  const [showAvatar, setShowAvatar] = useState(true);
   const [muscleTally, setMuscleTally] = useState<MuscleTally>(emptyTally());
+  const [muscleRoleMap, setMuscleRoleMap] = useState<MuscleRoles>(emptyRoles());
 
   const refresh = useCallback(async () => {
     if (!ready) return;
@@ -77,11 +74,10 @@ export default function HomeScreen() {
         getTrainingWeekStrip(new Date()),
       ]);
       setDisplayName(settings.displayName);
-      setAvatar(settings.avatar);
-      setShowAvatar(settings.showAvatarOnHome);
       setCalories(fuel.logs.length > 0 ? fuel.totals.calories : null);
       setCalorieTarget(fuel.goals.calorieTarget);
       setMuscleTally(await getMuscleTally(periodFor(7).since));
+      setMuscleRoleMap(await getMuscleRoles(periodFor(7).since));
       setWaterMl(fuel.waterMl);
       setWaterTarget(fuel.goals.waterTargetMl);
       setLastWorkout(workout);
@@ -109,11 +105,6 @@ export default function HomeScreen() {
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
       <View style={styles.headerRow}>
-        {showAvatar && avatar ? (
-          <Pressable onPress={() => router.push('/settings/character')} style={styles.avatarWrap}>
-            <PixelAvatar config={avatar} pose="idle" size={64} />
-          </Pressable>
-        ) : null}
         <View style={{ flex: 1 }}>
           <Text style={styles.brand}>128BIT FIT</Text>
           <Text style={styles.sub}>Hey, {displayName}</Text>
@@ -131,7 +122,7 @@ export default function HomeScreen() {
       <StepsCard />
 
       <Text style={styles.section}>Muscle load</Text>
-      <MuscleLoadCard tally={muscleTally} />
+      <MuscleLoadCard tally={muscleTally} roles={muscleRoleMap} />
 
       <Text style={styles.section}>Last workout</Text>
       {lastWorkout ? (
@@ -219,14 +210,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   gearText: { color: colors.text, fontWeight: '700', fontSize: 12 },
-  avatarWrap: {
-    marginRight: spacing.xs,
-    padding: 4,
-    borderRadius: 10,
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
   section: {
     color: colors.textMuted,
     fontWeight: '700',

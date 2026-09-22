@@ -2,14 +2,20 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MuscleMap } from '@/components/MuscleMap';
-import { MUSCLE_LABELS, neglectedMuscles, rankMuscles, type MuscleTally } from '@/lib/muscle-load';
+import {
+  MUSCLE_LABELS,
+  neglectedMuscles,
+  rankMuscles,
+  type MuscleRoles,
+  type MuscleTally,
+} from '@/lib/muscle-load';
 import { colors, spacing } from '@/lib/theme';
 
 /**
  * Muscle load on Home — the app's signature view, so it sits up front rather
  * than buried behind a tab.
  */
-export function MuscleLoadCard({ tally }: { tally: MuscleTally }) {
+export function MuscleLoadCard({ tally, roles }: { tally: MuscleTally; roles: MuscleRoles }) {
   const router = useRouter();
   const ranked = rankMuscles(tally).filter((r) => r.sets > 0);
   const neglected = neglectedMuscles(tally);
@@ -21,7 +27,7 @@ export function MuscleLoadCard({ tally }: { tally: MuscleTally }) {
         <Text style={styles.link}>Last 7 days →</Text>
       </View>
 
-      <MuscleMap tally={tally} width={104} showLegend={false} />
+      <MuscleMap roles={roles} width={104} showLegend={false} />
 
       {ranked.length > 0 ? (
         <Text style={styles.hint} numberOfLines={2}>

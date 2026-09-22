@@ -4,15 +4,8 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { useFocusEffect } from 'expo-router';
 import { MuscleMap } from '@/components/MuscleMap';
 import { useDb } from '@/db/DatabaseProvider';
-import { getMuscleTally, periodFor } from '@/db/muscle-queries';
-import {
-  MUSCLE_LABELS,
-  emptyTally,
-  loadLevel,
-  neglectedMuscles,
-  rankMuscles,
-  type MuscleTally,
-} from '@/lib/muscle-load';
+import { getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';
+import { MUSCLE_LABELS, emptyTally, loadLevel, neglectedMuscles, rankMuscles, type MuscleTally, emptyRoles, type MuscleRoles } from '@/lib/muscle-load';
 import { colors, muscleHeat, spacing } from '@/lib/theme';
 
 const PERIODS = [7, 30, 90] as const;
@@ -21,6 +14,7 @@ export default function ProgressScreen() {
   const { ready } = useDb();
   const [days, setDays] = useState<(typeof PERIODS)[number]>(7);
   const [tally, setTally] = useState<MuscleTally>(emptyTally());
+  const [roles, setRoles] = useState<MuscleRoles>(emptyRoles());
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -30,6 +24,7 @@ export default function ProgressScreen() {
       setLoading(true);
       void (async () => {
         const t = await getMuscleTally(periodFor(days).since);
+        setRoles(await getMuscleRoles(periodFor(days).since));
         if (alive) {
           setTally(t);
           setLoading(false);
@@ -68,7 +63,7 @@ export default function ProgressScreen() {
       ) : (
         <>
           <View style={styles.card}>
-            <MuscleMap tally={tally} width={130} />
+            <MuscleMap roles={roles} width={130} />
           </View>
 
           {trainedAnything ? (
