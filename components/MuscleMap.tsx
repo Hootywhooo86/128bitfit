@@ -17,8 +17,16 @@ import { colors, fonts, muscleRole, spacing } from '@/lib/theme';
  * would erase its own definition.
  */
 
-const BODY_TINT = '#1a1a1a';
-const LINE_TINT = '#969696';
+/**
+ * Flat fills with dark separating lines, not a wash over artwork.
+ *
+ * Translucent colour laid over light line art reads as a tint stuck on top of
+ * a photo. Opaque fills under near-black lines read as one drawing, which is
+ * how an anatomy chart is drawn: untrained muscle is a grey shape, trained
+ * muscle is a coloured one, and the lines divide them.
+ */
+const BODY_TINT = '#3d3d3d';
+const LINE_TINT = '#121212';
 
 function Figure({
   view,
@@ -44,7 +52,7 @@ function Figure({
           <Image
             key={m}
             source={masks[m]}
-            style={[StyleSheet.absoluteFill, { width, height, opacity: 0.82 }]}
+            style={[StyleSheet.absoluteFill, { width, height }]}
             resizeMode="contain"
             tintColor={muscleRole[role]}
           />

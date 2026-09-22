@@ -9,6 +9,9 @@ import { MEAL_TYPES, type MealType } from '@/db/schema';
 import { formatKcal } from '@/lib/nutrition';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
+/** A macro nobody recorded shows as a dash, never as 0. */
+const g = (v: number | null | undefined) => (v == null ? '–' : Math.round(v));
+
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'BREAKFAST',
   lunch: 'LUNCH',
@@ -54,7 +57,7 @@ export default function FuelScreen() {
     );
   }
 
-  const { goals, totals, byMeal, logs } = summary;
+  const { goals, totals, partial, byMeal, logs } = summary;
   const logged = logs.length > 0;
 
   return (
@@ -63,9 +66,9 @@ export default function FuelScreen() {
         <View style={s.ringrow}>
           <CalorieRing consumed={logged ? totals.calories : null} target={goals.calorieTarget} />
           <View style={s.macros}>
-            <MacroBar label="Protein" value={logged ? totals.protein : null} target={goals.proteinTarget} tone="p" />
-            <MacroBar label="Carbs" value={logged ? totals.carb : null} target={goals.carbTarget} tone="c" />
-            <MacroBar label="Fat" value={logged ? totals.fat : null} target={goals.fatTarget} tone="f" />
+            <MacroBar label="Protein" value={logged ? totals.protein : null} target={goals.proteinTarget} tone="p" partial={partial.protein} />
+            <MacroBar label="Carbs" value={logged ? totals.carb : null} target={goals.carbTarget} tone="c" partial={partial.carb} />
+            <MacroBar label="Fat" value={logged ? totals.fat : null} target={goals.fatTarget} tone="f" partial={partial.fat} />
           </View>
         </View>
       </Card>
@@ -109,8 +112,8 @@ export default function FuelScreen() {
                       {log.displayName}
                     </Text>
                     <Text style={s.itemSub}>
-                      {log.servings}× · P{Math.round(log.protein ?? 0)} C{Math.round(log.carb ?? 0)} F
-                      {Math.round(log.fat ?? 0)}
+                      {/* A dash is "nobody knows", which is not the same as 0 g. */}
+                      {log.servings}× · P{g(log.protein)} C{g(log.carb)} F{g(log.fat)}
                     </Text>
                   </View>
                   <Text style={s.itemK}>{Math.round(log.calories ?? 0)}</Text>

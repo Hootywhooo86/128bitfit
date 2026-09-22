@@ -13,7 +13,7 @@ import {
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { insertFoodLog } from '@/db/food-queries';
 import { MEAL_TYPES, type MealType } from '@/db/schema';
-import { estimateFood } from '@/lib/ai-food-client';
+import { MAX_RECIPE_PHOTOS, estimateFood, type AiPhoto } from '@/lib/ai-food-client';
 import { totalsOf, type AiFoodItem } from '@/lib/ai-food';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
@@ -36,7 +36,10 @@ const MEAL_LABELS: Record<MealType, string> = {
  */
 export default function AiFoodScreen() {
   const router = useRouter();
-  const [mode, setMode] = useState<'describe' | 'photo'>('describe');
+  const [mode, setMode] = useState<'describe' | 'photo' | 'recipe'>('describe');
+  const [shots, setShots] = useState<AiPhoto[]>([]);
+  const [link, setLink] = useState('');
+  const [servings, setServings] = useState('4');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,6 +92,46 @@ export default function AiFoodScreen() {
     }
   };
 
+  const addShot = async () => {
+    if (busy || !camera.current || shots.length >= MAX_RECIPE_PHOTOS) return;
+    setBusy(true);
+    try {
+      const shot = await camera.current.takePictureAsync({ quality: 0.55, base64: true });
+      if (shot?.base64) setShots((prev) => [...prev, { base64: shot.base64!, mimeType: 'image/jpeg' }]);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not take that photo.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const servingsNum = () => {
+    const n = Number(servings);
+    return Number.isFinite(n) && n > 0 ? Math.round(n) : 1;
+  };
+
+  const runRecipePhotos = async () => {
+    if (busy || shots.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      handle(await estimateFood({ kind: 'recipe-photos', photos: shots, servings: servingsNum() }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runRecipeLink = async () => {
+    if (busy || !link.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      handle(await estimateFood({ kind: 'recipe-link', url: link, servings: servingsNum() }));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const edit = (i: number, patch: Partial<AiFoodItem>) => {
     setItems((prev) => prev && prev.map((it, n) => (n === i ? { ...it, ...patch } : it)));
   };
@@ -98,22 +141,18 @@ export default function AiFoodScreen() {
     setBusy(true);
     try {
       for (const it of items) {
-        // food_logs stores macros NOT NULL, so a macro nobody estimated has to
-        // land as 0. That would otherwise read as "this meal had no fat", so
-        // the row records which ones were never estimated.
-        const unknown = (['protein', 'fat', 'carb'] as const).filter((k) => it[k] == null);
+        // A macro the model could not estimate is stored as null, not 0: the
+        // column is nullable precisely so an unknown never reads as "none".
         await insertFoodLog({
           foodId: null,
           customName: `${it.name} (${it.portion})`,
           mealType,
           servings: 1,
           calories: it.calories,
-          protein: it.protein ?? 0,
-          fat: it.fat ?? 0,
-          carb: it.carb ?? 0,
-          notes:
-            'AI estimate' +
-            (unknown.length > 0 ? ` · not estimated: ${unknown.join(', ')}` : ''),
+          protein: it.protein,
+          fat: it.fat,
+          carb: it.carb,
+          notes: 'AI estimate',
         });
       }
       router.replace('/(tabs)/fuel');
@@ -129,7 +168,7 @@ export default function AiFoodScreen() {
   return (
     <Screen section="AI log" back>
       <View style={s.seg}>
-        {(['describe', 'photo'] as const).map((m) => (
+        {(['describe', 'photo', 'recipe'] as const).map((m) => (
           <Pressable
             key={m}
             style={[s.segBtn, mode === m && s.segOn]}
@@ -162,7 +201,7 @@ export default function AiFoodScreen() {
             <Text style={s.primaryT}>{busy ? 'ESTIMATING…' : 'ESTIMATE'}</Text>
           </Pressable>
         </Card>
-      ) : !permission ? (
+      ) : mode === 'recipe' ? null : !permission ? (
         <View style={s.center}>
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -190,6 +229,93 @@ export default function AiFoodScreen() {
           </Pressable>
         </>
       )}
+
+      {mode === 'recipe' ? (
+        <>
+          <Card>
+            <Text style={s.help}>
+              A recipe from photos — the page, the back of the packet, whatever shows the
+              ingredients — or from a link. Up to {MAX_RECIPE_PHOTOS} photos, read as one recipe.
+            </Text>
+            <Text style={s.fieldL}>SERVINGS THE RECIPE MAKES</Text>
+            <TextInput
+              style={s.input2}
+              value={servings}
+              onChangeText={setServings}
+              keyboardType="number-pad"
+              placeholderTextColor={colors.textDim}
+            />
+            <Text style={s.help}>
+              Ingredients come back per serving, so one serving is what gets logged.
+            </Text>
+          </Card>
+
+          <Label>FROM A LINK</Label>
+          <Card>
+            <TextInput
+              style={s.input2}
+              value={link}
+              onChangeText={setLink}
+              placeholder="https://…"
+              placeholderTextColor={colors.textDim}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+            <Pressable
+              style={[s.primary, (busy || !link.trim()) && { opacity: 0.5 }]}
+              onPress={() => void runRecipeLink()}
+              disabled={busy || !link.trim()}
+            >
+              <Text style={s.primaryT}>{busy ? 'READING…' : 'READ RECIPE'}</Text>
+            </Pressable>
+          </Card>
+
+          <Label>FROM PHOTOS</Label>
+          {!permission?.granted ? (
+            <Card>
+              <Text style={s.help}>Photographing a recipe needs the camera.</Text>
+              <Pressable style={s.primary} onPress={() => void requestPermission()}>
+                <Text style={s.primaryT}>ALLOW CAMERA</Text>
+              </Pressable>
+            </Card>
+          ) : (
+            <>
+              <View style={s.cam}>
+                <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" />
+              </View>
+              <Text style={s.count}>
+                {shots.length} of {MAX_RECIPE_PHOTOS} captured
+              </Text>
+              <View style={s.row}>
+                <Pressable
+                  style={[s.secondary, { flex: 1 }, (busy || shots.length >= MAX_RECIPE_PHOTOS) && { opacity: 0.5 }]}
+                  onPress={() => void addShot()}
+                  disabled={busy || shots.length >= MAX_RECIPE_PHOTOS}
+                >
+                  <Text style={s.secondaryT}>
+                    {shots.length >= MAX_RECIPE_PHOTOS ? 'ALL 5 TAKEN' : 'ADD PHOTO'}
+                  </Text>
+                </Pressable>
+                {shots.length > 0 ? (
+                  <Pressable style={[s.secondary, { flex: 1 }]} onPress={() => setShots([])}>
+                    <Text style={s.secondaryT}>CLEAR</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <Pressable
+                style={[s.primary, (busy || shots.length === 0) && { opacity: 0.5 }]}
+                onPress={() => void runRecipePhotos()}
+                disabled={busy || shots.length === 0}
+              >
+                <Text style={s.primaryT}>
+                  {busy ? 'READING…' : `READ ${shots.length} PHOTO${shots.length === 1 ? '' : 'S'}`}
+                </Text>
+              </Pressable>
+            </>
+          )}
+        </>
+      ) : null}
 
       {error ? (
         <Card>
@@ -337,6 +463,19 @@ const s = StyleSheet.create({
   itemName: { color: colors.text, fontSize: 15, fontFamily: fonts.bodySemi },
   itemPortion: { color: colors.textDim, fontSize: 12, marginTop: 3, marginBottom: 10, fontFamily: fonts.body },
   row: { flexDirection: 'row', gap: 6 },
+  count: { color: colors.textDim, fontSize: 12, textAlign: 'center', marginBottom: 8, fontFamily: fonts.body },
+  input2: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    color: colors.text,
+    fontSize: 16,
+    marginBottom: 10,
+    fontFamily: fonts.body,
+  },
   field: { flex: 1 },
   fieldL: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textDim, letterSpacing: 1, marginBottom: 4 },
   fieldI: {

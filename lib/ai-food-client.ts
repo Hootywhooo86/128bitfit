@@ -11,11 +11,27 @@
  */
 import { getAiRuntimeConfig } from '@/db/ai-settings';
 import { AiCoachError, coachChat, providerSupportsVision } from './ai-coach';
-import { PHOTO_PROMPT, describePrompt, parseAiFood, systemPrompt, type AiFoodResult } from './ai-food';
+import {
+  PHOTO_PROMPT,
+  describePrompt,
+  parseAiFood,
+  recipeLinkPrompt,
+  recipePhotosPrompt,
+  systemPrompt,
+  type AiFoodResult,
+} from './ai-food';
+import type { ChatMessage } from './ai-coach';
+
+export type AiPhoto = { base64: string; mimeType: string };
 
 export type AiFoodRequest =
   | { kind: 'describe'; text: string }
-  | { kind: 'photo'; base64: string; mimeType: string };
+  | { kind: 'photo'; base64: string; mimeType: string }
+  | { kind: 'recipe-photos'; photos: AiPhoto[]; servings: number }
+  | { kind: 'recipe-link'; url: string; servings: number };
+
+/** More than this and the request gets large enough to time out on mobile data. */
+export const MAX_RECIPE_PHOTOS = 5;
 
 export type AiFoodOutcome =
   | AiFoodResult
@@ -33,11 +49,15 @@ export async function estimateFood(
       message: 'No AI key set. Add one in Settings → AI, or add the food by hand.',
     };
   }
-  if (req.kind === 'photo' && !providerSupportsVision(cfg.provider)) {
+  const needsVision = req.kind === 'photo' || req.kind === 'recipe-photos';
+  if (needsVision && !providerSupportsVision(cfg.provider)) {
     return {
       status: 'unavailable',
-      message: `${cfg.provider} cannot read photos. Use Describe instead, or switch provider in Settings → AI.`,
+      message: `${cfg.provider} cannot read photos. Use Describe or a link instead, or switch provider in Settings → AI.`,
     };
+  }
+  if (req.kind === 'recipe-photos' && req.photos.length === 0) {
+    return { status: 'unavailable', message: 'Add at least one photo of the recipe.' };
   }
 
   try {
@@ -47,16 +67,7 @@ export async function estimateFood(
       model: cfg.model,
       baseUrl: cfg.baseUrl,
       signal,
-      messages: [
-        { role: 'system', content: systemPrompt() },
-        req.kind === 'describe'
-          ? { role: 'user', content: describePrompt(req.text) }
-          : {
-              role: 'user',
-              content: PHOTO_PROMPT,
-              image: { base64: req.base64, mimeType: req.mimeType },
-            },
-      ],
+      messages: [{ role: 'system', content: systemPrompt() }, ...userMessages(req)],
     });
     return parseAiFood(result.content);
   } catch (e) {
@@ -67,5 +78,38 @@ export async function estimateFood(
       status: 'failed',
       message: e instanceof Error ? e.message : 'The estimate failed. Try again, or add the food by hand.',
     };
+  }
+}
+
+/**
+ * The user turns of the request.
+ *
+ * Several photos become several messages, because every provider's image
+ * format carries one image per message; the prompt on the first says they are
+ * one recipe, so the model does not return each ingredient once per photo.
+ */
+function userMessages(req: AiFoodRequest): ChatMessage[] {
+  switch (req.kind) {
+    case 'describe':
+      return [{ role: 'user', content: describePrompt(req.text) }];
+    case 'photo':
+      return [
+        {
+          role: 'user',
+          content: PHOTO_PROMPT,
+          image: { base64: req.base64, mimeType: req.mimeType },
+        },
+      ];
+    case 'recipe-link':
+      return [{ role: 'user', content: recipeLinkPrompt(req.url, req.servings) }];
+    case 'recipe-photos':
+      return req.photos.map((p, i) => ({
+        role: 'user' as const,
+        content:
+          i === 0
+            ? recipePhotosPrompt(req.photos.length, req.servings)
+            : `Photo ${i + 1} of ${req.photos.length} of the same recipe.`,
+        image: p,
+      }));
   }
 }

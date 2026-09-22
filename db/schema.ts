@@ -109,9 +109,14 @@ export const foodLogs = sqliteTable('food_logs', {
   servingSize: real('serving_size'),
   servingUnit: text('serving_unit'),
   calories: real('calories').notNull().default(0),
-  protein: real('protein').notNull().default(0),
-  fat: real('fat').notNull().default(0),
-  carb: real('carb').notNull().default(0),
+  /**
+   * Macros are nullable: null means nobody knows, 0 means the food genuinely
+   * has none. They used to be NOT NULL DEFAULT 0, which made an unestimated
+   * macro read as "this meal had no fat".
+   */
+  protein: real('protein'),
+  fat: real('fat'),
+  carb: real('carb'),
   notes: text('notes'),
 });
 

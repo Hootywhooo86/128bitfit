@@ -173,11 +173,14 @@ export function MacroBar({
   value,
   target,
   tone = 'p',
+  partial = false,
 }: {
   label: string;
   value: number | null;
   target: number;
   tone?: 'p' | 'c' | 'f';
+  /** At least one of today's logs has no figure for this macro. */
+  partial?: boolean;
 }) {
   const pct = value == null || target <= 0 ? 0 : Math.min(100, (value / target) * 100);
   const fill = tone === 'p' ? colors.accent : tone === 'c' ? '#9a9a9a' : '#5e5e5e';
@@ -186,7 +189,12 @@ export function MacroBar({
       <View style={s.macL}>
         <Text style={s.macLabel}>{label}</Text>
         <Text style={s.macVal}>
-          {value == null ? '–' : Math.round(value)} / {Math.round(target)}g
+          {/*
+            A leading + says the real figure is at least this: something logged
+            today has no value for this macro, so the sum is a floor.
+          */}
+          {value == null ? '–' : `${partial ? '+' : ''}${Math.round(value)}`} /{' '}
+          {Math.round(target)}g
         </Text>
       </View>
       <View style={s.macT}>

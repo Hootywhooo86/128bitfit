@@ -56,6 +56,35 @@ export function describePrompt(text: string): string {
 export const PHOTO_PROMPT =
   'Estimate the nutrition for the food in this photo. If portion size is unclear, assume a normal serving and say so in "note".';
 
+/**
+ * A recipe spread over several photos — a page of a book, a label, the pan.
+ * The model is told they are one recipe so it does not return the same
+ * ingredient once per photo.
+ */
+export function recipePhotosPrompt(count: number, servings: number): string {
+  return (
+    `These ${count} photo${count === 1 ? '' : 's'} are one recipe. Read the ingredients ` +
+    `and return one entry per ingredient for a single serving, assuming the recipe ` +
+    `makes ${servings} serving${servings === 1 ? '' : 's'}. ` +
+    `Do not repeat an ingredient that appears in more than one photo. ` +
+    `If the photos do not show a recipe, return no items and say so in "note".`
+  );
+}
+
+/**
+ * A recipe at a URL. The model is asked to use the page if it can reach it and
+ * to say so plainly if it cannot, rather than reciting a recipe from memory
+ * and presenting it as that page's.
+ */
+export function recipeLinkPrompt(url: string, servings: number): string {
+  return (
+    `Read the recipe at ${url.trim()} and return one entry per ingredient for a ` +
+    `single serving, assuming it makes ${servings} serving${servings === 1 ? '' : 's'}. ` +
+    `If you cannot open that page, return no items and put "could not open the link" ` +
+    `in "note" — do not answer from memory of a similar recipe.`
+  );
+}
+
 export function systemPrompt(): string {
   return SYSTEM;
 }

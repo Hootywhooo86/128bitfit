@@ -27,6 +27,7 @@ import {
 import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
 import { explainFloor } from '@/lib/calorie-floor';
 import { colors, spacing } from '@/lib/theme';
+import { HfModelPicker } from '@/components/HfModelPicker';
 import { Screen } from '@/components/ui';
 
 export default function SettingsScreen() {
@@ -47,6 +48,7 @@ export default function SettingsScreen() {
   const [aiKeyDraft, setAiKeyDraft] = useState('');
   const [aiHasKey, setAiHasKey] = useState(false);
   const [clearKeyConfirm, setClearKeyConfirm] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const applyApp = (s: AppSettings) => {
     setDisplayName(s.displayName);
@@ -168,6 +170,13 @@ export default function SettingsScreen() {
         </View>
       </Pressable>
 
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/import')}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Import exercises</Text>
+          <Text style={styles.muted}>From Hevy, a CSV, or a JSON export →</Text>
+        </View>
+      </Pressable>
+
       <Pressable style={styles.charCard} onPress={() => router.push('/settings/export')}>
         <View style={{ flex: 1 }}>
           <Text style={styles.aiTitle}>Export data</Text>
@@ -261,6 +270,20 @@ export default function SettingsScreen() {
           autoCapitalize="none"
           autoCorrect={false}
         />
+        {aiProvider === 'huggingface' ? (
+          <Pressable style={styles.browseBtn} onPress={() => setPickerOpen(true)}>
+            <Text style={styles.browseText}>Browse models →</Text>
+          </Pressable>
+        ) : null}
+        <HfModelPicker
+          visible={pickerOpen}
+          apiKey={aiKeyDraft.trim() || null}
+          onPick={(id) => {
+            setAiModel(id);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
 
         {(providerMeta.needsBaseUrl ||
           aiProvider === 'openai' ||
@@ -328,6 +351,8 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
+  browseBtn: { paddingVertical: 10 },
+  browseText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   center: {
     flex: 1,
