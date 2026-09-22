@@ -18,6 +18,7 @@ import { saveFoodPhoto } from '@/lib/food-photo-store';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
 import type { LabelReading } from '@/lib/nutrition-label';
 import { colors, spacing } from '@/lib/theme';
+import { Screen } from '@/components/ui';
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -163,7 +164,7 @@ export default function CustomFoodScreen() {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
+    <Screen section="Custom food" back>
       <Text style={styles.title}>Custom food</Text>
       {params.message ? <Text style={styles.muted}>{params.message}</Text> : null}
 
@@ -284,7 +285,7 @@ export default function CustomFoodScreen() {
       >
         <Text style={styles.saveText}>{saving ? 'Saving…' : 'Save & log'}</Text>
       </Pressable>
-    </ScrollView>
+    </Screen>
   );
 }
 

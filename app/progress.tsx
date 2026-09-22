@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Screen } from '@/components/ui';
 import { useFocusEffect } from 'expo-router';
 import { MuscleMap } from '@/components/MuscleMap';
 import { useDb } from '@/db/DatabaseProvider';
@@ -41,7 +42,7 @@ export default function ProgressScreen() {
   const trainedAnything = ranked.length > 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
+    <Screen section="Muscle map" back>
       <Stack.Screen options={{ title: 'Muscle load' }} />
 
       <View style={styles.tabs}>
@@ -105,7 +106,7 @@ export default function ProgressScreen() {
           </Text>
         </>
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 

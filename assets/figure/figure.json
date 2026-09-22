@@ -1,11 +1,12 @@
 {
   "front": {
-    "width": 329,
-    "height": 720,
+    "width": 347,
+    "height": 760,
     "muscles": [
       "neck",
       "traps",
       "shoulders",
+      "chest",
       "abdominals",
       "biceps",
       "forearms",
@@ -14,13 +15,12 @@
       "adductors",
       "calves",
       "lats",
-      "triceps",
-      "chest"
+      "triceps"
     ]
   },
   "back": {
-    "width": 308,
-    "height": 720,
+    "width": 325,
+    "height": 760,
     "muscles": [
       "neck",
       "traps",

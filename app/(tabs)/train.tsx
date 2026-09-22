@@ -1,14 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { Label, MenuRow, Screen, SessionCard } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { ensureStarterRoutines } from '@/db/seed-routines';
 import {
@@ -19,7 +12,7 @@ import {
   startRoutineWorkout,
 } from '@/db/workout-queries';
 import type { Routine, WorkoutSession } from '@/db/schema';
-import { colors, spacing } from '@/lib/theme';
+import { colors } from '@/lib/theme';
 
 export default function TrainScreen() {
   const router = useRouter();
@@ -101,149 +94,80 @@ export default function TrainScreen() {
 
   if (!ready || loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
+      <Screen section="Train">
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      </Screen>
     );
   }
 
+  const todays = routines[0];
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
-      <Text style={styles.title}>Train</Text>
-      <Text style={styles.muted}>
-        Log sets offline. Library: {exerciseCount} exercises.
-      </Text>
-
+    <Screen section="Train">
       {inProgress ? (
-        <View style={styles.resumeBar}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.resumeTitle}>Workout in progress</Text>
-            <Text style={styles.resumeMeta}>
-              Started{' '}
-              {inProgress.startedAt
-                ? new Date(inProgress.startedAt).toLocaleTimeString([], {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })
-                : '—'}
-            </Text>
-          </View>
-          <Pressable
-            style={styles.resumeBtn}
-            onPress={() => router.push(`/train/active?id=${encodeURIComponent(inProgress.id)}`)}
-          >
-            <Text style={styles.resumeBtnText}>Resume</Text>
-          </Pressable>
-          <Pressable style={styles.discardBtn} onPress={onDiscard}>
-            <Text style={styles.discardBtnText}>Discard</Text>
-          </Pressable>
-        </View>
-      ) : null}
-
-      <Text style={styles.section}>Start workout</Text>
-      <Pressable style={styles.primaryBtn} onPress={startFreestyle} disabled={busy}>
-        <Text style={styles.primaryBtnText}>Freestyle</Text>
-        <Text style={styles.primaryBtnSub}>Pick exercises as you go</Text>
-      </Pressable>
-
-      <Text style={styles.section}>Starter routines</Text>
-      {routines.length === 0 ? (
-        // User-facing copy, not internal wording: "seeded" means nothing to a
-        // new user, and the library is the one thing that ships populated.
-        <Text style={styles.muted}>
-          No routines yet. Start a freestyle session, or browse the exercise library — it
-          ships with the app and works offline.
-        </Text>
+        <SessionCard
+          title="SESSION IN PROGRESS"
+          sub={`Started ${
+            inProgress.startedAt
+              ? new Date(inProgress.startedAt).toLocaleTimeString([], {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })
+              : '—'
+          }`}
+          action="RESUME"
+          onPress={() => router.push(`/train/active?id=${encodeURIComponent(inProgress.id)}`)}
+        />
       ) : (
-        routines.map((r) => (
-          <Pressable
-            key={r.id}
-            style={styles.routineCard}
-            onPress={() => startRoutine(r.id)}
-            disabled={busy}
-          >
-            <Text style={styles.routineName}>{r.name}</Text>
-            {r.notes ? <Text style={styles.routineNotes}>{r.notes}</Text> : null}
-          </Pressable>
-        ))
+        <SessionCard
+          title={todays ? todays.name.toUpperCase() : 'FREESTYLE'}
+          sub={todays ? 'Scheduled today · or pick something else' : 'Pick exercises as you go'}
+          action="START WORKOUT"
+          onPress={() => (todays ? void startRoutine(todays.id) : void startFreestyle())}
+        />
       )}
 
-      <Pressable style={styles.linkBtn} onPress={() => router.push('/exercise')}>
-        <Text style={styles.linkBtnText}>Browse Exercise Library</Text>
-      </Pressable>
-    </ScrollView>
+      {inProgress ? (
+        <MenuRow icon="✕" name="Discard session" sub="Nothing logged is kept" onPress={onDiscard} />
+      ) : null}
+
+      <Label>BUILD</Label>
+      {routines.map((r) => (
+        <MenuRow
+          key={r.id}
+          icon="▤"
+          name={r.name}
+          sub={r.notes ?? 'Ready to run'}
+          onPress={() => void startRoutine(r.id)}
+        />
+      ))}
+      <MenuRow
+        icon="✎"
+        name="Freestyle session"
+        sub="Start empty and pick as you go"
+        onPress={() => void startFreestyle()}
+      />
+      <MenuRow
+        icon="▦"
+        name="Exercise library"
+        sub="Browse, or create your own"
+        value={String(exerciseCount)}
+        onPress={() => router.push('/exercise')}
+      />
+
+      <Label>REVIEW</Label>
+      <MenuRow
+        icon="◍"
+        name="Muscle map"
+        sub="What you've hit, and what you haven't"
+        onPress={() => router.push('/progress')}
+      />
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
-  center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  title: { color: colors.text, fontSize: 24, fontWeight: '800' },
-  muted: { color: colors.textMuted, lineHeight: 20, marginTop: 4, marginBottom: spacing.md },
-  section: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  resumeBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  resumeTitle: { color: colors.accent, fontWeight: '800' },
-  resumeMeta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  resumeBtn: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  resumeBtnText: { color: colors.chipActiveText, fontWeight: '800' },
-  discardBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.danger,
-  },
-  discardBtnText: { color: colors.danger, fontWeight: '700', fontSize: 12 },
-  primaryBtn: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    marginBottom: spacing.sm,
-  },
-  primaryBtnText: { color: colors.accent, fontWeight: '800', fontSize: 17 },
-  primaryBtnSub: { color: colors.textMuted, marginTop: 4, fontSize: 13 },
-  routineCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 8,
-  },
-  routineName: { color: colors.text, fontWeight: '700', fontSize: 16 },
-  routineNotes: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  linkBtn: {
-    marginTop: spacing.lg,
-    padding: spacing.md,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  linkBtnText: { color: colors.text, fontWeight: '700', textAlign: 'center' },
+  center: { paddingVertical: 80, alignItems: 'center' },
 });

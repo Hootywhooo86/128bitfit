@@ -1,11 +1,15 @@
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { Silkscreen_400Regular, Silkscreen_700Bold } from '@expo-google-fonts/silkscreen';
+import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { DarkTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import React from 'react';
+import { View } from 'react-native';
 import { OnboardingGate } from '@/components/OnboardingGate';
 import { DatabaseProvider } from '@/db/DatabaseProvider';
 import { RestTimerProvider } from '@/lib/rest-timer';
-import { colors } from '@/lib/theme';
+import { colors, fonts } from '@/lib/theme';
 
 const navTheme = {
   ...DarkTheme,
@@ -20,13 +24,39 @@ const navTheme = {
 };
 
 export default function RootLayout() {
+  // Silkscreen is the pixel face for labels and headers; Inter is body text.
+  // Holding the first frame until they load avoids a flash of the system font
+  // reflowing every label in the app.
+  const [fontsReady] = useFonts({
+    Silkscreen_400Regular,
+    Silkscreen_700Bold,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  if (!fontsReady) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
+
   return (
     <ThemeProvider value={navTheme}>
       <DatabaseProvider>
         <RestTimerProvider>
           <OnboardingGate>
           <StatusBar style="light" />
-          <Stack>
+          <Stack
+            screenOptions={{
+              // The pixel TopBar is part of each screen, so the stack header is
+              // off by default. Screens not yet ported to it re-enable a styled
+              // one below rather than being left with no way back.
+              headerShown: false,
+              contentStyle: { backgroundColor: colors.bg },
+              headerStyle: { backgroundColor: colors.bg },
+              headerTintColor: colors.text,
+              headerTitleStyle: { fontFamily: fonts.pixel, fontSize: 11 },
+              headerShadowVisible: false,
+            }}
+          >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen
               name="onboarding/index"
@@ -34,51 +64,51 @@ export default function RootLayout() {
             />
             <Stack.Screen
               name="exercise/index"
-              options={{ title: 'Exercise Library', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ headerShown: true, title: 'Exercise Library', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="exercise/[id]"
-              options={{ title: 'Exercise', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ headerShown: true, title: 'Exercise', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="train/active"
-              options={{ title: 'Workout', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ headerShown: true, title: 'Workout', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="train/add-exercise"
-              options={{ title: 'Add exercise', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ headerShown: true, title: 'Add exercise', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="train/summary"
-              options={{ title: 'Summary', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ headerShown: true, title: 'Summary', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="fuel/add"
-              options={{ title: 'Add food', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ title: 'Add food', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="fuel/scan"
-              options={{ title: 'Scan barcode', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ headerShown: true, title: 'Scan barcode', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="fuel/custom"
-              options={{ title: 'Custom food', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ title: 'Custom food', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="fuel/edit/[id]"
-              options={{ title: 'Edit food', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ headerShown: true, title: 'Edit food', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="coach/[mode]"
-              options={{ title: 'Coach', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ headerShown: true, title: 'Coach', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="settings/index"
-              options={{ title: 'Settings', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ title: 'Settings', headerStyle: { backgroundColor: colors.bg } }}
             />
             <Stack.Screen
               name="home/weight"
-              options={{ title: 'Weight', headerStyle: { backgroundColor: colors.surface } }}
+              options={{ title: 'Weight', headerStyle: { backgroundColor: colors.bg } }}
             />
           </Stack>
           </OnboardingGate>

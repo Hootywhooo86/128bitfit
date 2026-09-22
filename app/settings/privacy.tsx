@@ -3,6 +3,7 @@ import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { health } from '@/lib/health';
 import { colors, spacing } from '@/lib/theme';
+import { Screen } from '@/components/ui';
 
 const POLICY_URL = 'https://github.com/Hootywhooo86/128bitfit/blob/main/docs/privacy-policy.md';
 
@@ -16,7 +17,7 @@ const POLICY_URL = 'https://github.com/Hootywhooo86/128bitfit/blob/main/docs/pri
  */
 export default function PrivacyScreen() {
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
+    <Screen section="Privacy" back>
       <Stack.Screen options={{ title: 'Privacy & health data' }} />
 
       <View style={styles.card}>
@@ -98,7 +99,7 @@ export default function PrivacyScreen() {
       <Pressable style={styles.link} onPress={() => Linking.openURL(POLICY_URL)}>
         <Text style={styles.linkText}>Read the full privacy policy →</Text>
       </Pressable>
-    </ScrollView>
+    </Screen>
   );
 }
 

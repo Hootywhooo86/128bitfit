@@ -20,6 +20,7 @@ import {
   listRecentWeightEntries,
 } from '@/db/weight-queries';
 import { colors, spacing } from '@/lib/theme';
+import { Screen } from '@/components/ui';
 
 export default function WeightLogScreen() {
   const { ready } = useDb();
@@ -96,7 +97,7 @@ export default function WeightLogScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
+    <Screen section="Weight" back>
       <Text style={styles.muted}>Last 7 weigh-ins. Units follow Settings ({units}).</Text>
 
       <Text style={styles.label}>Weight ({units})</Text>
@@ -144,7 +145,7 @@ export default function WeightLogScreen() {
           </Pressable>
         ))
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 

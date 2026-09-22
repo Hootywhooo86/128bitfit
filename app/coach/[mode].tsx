@@ -277,7 +277,7 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 22, fontWeight: '800', marginTop: 4, marginBottom: spacing.md },
   providerLine: { color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm },
   placeholderCard: {
-    backgroundColor: colors.accentDim,
+    backgroundColor: colors.track,
     borderRadius: 12,
     padding: spacing.md,
     borderWidth: 1,
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   replyCard: {
-    backgroundColor: colors.accentDim,
+    backgroundColor: colors.track,
     borderRadius: 12,
     padding: spacing.md,
     borderWidth: 1,

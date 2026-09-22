@@ -2,20 +2,23 @@ import React from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { BACK_MASKS, FIGURE, FRONT_MASKS } from '@/lib/figure-assets';
 import { MUSCLE_LABELS, type MuscleGroup, type MuscleRoles } from '@/lib/muscle-load';
-import { colors, muscleRole, spacing } from '@/lib/theme';
+import { colors, fonts, muscleRole, spacing } from '@/lib/theme';
 
 /**
  * The muscle map.
  *
- * A front and a back view of the same figure, with a muscle tinted only once it
- * has actually been trained: red where it was the target, yellow where it only
- * assisted. Everything else is left as the plain figure, which is honest —
- * nothing logged, nothing coloured — and it visibly wants filling in.
+ * Front and back, drawn hollow: anatomical line art over a dark body, with a
+ * muscle filled in only once it has actually been trained — red where it was
+ * the exercise's target, yellow where it only assisted. An untrained map is
+ * honest (nothing logged, nothing coloured) and it visibly wants filling in.
  *
- * Each muscle is a separate alpha mask stacked over the base artwork and tinted
- * with `tintColor`. Only the trained ones are rendered, so a typical session
- * costs a handful of images rather than one per muscle.
+ * Three layers, bottom to top: the body silhouette, the fills for whatever was
+ * worked, then the line art. The lines have to sit on top or a filled muscle
+ * would erase its own definition.
  */
+
+const BODY_TINT = '#1a1a1a';
+const LINE_TINT = '#969696';
 
 function Figure({
   view,
@@ -29,10 +32,11 @@ function Figure({
   const spec = FIGURE[view];
   const masks = view === 'front' ? FRONT_MASKS : BACK_MASKS;
   const height = (width * spec.height) / spec.width;
+  const layer = [StyleSheet.absoluteFill, { width, height }];
 
   return (
     <View style={{ width, height }}>
-      <Image source={spec.base} style={{ width, height }} resizeMode="contain" />
+      <Image source={spec.body} style={{ width, height }} resizeMode="contain" tintColor={BODY_TINT} />
       {(Object.keys(masks) as MuscleGroup[]).map((m) => {
         const role = roles[m];
         if (role === 'none') return null;
@@ -40,12 +44,13 @@ function Figure({
           <Image
             key={m}
             source={masks[m]}
-            style={[StyleSheet.absoluteFill, { width, height, opacity: 0.72 }]}
+            style={[StyleSheet.absoluteFill, { width, height, opacity: 0.82 }]}
             resizeMode="contain"
             tintColor={muscleRole[role]}
           />
         );
       })}
+      <Image source={spec.line} style={layer} resizeMode="contain" tintColor={LINE_TINT} />
     </View>
   );
 }
@@ -62,38 +67,36 @@ export function MuscleMap({
   const worked = (Object.keys(roles) as MuscleGroup[]).filter((m) => roles[m] !== 'none');
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.figures}>
-        <View style={styles.figureCol}>
+    <View style={s.wrap}>
+      <View style={s.figures}>
+        <View style={s.col}>
           <Figure view="front" roles={roles} width={width} />
-          <Text style={styles.caption}>Front</Text>
+          <Text style={s.caption}>FRONT</Text>
         </View>
-        <View style={styles.figureCol}>
+        <View style={s.col}>
           <Figure view="back" roles={roles} width={width} />
-          <Text style={styles.caption}>Back</Text>
+          <Text style={s.caption}>BACK</Text>
         </View>
       </View>
 
       {showLegend ? (
         worked.length === 0 ? (
-          <Text style={styles.empty}>
+          <Text style={s.empty}>
             Nothing trained yet. Log a session and the muscles you worked colour in.
           </Text>
         ) : (
           <>
-            <View style={styles.legend}>
-              <View style={styles.legendItem}>
-                <View style={[styles.swatch, { backgroundColor: muscleRole.primary }]} />
-                <Text style={styles.legendText}>Targeted</Text>
+            <View style={s.legend}>
+              <View style={s.legendItem}>
+                <View style={[s.swatch, { backgroundColor: muscleRole.primary }]} />
+                <Text style={s.legendText}>TARGETED</Text>
               </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.swatch, { backgroundColor: muscleRole.secondary }]} />
-                <Text style={styles.legendText}>Assisted</Text>
+              <View style={s.legendItem}>
+                <View style={[s.swatch, { backgroundColor: muscleRole.secondary }]} />
+                <Text style={s.legendText}>ASSISTED</Text>
               </View>
             </View>
-            <Text style={styles.worked}>
-              {worked.map((m) => MUSCLE_LABELS[m]).join(' · ')}
-            </Text>
+            <Text style={s.worked}>{worked.map((m) => MUSCLE_LABELS[m]).join(' · ')}</Text>
           </>
         )
       ) : null}
@@ -101,21 +104,32 @@ export function MuscleMap({
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   wrap: { gap: spacing.sm },
   figures: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md },
-  figureCol: { alignItems: 'center', gap: 4 },
+  col: { alignItems: 'center', gap: 6 },
   caption: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
+    fontFamily: fonts.pixel,
+    fontSize: 7,
+    color: colors.textDim,
+    letterSpacing: 1.5,
   },
-  legend: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md },
+  legend: { flexDirection: 'row', justifyContent: 'center', gap: spacing.lg },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  swatch: { width: 10, height: 10, borderRadius: 2 },
-  legendText: { color: colors.textMuted, fontSize: 12 },
-  worked: { color: colors.textMuted, fontSize: 12, textAlign: 'center', lineHeight: 18 },
-  empty: { color: colors.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  swatch: { width: 9, height: 9, borderRadius: 2 },
+  legendText: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textDim, letterSpacing: 1 },
+  worked: {
+    color: colors.textMuted,
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
+    fontFamily: fonts.body,
+  },
+  empty: {
+    color: colors.textDim,
+    fontSize: 12.5,
+    textAlign: 'center',
+    lineHeight: 19,
+    fontFamily: fonts.body,
+  },
 });

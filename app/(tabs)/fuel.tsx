@@ -1,48 +1,38 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import {
-  Image,
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { CalorieProgress } from '@/components/CalorieProgress';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { CalorieRing } from '@/components/CalorieRing';
+import { Card, MacroBar, QuickActions, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
-import {
-  addWater,
-  deleteFoodLog,
-  getDayFuelSummary,
-  type DayFuelSummary,
-  type FoodLogWithName,
-} from '@/db/food-queries';
+import { getDayFuelSummary, type DayFuelSummary } from '@/db/food-queries';
 import { MEAL_TYPES, type MealType } from '@/db/schema';
-import { formatGrams, formatKcal } from '@/lib/nutrition';
-import { colors, spacing } from '@/lib/theme';
+import { formatKcal } from '@/lib/nutrition';
+import { colors, fonts, radius, spacing } from '@/lib/theme';
 
 const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Breakfast',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  snack: 'Snacks',
+  breakfast: 'BREAKFAST',
+  lunch: 'LUNCH',
+  dinner: 'DINNER',
+  snack: 'SNACKS',
 };
 
+/**
+ * Fuel, laid out as prototype/app-shell.html: the ring with macro bars beside
+ * it, the row of capture actions, then one card per meal.
+ *
+ * An unlogged day shows the target in an empty ring, never a filled zero — a
+ * day nobody logged is not a day of eating nothing.
+ */
 export default function FuelScreen() {
-  const router = useRouter();
   const { ready } = useDb();
+  const router = useRouter();
   const [summary, setSummary] = useState<DayFuelSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busyWater, setBusyWater] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!ready) return;
-    setLoading(true);
     try {
-      const s = await getDayFuelSummary(new Date());
-      setSummary(s);
+      setSummary(await getDayFuelSummary(new Date()));
     } finally {
       setLoading(false);
     }
@@ -54,263 +44,138 @@ export default function FuelScreen() {
     }, [refresh])
   );
 
-  const onAddWater = async (ml: number) => {
-    if (busyWater) return;
-    setBusyWater(true);
-    try {
-      await addWater(ml);
-      await refresh();
-    } finally {
-      setBusyWater(false);
-    }
-  };
-
-  const onRemoveLog = (log: FoodLogWithName) => {
-    Alert.alert('Remove food?', `Remove ${log.displayName} from today's log?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          await deleteFoodLog(log.id);
-          await refresh();
-        },
-      },
-    ]);
-  };
-
-  if (!ready || (loading && !summary)) {
+  if (!ready || loading || !summary) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
-      </View>
+      <Screen section="Today">
+        <View style={s.center}>
+          <ActivityIndicator color={colors.accent} />
+        </View>
+      </Screen>
     );
   }
 
-  if (!summary) return null;
-
-  const { goals, totals, waterMl, byMeal, logs } = summary;
-  const waterPct =
-    goals.waterTargetMl > 0 ? Math.min(1, waterMl / goals.waterTargetMl) : 0;
+  const { goals, totals, byMeal, logs } = summary;
+  const logged = logs.length > 0;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.title}>Fuel</Text>
-          <Text style={styles.muted}>Today</Text>
+    <Screen section="Today">
+      <Card>
+        <View style={s.ringrow}>
+          <CalorieRing consumed={logged ? totals.calories : null} target={goals.calorieTarget} />
+          <View style={s.macros}>
+            <MacroBar label="Protein" value={logged ? totals.protein : null} target={goals.proteinTarget} tone="p" />
+            <MacroBar label="Carbs" value={logged ? totals.carb : null} target={goals.carbTarget} tone="c" />
+            <MacroBar label="Fat" value={logged ? totals.fat : null} target={goals.fatTarget} tone="f" />
+          </View>
         </View>
-        <View style={styles.headerActions}>
-          <Pressable style={styles.addBtn} onPress={() => router.push('/fuel/add')}>
-            <Text style={styles.addBtnText}>+ Add food</Text>
-          </Pressable>
-        </View>
-      </View>
+      </Card>
 
-      {/*
-        Three ways in, because the catalog will not have everything: a barcode
-        for a packaged product, the panel itself when the barcode is unknown,
-        and typing it in when neither works.
-      */}
-      <View style={styles.captureRow}>
-        <Pressable style={styles.captureBtn} onPress={() => router.push('/fuel/scan')}>
-          <Text style={styles.captureText}>Scan barcode</Text>
-        </Pressable>
-        <Pressable style={styles.captureBtn} onPress={() => router.push('/fuel/label')}>
-          <Text style={styles.captureText}>Scan label</Text>
-        </Pressable>
-        <Pressable style={styles.captureBtn} onPress={() => router.push('/fuel/custom')}>
-          <Text style={styles.captureText}>Custom food</Text>
-        </Pressable>
-      </View>
-
-      {/* null, not 0: an unlogged day is not a day of eating nothing. */}
-      <CalorieProgress
-        consumed={logs.length > 0 ? totals.calories : null}
-        target={goals.calorieTarget}
+      <QuickActions
+        items={[
+          { icon: '◉', label: 'PHOTO', onPress: () => router.push('/fuel/label') },
+          { icon: '▣', label: 'SCAN', onPress: () => router.push('/fuel/scan') },
+          { icon: '⌕', label: 'SEARCH', onPress: () => router.push('/fuel/add') },
+          { icon: '↺', label: 'RECENT', onPress: () => router.push('/fuel/add') },
+          { icon: '✎', label: 'CUSTOM', onPress: () => router.push('/fuel/custom') },
+        ]}
       />
 
-      <View style={styles.macroRow}>
-        <MacroChip label="Protein" value={formatGrams(totals.protein)} target={`${goals.proteinTarget}g`} />
-        <MacroChip label="Fat" value={formatGrams(totals.fat)} target={`${goals.fatTarget}g`} />
-        <MacroChip label="Carbs" value={formatGrams(totals.carb)} target={`${goals.carbTarget}g`} />
-      </View>
+      {MEAL_TYPES.map((meal) => {
+        const items = byMeal[meal];
+        const kcal = items.reduce((n, l) => n + (l.calories ?? 0), 0);
+        return (
+          <View key={meal} style={s.meal}>
+            <View style={s.mh}>
+              <Text style={s.mhN}>{MEAL_LABELS[meal]}</Text>
+              <Text style={s.mhK}>{items.length > 0 ? formatKcal(kcal) : ''}</Text>
+            </View>
 
-      <Text style={styles.section}>Water</Text>
-      <View style={styles.waterCard}>
-        <Text style={styles.waterTotal}>
-          {waterMl} / {goals.waterTargetMl} ml
-        </Text>
-        <View style={styles.waterTrack}>
-          <View style={[styles.waterFill, { width: `${Math.round(waterPct * 100)}%` }]} />
-        </View>
-        <View style={styles.waterBtns}>
-          <Pressable style={styles.waterBtn} onPress={() => onAddWater(250)} disabled={busyWater}>
-            <Text style={styles.waterBtnText}>+250 ml</Text>
-          </Pressable>
-          <Pressable style={styles.waterBtn} onPress={() => onAddWater(500)} disabled={busyWater}>
-            <Text style={styles.waterBtnText}>+500 ml</Text>
-          </Pressable>
-        </View>
-      </View>
+            {items.length === 0 ? (
+              <Text style={s.empty}>Nothing logged</Text>
+            ) : (
+              items.map((log) => (
+                <Pressable
+                  key={log.id}
+                  style={s.item}
+                  onPress={() => router.push(`/fuel/edit/${encodeURIComponent(log.id)}`)}
+                >
+                  {log.photoUri ? (
+                    <Image source={{ uri: log.photoUri }} style={s.thumb} resizeMode="cover" />
+                  ) : null}
+                  <View style={s.itemN}>
+                    <Text style={s.itemName} numberOfLines={1}>
+                      {log.displayName}
+                    </Text>
+                    <Text style={s.itemSub}>
+                      {log.servings}× · P{Math.round(log.protein ?? 0)} C{Math.round(log.carb ?? 0)} F
+                      {Math.round(log.fat ?? 0)}
+                    </Text>
+                  </View>
+                  <Text style={s.itemK}>{Math.round(log.calories ?? 0)}</Text>
+                </Pressable>
+              ))
+            )}
 
-      {MEAL_TYPES.map((meal) => (
-        <View key={meal}>
-          <Text style={styles.section}>{MEAL_LABELS[meal]}</Text>
-          {byMeal[meal].length === 0 ? (
-            <Text style={styles.emptyMeal}>Nothing logged</Text>
-          ) : (
-            byMeal[meal].map((log) => (
-              <Pressable
-                key={log.id}
-                style={styles.logRow}
-                onPress={() => router.push(`/fuel/edit/${encodeURIComponent(log.id)}`)}
-                onLongPress={() => onRemoveLog(log)}
-              >
-                {log.photoUri ? (
-                  <Image source={{ uri: log.photoUri }} style={styles.logPhoto} resizeMode="cover" />
-                ) : null}
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.logName}>{log.displayName}</Text>
-                  <Text style={styles.logMeta}>
-                    {log.servings}× · P {formatGrams(log.protein)} · C {formatGrams(log.carb)} · F{' '}
-                    {formatGrams(log.fat)}
-                  </Text>
-                </View>
-                <Text style={styles.logCal}>{formatKcal(log.calories)}</Text>
-              </Pressable>
-            ))
-          )}
-        </View>
-      ))}
-    </ScrollView>
+            <Pressable style={s.addf} onPress={() => router.push('/fuel/add')}>
+              <Text style={s.addfT}>+ Add food</Text>
+            </Pressable>
+          </View>
+        );
+      })}
+    </Screen>
   );
 }
 
-function MacroChip({
-  label,
-  value,
-  target,
-}: {
-  label: string;
-  value: string;
-  target: string;
-}) {
-  return (
-    <View style={styles.macroChip}>
-      <Text style={styles.macroLabel}>{label}</Text>
-      <Text style={styles.macroValue}>{value}</Text>
-      <Text style={styles.macroTarget}>/ {target}</Text>
-    </View>
-  );
-}
+const s = StyleSheet.create({
+  center: { paddingVertical: 80, alignItems: 'center' },
+  ringrow: { flexDirection: 'row', gap: 16, alignItems: 'center' },
+  macros: { flex: 1, minWidth: 0 },
 
-const styles = StyleSheet.create({
-  logPhoto: {
-    width: 36,
-    height: 36,
-    borderRadius: 6,
-    marginRight: 10,
-    backgroundColor: colors.surface,
-  },
-  captureRow: { flexDirection: 'row', gap: 8, marginBottom: 16 },
-  captureBtn: {
-    flex: 1,
+  meal: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
+    borderRadius: radius.lg,
+    marginBottom: 10,
+    overflow: 'hidden',
   },
-  captureText: { color: colors.text, fontWeight: '700', fontSize: 13 },
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
-  center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
-  headerRow: {
+  mh: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    paddingVertical: 13,
+    paddingHorizontal: spacing.md,
   },
-  title: { color: colors.text, fontSize: 24, fontWeight: '800' },
-  muted: { color: colors.textMuted, marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  scanBtn: {
-    backgroundColor: colors.surfaceAlt,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  scanBtnText: { color: colors.text, fontWeight: '700' },
-  addBtn: {
-    backgroundColor: colors.accent,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  addBtnText: { color: colors.chipActiveText, fontWeight: '800' },
-  macroRow: { flexDirection: 'row', gap: 8, marginTop: spacing.md },
-  macroChip: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    padding: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  macroLabel: { color: colors.textMuted, fontSize: 11, fontWeight: '700' },
-  macroValue: { color: colors.text, fontWeight: '800', fontSize: 15, marginTop: 2 },
-  macroTarget: { color: colors.textMuted, fontSize: 11, marginTop: 2 },
-  section: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  waterCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.sm,
-  },
-  waterTotal: { color: colors.text, fontWeight: '700', fontSize: 16 },
-  waterTrack: {
-    height: 8,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  waterFill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
-  waterBtns: { flexDirection: 'row', gap: 8 },
-  waterBtn: {
-    flex: 1,
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 8,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  waterBtnText: { color: colors.text, fontWeight: '700' },
-  emptyMeal: { color: colors.textMuted, fontSize: 13, marginBottom: 4 },
-  logRow: {
+  mhN: { fontFamily: fonts.pixel, fontSize: 9, letterSpacing: 1, color: colors.text },
+  mhK: { fontSize: 13, color: colors.textMuted, fontFamily: fonts.bodySemi },
+  item: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 8,
+    gap: 10,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  logName: { color: colors.text, fontWeight: '700' },
-  logMeta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
-  logCal: { color: colors.accent, fontWeight: '800', marginLeft: 8 },
+  thumb: { width: 34, height: 34, borderRadius: 6, backgroundColor: colors.surfaceAlt },
+  itemN: { flex: 1, minWidth: 0 },
+  itemName: { fontSize: 14, color: colors.text, fontFamily: fonts.body },
+  itemSub: { fontSize: 11, color: colors.textDim, marginTop: 3, fontFamily: fonts.body },
+  itemK: { fontSize: 13, color: colors.textMuted, fontFamily: fonts.bodySemi },
+  addf: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingVertical: 13,
+    paddingHorizontal: spacing.md,
+  },
+  addfT: { color: colors.textDim, fontSize: 13, fontFamily: fonts.bodySemi },
+  empty: {
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+    fontSize: 13,
+    color: colors.textDim,
+    fontFamily: fonts.body,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
 });

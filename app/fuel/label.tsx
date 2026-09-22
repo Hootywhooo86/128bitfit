@@ -4,6 +4,7 @@ import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { describeReading, parseNutritionLabel, type LabelField } from '@/lib/nutrition-label';
 import { ocrAvailable, readTextFromImage } from '@/lib/ocr';
+import { Screen } from '@/components/ui';
 import { colors, spacing } from '@/lib/theme';
 
 const FIELD_LABELS: Record<LabelField, string> = {
@@ -75,7 +76,7 @@ export default function ScanLabelScreen() {
 
   if (!available) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.pad}>
+      <Screen section="Scan label" back>
         <Text style={styles.title}>Scan nutrition label</Text>
         <Text style={styles.muted}>
           This build cannot read text from photos, so there is nothing to scan. Add the food by
@@ -84,7 +85,7 @@ export default function ScanLabelScreen() {
         <Pressable style={styles.primaryBtn} onPress={() => router.replace('/fuel/custom')}>
           <Text style={styles.primaryBtnText}>Add by hand</Text>
         </Pressable>
-      </ScrollView>
+      </Screen>
     );
   }
 
@@ -98,7 +99,7 @@ export default function ScanLabelScreen() {
 
   if (!permission.granted) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={styles.pad}>
+      <Screen section="Scan label" back>
         <Text style={styles.title}>Camera permission</Text>
         <Text style={styles.muted}>
           Reading a nutrition label needs the camera. The photo is processed on this phone and is
@@ -110,12 +111,12 @@ export default function ScanLabelScreen() {
         <Pressable style={styles.secondaryBtn} onPress={() => router.replace('/fuel/custom')}>
           <Text style={styles.secondaryBtnText}>Add by hand instead</Text>
         </Pressable>
-      </ScrollView>
+      </Screen>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <Screen section="Scan label" back scroll={false}>
       <View style={styles.cameraWrap}>
         <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" enableTorch={torch} />
         <View style={styles.overlay} pointerEvents="none">
@@ -156,7 +157,7 @@ export default function ScanLabelScreen() {
           is left blank for you rather than guessed at.
         </Text>
       </View>
-    </View>
+    </Screen>
   );
 }
 
