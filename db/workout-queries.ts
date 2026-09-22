@@ -44,6 +44,56 @@ export async function listRoutines(): Promise<Routine[]> {
   return db.select().from(routines).orderBy(asc(routines.name));
 }
 
+export type RoutineListItem = Routine & {
+  exerciseCount: number;
+  /** The first few exercise names, so a row says what the routine actually is. */
+  names: string[];
+};
+
+/**
+ * Routines with enough detail to tell them apart.
+ *
+ * "Day 1", "Day 2", "NEW DAY ONE" — an imported list is full of names that say
+ * nothing, so the row has to show what is in it before anyone can decide which
+ * one to delete.
+ */
+export async function listRoutinesWithDetail(): Promise<RoutineListItem[]> {
+  const list = await listRoutines();
+  if (list.length === 0) return [];
+
+  const rows = await db
+    .select({
+      routineId: routineExercises.routineId,
+      position: routineExercises.position,
+      name: exercises.name,
+    })
+    .from(routineExercises)
+    .leftJoin(exercises, eq(routineExercises.exerciseId, exercises.id))
+    .where(
+      inArray(
+        routineExercises.routineId,
+        list.map((r) => r.id)
+      )
+    )
+    .orderBy(asc(routineExercises.position));
+
+  const byRoutine = new Map<string, string[]>();
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    counts.set(r.routineId, (counts.get(r.routineId) ?? 0) + 1);
+    if (!r.name) continue;
+    const names = byRoutine.get(r.routineId) ?? [];
+    if (names.length < 3) names.push(r.name);
+    byRoutine.set(r.routineId, names);
+  }
+
+  return list.map((r) => ({
+    ...r,
+    exerciseCount: counts.get(r.id) ?? 0,
+    names: byRoutine.get(r.id) ?? [],
+  }));
+}
+
 export async function getRoutineExercises(routineId: string): Promise<(RoutineExercise & { exerciseName: string })[]> {
   const rows = await db
     .select({

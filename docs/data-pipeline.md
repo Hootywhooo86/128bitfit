@@ -97,7 +97,12 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 
 - Schema: `routines`, `routine_exercises`, `workout_sessions`,
   `session_exercises`, `sets`
-- Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` (once, if empty)
+- Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` — once
+  ever, flagged by the `starter_routines_seeded` setting, never re-seeded when
+  the table is empty (deleting every routine used to bring the starters back).
+- Deleting: sessions in `app/train/history.tsx`, routines in
+  `app/train/routines.tsx`. Both use a visible Delete on the row, never a
+  long-press — the normal tap on a routine starts a workout.
 - Rest timer: `lib/rest-timer.tsx` + `lib/rest-timer-notifications.ts`
 - Screen wake lock: `lib/session-awake.ts` (the rule) + `lib/use-session-awake.ts`
   (the effect). Held only while a session is `in_progress`, released on unmount.
