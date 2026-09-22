@@ -22,6 +22,7 @@ import type {
   HealthPermissionState,
   HealthProvider,
   HealthWeightEntry,
+  HealthWindow,
   HealthWorkoutEntry,
   HealthWriteResult,
 } from './types';
@@ -65,6 +66,9 @@ export const health: HealthProvider = {
   readDays(startDate: string, endDate: string): Promise<HealthDay[]> {
     return provider().readDays(startDate, endDate);
   },
+  readWindow(startMs: number, endMs: number): Promise<HealthWindow> {
+    return provider().readWindow(startMs, endMs);
+  },
   writeEntries(entries: HealthWorkoutEntry[]): Promise<number> {
     return provider().writeEntries(entries);
   },
@@ -76,6 +80,12 @@ export const health: HealthProvider = {
   },
   writeHydration(entries: HealthHydrationEntry[]): Promise<HealthWriteResult> {
     return provider().writeHydration(entries);
+  },
+  deleteEntries(
+    scope: 'nutrition' | 'weight' | 'hydration' | 'exercise',
+    clientIds: string[]
+  ): Promise<HealthWriteResult> {
+    return provider().deleteEntries(scope, clientIds);
   },
   openSettings(): void {
     provider().openSettings();

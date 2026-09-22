@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { health } from '@/lib/health';
+import { HealthSyncCard } from '@/components/HealthSyncCard';
 import { colors, spacing } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 
@@ -30,10 +31,15 @@ export default function PrivacyScreen() {
       </View>
 
       <Text style={styles.section}>Health Connect</Text>
+
+      <HealthSyncCard />
+
       <View style={styles.card}>
         <Text style={styles.body}>
           Connecting Health Connect is optional. Every screen works without it, and the app
-          shows &quot;Not connected&quot; rather than inventing numbers.
+          shows &quot;Not connected&quot; rather than inventing numbers. Each permission is
+          separate — granting one does not grant the rest, and refusing one only costs you
+          the feature below it.
         </Text>
 
         <View style={styles.row}>
@@ -45,10 +51,45 @@ export default function PrivacyScreen() {
         </View>
 
         <View style={styles.row}>
+          <Text style={styles.perm}>Read sleep and resting heart rate</Text>
+          <Text style={styles.permWhy}>
+            The readiness and rest scores on Home. Without sleep there is no score and the
+            card says so rather than guessing one.
+          </Text>
+        </View>
+
+        <View style={styles.row}>
+          <Text style={styles.perm}>Read heart rate and active calories</Text>
+          <Text style={styles.permWhy}>
+            Read for the exact window of a workout you finish, to work out what it cost. A
+            figure measured by your watch is shown as measured; anything the app worked out
+            itself is labelled an estimate.
+          </Text>
+        </View>
+
+        <View style={styles.row}>
+          <Text style={styles.perm}>Read and write weight</Text>
+          <Text style={styles.permWhy}>
+            A weigh-in from your scale shows up here without re-typing it, and one you type
+            here goes back so your other apps have it.
+          </Text>
+        </View>
+
+        <View style={styles.row}>
+          <Text style={styles.perm}>Write food and water</Text>
+          <Text style={styles.permWhy}>
+            Meals and water you log are copied across with their calories and macros, so
+            anything else reading your nutrition sees the same figures. Edit one and the copy
+            is updated; delete one and the copy is deleted with it.
+          </Text>
+        </View>
+
+        <View style={styles.row}>
           <Text style={styles.perm}>Write exercise</Text>
           <Text style={styles.permWhy}>
             Writes workouts you complete back to Health Connect so your other apps can see
-            them.
+            them — when you trained and for how long. Calories are not written, because the
+            app&apos;s figure is usually an estimate and Health Connect has nowhere to say so.
           </Text>
         </View>
 

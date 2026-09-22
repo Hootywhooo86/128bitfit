@@ -103,7 +103,7 @@ export const foodLogs = sqliteTable('food_logs', {
   id: text('id').primaryKey(),
   foodId: text('food_id'),
   customName: text('custom_name'),
-  mealType: text('meal_type').notNull().default('snack'),
+  mealType: text('meal_type', { enum: MEAL_TYPES }).notNull().default('snack'),
   loggedAt: integer('logged_at', { mode: 'timestamp' }).notNull(),
   servings: real('servings').notNull().default(1),
   servingSize: real('serving_size'),
