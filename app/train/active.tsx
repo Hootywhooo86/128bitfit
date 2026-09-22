@@ -23,6 +23,7 @@ import {
 } from '@/db/workout-queries';
 import type { WorkoutSet } from '@/db/schema';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
+import { describeLastPerformance } from '@/lib/set-prefill';
 import { colors, spacing } from '@/lib/theme';
 
 export default function ActiveWorkoutScreen() {
@@ -204,10 +205,18 @@ function ExerciseBlock({
     patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed'>>
   ) => void;
 }) {
+  const lastLine = describeLastPerformance(se.lastPerformance);
   return (
     <View style={styles.card}>
       <Text style={styles.exName}>{se.exerciseName}</Text>
       <Text style={styles.exMeta}>Rest {se.restSeconds ?? 60}s</Text>
+      {lastLine ? (
+        // Says where the pre-filled numbers came from, so they read as last
+        // week's rather than as something already logged today.
+        <Text style={styles.exLast}>Last: {lastLine}</Text>
+      ) : (
+        <Text style={styles.exLast}>First time — no previous sets</Text>
+      )}
 
       <View style={styles.setHeader}>
         <Text style={[styles.col, styles.colSet]}>Set</Text>
@@ -321,6 +330,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   exName: { color: colors.text, fontWeight: '800', fontSize: 16 },
+  exLast: { color: colors.textMuted, fontSize: 11, marginBottom: 4 },
   exMeta: { color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm, marginTop: 2 },
   setHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
   setRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },

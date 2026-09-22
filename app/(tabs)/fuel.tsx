@@ -88,7 +88,7 @@ export default function FuelScreen() {
 
   if (!summary) return null;
 
-  const { goals, totals, waterMl, byMeal } = summary;
+  const { goals, totals, waterMl, byMeal, logs } = summary;
   const waterPct =
     goals.waterTargetMl > 0 ? Math.min(1, waterMl / goals.waterTargetMl) : 0;
 
@@ -109,7 +109,11 @@ export default function FuelScreen() {
         </View>
       </View>
 
-      <CalorieProgress consumed={totals.calories} target={goals.calorieTarget} />
+      {/* null, not 0: an unlogged day is not a day of eating nothing. */}
+      <CalorieProgress
+        consumed={logs.length > 0 ? totals.calories : null}
+        target={goals.calorieTarget}
+      />
 
       <View style={styles.macroRow}>
         <MacroChip label="Protein" value={formatGrams(totals.protein)} target={`${goals.proteinTarget}g`} />

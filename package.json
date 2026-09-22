@@ -6,8 +6,8 @@
   "description": "Fitness + nutrition offline-first Expo app",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
     "web": "expo start --web",
     "build:exercises": "node scripts/build-exercise-db.mjs",
     "build:exercises:images": "node scripts/build-exercise-db.mjs --images",
@@ -15,19 +15,26 @@
     "check:usda": "node scripts/check-usda.mjs",
     "db:generate": "drizzle-kit generate",
     "typecheck": "tsc --noEmit",
-    "verify:import": "node scripts/verify-import.mjs"
+    "verify:import": "node scripts/verify-import.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build:web": "expo export -p web",
+    "serve:web": "node scripts/serve-web.mjs"
   },
   "dependencies": {
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.44.7",
     "expo": "~57.0.24",
+    "expo-build-properties": "~57.0.21",
     "expo-camera": "~57.0.5",
     "expo-constants": "~57.0.19",
+    "expo-file-system": "~57.0.7",
     "expo-font": "~57.0.4",
     "expo-linking": "~57.0.10",
     "expo-notifications": "~57.0.20",
     "expo-router": "~57.0.22",
     "expo-secure-store": "~57.0.4",
+    "expo-sharing": "~57.0.21",
     "expo-splash-screen": "~57.0.9",
     "expo-sqlite": "~57.0.3",
     "expo-status-bar": "~57.0.1",
@@ -36,6 +43,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-health-connect": "^4.1.3",
     "react-native-reanimated": "4.5.1",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
@@ -46,7 +54,8 @@
     "@types/react": "~19.2.2",
     "babel-plugin-inline-import": "^3.0.0",
     "drizzle-kit": "^0.31.10",
-    "typescript": "~5.9.2"
+    "typescript": "~5.9.2",
+    "vitest": "^5.0.1"
   },
   "engines": {
     "node": ">=18"

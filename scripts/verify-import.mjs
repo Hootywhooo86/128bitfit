@@ -2,6 +2,10 @@
 /**
  * Headless verification that bundled JSON imports into SQLite with expected counts.
  * Uses Node's built-in node:sqlite (no Expo runtime required).
+ *
+ * Expected counts and import version come from db/data-manifest.ts, so
+ * regenerating the JSON and recomputing the manifest is enough — there are no
+ * counts to update here.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,6 +18,42 @@ const root = path.join(__dirname, '..');
 
 const exercisesPath = path.join(root, 'assets/data/exercises.json');
 const foodsPath = path.join(root, 'assets/data/foods.json');
+const manifestPath = path.join(root, 'db/data-manifest.ts');
+
+/**
+ * db/data-manifest.ts is generated and its object literal is plain JSON, so we
+ * lift it out rather than pulling a TypeScript loader into this script.
+ */
+function readManifest() {
+  const src = fs.readFileSync(manifestPath, 'utf8');
+  const match = src.match(/DATA_MANIFEST\s*=\s*(\{[\s\S]*?\})\s*as const/);
+  if (!match) {
+    throw new Error(
+      `Could not find the DATA_MANIFEST object literal in ${manifestPath}. ` +
+        'It should stay generated: `export const DATA_MANIFEST = { ... } as const;`'
+    );
+  }
+  try {
+    return JSON.parse(match[1]);
+  } catch (e) {
+    throw new Error(
+      `DATA_MANIFEST in ${manifestPath} is not valid JSON (${e.message}). ` +
+        'Regenerate it rather than hand-editing.'
+    );
+  }
+}
+
+const manifest = readManifest();
+const expected = {
+  exercises: manifest.exercises.count,
+  foods: manifest.foods.count,
+};
+
+for (const [key, value] of Object.entries(expected)) {
+  if (!Number.isInteger(value)) {
+    throw new Error(`DATA_MANIFEST.${key}.count is ${JSON.stringify(value)}, expected an integer.`);
+  }
+}
 
 const exBuf = fs.readFileSync(exercisesPath);
 const foodBuf = fs.readFileSync(foodsPath);
@@ -98,7 +138,7 @@ for (const f of foods) {
     JSON.stringify(f.nutrients ?? {})
   );
 }
-insertMeta.run('import_version', '1');
+insertMeta.run('import_version', String(manifest.version));
 insertMeta.run('exercises_checksum', checksum(exBuf));
 insertMeta.run('foods_checksum', checksum(foodBuf));
 db.exec('COMMIT');
@@ -107,11 +147,13 @@ const exCount = db.prepare('SELECT COUNT(*) AS n FROM exercises').get().n;
 const foodCount = db.prepare('SELECT COUNT(*) AS n FROM foods').get().n;
 const sample = db.prepare('SELECT id, name, equipment FROM exercises WHERE id = ?').get('3_4_Sit-Up');
 
+const ok = exCount === expected.exercises && foodCount === expected.foods;
+
 console.log(JSON.stringify({
-  ok: exCount === 876 && foodCount === 8114,
+  ok,
   exercises: exCount,
   foods: foodCount,
-  expected: { exercises: 876, foods: 8114 },
+  expected,
   sample,
   checksums: {
     exercises: checksum(exBuf),
@@ -119,6 +161,12 @@ console.log(JSON.stringify({
   },
 }, null, 2));
 
-if (exCount !== 876 || foodCount !== 8114) {
+if (!ok) {
+  console.error(
+    `Import count mismatch against db/data-manifest.ts: ` +
+      `exercises ${exCount} (expected ${expected.exercises}), ` +
+      `foods ${foodCount} (expected ${expected.foods}). ` +
+      'Recompute the manifest if the JSON was regenerated on purpose.'
+  );
   process.exit(1);
 }

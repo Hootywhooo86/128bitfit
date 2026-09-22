@@ -1,115 +1,168 @@
-# 128bitfit — offline data / DB bible
+# 128BIT FIT — project brief
 
-Private fitness + nutrition app. This doc covers **offline databases only** (Expo app comes later).
+Read this first. It's the standing context for this repo.
 
-## Generated assets (commit these)
+## What this is
 
-| File | Source | Approx size |
-|------|--------|-------------|
-| `assets/data/exercises.json` | [yuhonas/free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain) | ~677 KB, ~876 exercises |
-| `assets/data/foods.json` | [USDA FoodData Central](https://fdc.nal.usda.gov/) API | ~4 MB (Foundation + SR Legacy) |
+A strength-training and nutrition tracker where the user's real progress drives a
+pixel character they built. Android first, React Native / Expo.
 
-Optional (gitignored): `assets/exercises/` image files (~120 MB). Paths in JSON still reference relative image names.
+The differentiator is **not** the character. It's that training and nutrition live in
+the same app, so the coach can say "your bench stalled and you're 32g under on protein
+on training days" — something no split-app setup can do.
 
-## Regenerating
+## Non-negotiables
 
-```bash
-cp .env.example .env   # then set FDC_API_KEY
-npm install
+These are product constraints, not preferences. Don't quietly trade them away.
 
-npm run build:exercises              # JSON only (default)
-npm run build:exercises:images       # also download images into assets/exercises/
+1. **Logging a set takes under three seconds.** Last session's weights are pre-filled.
+   Every feature competes against this; if something slows logging down, it loses.
+2. **Nothing free becomes paid later.** The free tier is published and does not shrink.
+   This is the single most common way fitness apps lose their users' goodwill.
+3. **Full data export, always.** CSV and JSON. If the schema can't dump cleanly, the
+   schema is wrong.
+4. **Offline-first.** SQLite is the source of truth for a live session. Gyms have no
+   signal. The UI never waits on the network.
+5. **No simulated data in a shipping path.** If Health Connect is unavailable or the
+   user declined, show an empty state. Never estimate a number and present it as a
+   measurement. (The original prototype did this and it's why it was thrown away.)
+6. **Calorie floors are enforced in code.** Targets never drop below the higher of the
+   user's BMR or the standard minimum, whatever rate they pick. Deficit capped at 25%
+   of TDEE. No user setting overrides this.
 
-npm run check:usda                   # verify API key + ping FDC
-npm run build:foods                  # Foundation + SR Legacy → foods.json
-npm run build:foods -- --survey      # include FNDDS survey foods
-npm run build:foods -- --branded --max=5000
-npm run build:foods -- --debug
-```
+## First run and empty states
 
-## Exercise record shape
+Every number in the prototype is seeded demo data. **On a real first launch, none of
+it exists.** Build the empty states deliberately — they are the first thing a new user
+sees and they are where the app earns or loses trust.
 
-`id`, `name`, `force`, `level`, `mechanic`, `equipment`, `primaryMuscles`, `secondaryMuscles`, `instructions`, `category`, `images`
+**Zero and "no data" are different things. Never conflate them.**
 
-## Food record shape
+| Situation | Show |
+| --- | --- |
+| Health Connect connected, no steps yet today | `0` — that's a real reading |
+| Health Connect not connected / permission declined | "Not connected" + a way to connect |
+| Health Connect unavailable on this device | "Not available on this phone" |
+| Weight never logged | "Log your first weigh-in", not `0 lbs` |
+| No sessions yet | "No workouts yet" + Start workout, not `0 workouts` |
+| No food logged today | Empty ring showing the target, not a filled `0` |
 
-- `id` / `source_id` (fdcId), `name` / `description`, `source` (`foundation` | `sr_legacy` | `survey` | `branded`)
-- `barcode` / `gtin` when present
-- `serving_size`, `serving_unit`, `nutrition_basis` (`per_100g` | `per_serving`)
-- `nutrients` map (31 keys; nulls allowed): calories, protein, fat, carb, fiber, sugars, saturated_fat, trans_fat, cholesterol, sodium, potassium, calcium, iron, magnesium, phosphorus, zinc, copper, manganese, selenium, vitamin_c, thiamin, riboflavin, niacin, pantothenic_acid, vitamin_b6, folate, vitamin_b12, vitamin_a, vitamin_d, vitamin_e, vitamin_k
+A `0` claims a measurement was taken and came back zero. A dash or a prompt says none
+was taken. Getting this wrong is the same class of mistake as the original prototype's
+fake Health Connect sync.
 
-## USDA pipeline rules (do not regress)
+**What a brand-new user's screens should contain:**
 
-- Never request >25 nutrient IDs in an API filter (USDA rejects). Prefer no nutrient filter; map client-side.
-- Branded foods: prefer `labelNutrients` (per serving); set `nutrition_basis` accordingly.
-- Energy nutrient IDs: 1008, 2047, 2048 (kcal); 1062 (kJ → kcal / 4.184).
-- Small batches (~12) with retry backoff 3/6/9/12/15s on 504 / timeouts.
-- Skip foods with no usable energy; report skip counts.
+- **Home** — no rings filled, no streak, no weight journey bar. A single clear next
+  action: create your character, then set your targets.
+- **Train** — no schedule, no history, no PRs. The exercise library is the one thing
+  that *is* populated, because it ships with the app. Lead with it.
+- **Fuel** — calorie ring shows the target with nothing consumed. Food search works
+  offline from day one; that's the win to surface.
+- **Coach** — nothing to say yet, and it should say so plainly rather than inventing
+  encouragement. Something like: "Log a couple of sessions and I'll have something
+  useful to tell you."
+- **Progress / muscle map** — everything grey. The map with no colour is honest and it
+  also motivates: it visibly wants filling in.
 
----
+**Derived numbers need a minimum before they mean anything.** Don't show a 7-day weight
+trend from one weigh-in, a TDEE estimate from three days of logging, or a "volume vs
+last week" from a single session. Say what's still needed: "two more weigh-ins for a
+trend". The prototype's weight screen already does this — carry the pattern everywhere.
 
-## Expo app (foundation)
+**Seed nothing.** No sample workouts, no demo foods, no placeholder character stats.
+An empty app that tells the truth beats a full one that lies.
 
-- App lives at **repo root** (Expo Router `app/` directory). Data pipelines stay in `scripts/` + `assets/data/`.
-- Run: `npx expo start` (or `npm start`).
-- SQLite schema: `db/schema.ts`. Migrations: `drizzle/` (generate with `npm run db:generate`).
-- Import: `db/import.ts` — checksum-gated via `db/data-manifest.ts`. Do not parse JSON into UI every launch.
-- After regenerating `exercises.json` / `foods.json`, recompute `db/data-manifest.ts` (or bump `version`) so devices re-import.
+## Stack
 
-### Train / workouts
+| Layer | Choice |
+| --- | --- |
+| Framework | Expo (React Native), SDK 54+, dev builds not Expo Go |
+| Language | TypeScript |
+| Local DB | expo-sqlite + Drizzle ORM |
+| Sync | Supabase (Postgres + Auth + row-level security) |
+| State | Zustand |
+| Sprites | react-native-skia |
+| Health | react-native-health-connect (Android), HealthKit later |
+| Camera | expo-camera (barcode + photos) |
+| Billing | RevenueCat |
+| Notifications | expo-notifications |
 
-- Schema: `routines`, `routine_exercises`, `workout_sessions`, `session_exercises`, `sets`
-- Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` (once if empty)
-- Rest timer: `lib/rest-timer.tsx` + `lib/rest-timer-notifications.ts` (in-app countdown synced to OS local notifications via `expo-notifications`; +15/Skip actions; lock-screen alert)
-- Screens: `app/(tabs)/train.tsx`, `app/train/active.tsx`, `app/train/add-exercise.tsx`, `app/train/summary.tsx`
+Design a single `HealthProvider` interface with `readDays()` / `writeEntries()` so the
+iOS HealthKit implementation slots in behind it later.
 
+## Data sources
 
-### Rest timer notifications
+Build commands, generated-asset sizes, record shapes, the USDA API constraints
+that must not regress, and the app file map live in
+[`docs/data-pipeline.md`](docs/data-pipeline.md).
 
-- Package: `expo-notifications` (config plugin in `app.json`; Android channel `rest_timer`)
-- On first timed rest: explain + request notification permission
-- Rest start schedules a local notification for rest end; +15 / Skip / complete cancel or reschedule it
-- Notification category actions: `+15s` and `Skip` (appear on the delivered rest-end alert)
-- Tapping the alert opens Train / active workout when `sessionId` is known
-- Do not rely on `setTimeout` alone when backgrounded; OS schedule is the completion signal
-- Out of scope: Wear OS, custom arcade sound library, Health Connect
-- iOS Silent / Focus may mute notification sound
+**Exercises — done, free, public domain**
+- `free-exercise-db` (yuhonas). 876 exercises, name / primary + secondary muscles /
+  equipment / category / level / instructions / image paths.
+- Images: `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/<path>`
+- Run `scripts/build-exercise-db.mjs` to fetch and normalise.
 
-### Fuel / nutrition logging
+**Food — to build**
+- **USDA FoodData Central** — public domain, free API key from api.data.gov.
+  Foundation Foods + SR Legacy. Bundle offline. Full micronutrients.
+  Run `scripts/build-food-db.mjs`.
+- **Open Food Facts** — 4.6M barcoded products, live lookup at runtime, cache results.
+  ⚠️ **ODbL, share-alike.** Per-barcode lookups are the intended use. Do NOT bulk-ingest
+  into a proprietary database without a lawyer looking at it first.
+- **Nutritionix** — paid, restaurant and branded items. This is the gap that loses
+  users. Offer it as a user-supplied API key rather than eating the cost.
 
-- Schema: `food_logs`, `water_logs`, `settings` (calorie/protein/water targets)
-- Queries: `db/food-queries.ts`; macros helper: `lib/nutrition.ts` (respects `nutrition_basis`)
-- Screens: `app/(tabs)/fuel.tsx`, `app/fuel/add.tsx`, `app/fuel/edit/[id].tsx`
-- Barcode: `app/fuel/scan.tsx` + `app/fuel/custom.tsx`; lookup `db/barcode-queries.ts`
-- Open Food Facts: `lib/open-food-facts.ts` (per-barcode v2 API + ODbL note); cache table `off_food_cache`
-- Lookup order: local USDA barcode/gtin → OFF cache → OFF API → custom food form
-- Out of scope: bulk OFF import, AI meal photo, recipes
+**Licences to respect**
+- openGym is **AGPL**. Read it for ideas, don't copy code.
+- wger is **AGPL**. Fine to call over its API, risky to bundle.
 
-### Home + Coach (BYO key)
+## AI
 
-- Schema: `weight_entries`; `coach_threads` / `coach_messages`; settings keys for goals + AI prefs (`ai_provider`, `ai_model`, `ai_base_url`)
-- Queries: `db/weight-queries.ts`, `db/settings-queries.ts`, `db/coach-context.ts`, `db/ai-settings.ts`, `db/coach-chat.ts`
-- AI client: `lib/ai-coach.ts` (Anthropic / OpenAI / Gemini / OpenRouter / custom OpenAI-compatible); keys in `lib/ai-secure.ts` via expo-secure-store
-- Home: calorie ring + water, last workout / Train CTA, weight latest + log screen, optional training week strip
-- Coach: post-workout / ask / weekly check-in — builds SQLite context pack, calls selected provider (real responses only; stub UX if no key)
-- Settings: goals + AI provider picker, model, optional base URL, BYO API key; barcode data licenses note; Character editor
-- Out of scope: on-device LLM weights, Health Connect, paid themes, subscriptions
+Bring-your-own-key is a first-class path, not a fallback. Supported providers:
+Anthropic, Google AI Studio, OpenAI, xAI, Hugging Face, OpenRouter, Together AI,
+Ollama, custom OpenAI-compatible endpoint, on-device.
 
-### Pixel avatar + onboarding
+Keys are stored with `expo-secure-store` and sent straight to the provider. They never
+touch our servers.
 
-- Settings keys: `onboarding_complete`, `avatar_config` (JSON), `show_avatar_on_home`, `sex`, `birthday`, `height_cm`
-- `lib/avatar.ts` (palettes + Mifflin–St Jeor helpers), `components/PixelAvatar.tsx` (layered Views), `components/AvatarCreator.tsx`
-- Gate: `components/OnboardingGate.tsx` → `app/onboarding/index.tsx` (Basics → Avatar → Goals → Done)
-- Home: small idle avatar (Settings show/hide); re-edit via Settings → Character
-- Poses supported on renderer (`idle` / `curl` / `eat` / `think`); Home uses idle
-- Out of scope: hand-drawn 28×44 asset pipeline, clothing shop, Health Connect
+Coach prompts get a pre-computed summary (~1,500 tokens), never the raw database.
+The coach must be willing to say a plan is fine — a coach that finds a problem every
+time is noise.
 
-## Visual source of truth
+**Hard limits in the coach's system prompt:** no diagnosing, no rehab programming, no
+advice on medication. Never recommend a target below the calorie floor regardless of
+what the user asks for. If logged behaviour or stated goals suggest disordered eating,
+step back and point to a professional rather than optimising the plan.
 
-The Claude HTML prototype at `prototype/app-shell.html` is the **look to match** (from Daniel's Claude/Claude Code work):
+## Where the prototype fits
 
-- Fonts: **Silkscreen** (pixel labels) + **Inter** (body)
-- Chrome: pure black background, dark cards, **white** accent buttons
-- Muscle heat intensity may use yellow / orange / red (`#ffd95e` / `#ff9a3d` / `#ff4d6d`) — data colours, not neon UI chrome
-- Expo UI should track this shell; Daniel may still upload fuller Claude Code project files into the repo
+`prototype/app-shell.html` is a complete, working, single-file mock of the whole app —
+every screen, real navigation, the 876-exercise database embedded. It is the visual and
+behavioural spec. Port from it; don't ship it.
 
+Visual rules it establishes:
+- Monochrome UI. **Colour only ever means data.**
+- The only colour in the app is muscle load: yellow (1–3 sets) → orange (4–7) → red (8+),
+  plus red for over-target. An accent colour is user-selectable (paid) and must never
+  bleed into the muscle heat scale.
+- Pixel font (Silkscreen) for section labels and headers only. Body text is Inter.
+- The character is a hand-authored 28×44 sprite grid rendered at 2×, not procedural shapes.
+
+## Build order
+
+1. Scaffold Expo + SQLite + Drizzle. Port the schema from the build spec.
+2. Exercise database → bundled asset → searchable library.
+3. Live session logging: routines, sets, rest timer with a **scheduled OS notification**
+   (not a JS timer — it must fire with the screen off).
+4. Food database + barcode.
+5. Health Connect.
+6. Coach.
+7. Supabase sync, RevenueCat, importers (Strong / Hevy / MyFitnessPal / Cronometer).
+
+## House style for code in this repo
+
+- Plain, direct naming. No clever abstractions before there are two call sites.
+- Every network call has an offline path.
+- Errors surface to the user in one honest sentence — never a silent no-op.
+  (A dead button that does nothing is worse than one that says "not built yet".)

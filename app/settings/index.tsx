@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +19,7 @@ import {
 import { useDb } from '@/db/DatabaseProvider';
 import {
   getAppSettings,
+  previewCalorieTarget,
   updateAppSettings,
   type AppSettings,
   type WeightUnit,
@@ -26,6 +28,7 @@ import { PixelAvatar } from '@/components/PixelAvatar';
 import type { AvatarConfig } from '@/lib/avatar';
 import { DEFAULT_AVATAR } from '@/lib/avatar';
 import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
+import { explainFloor } from '@/lib/calorie-floor';
 import { colors, spacing } from '@/lib/theme';
 
 export default function SettingsScreen() {
@@ -98,6 +101,10 @@ export default function SettingsScreen() {
     if (saving) return;
     setSaving(true);
     try {
+      // The floor is enforced in updateAppSettings regardless; this is only so
+      // the change is explained rather than applied silently.
+      const floorCheck = await previewCalorieTarget(Number(calorieTarget) || 2200);
+
       const nextApp = await updateAppSettings({
         displayName,
         calorieTarget: Number(calorieTarget) || 2200,
@@ -107,6 +114,10 @@ export default function SettingsScreen() {
         showAvatarOnHome,
       });
       applyApp(nextApp);
+      if (floorCheck.clamped) {
+        setCalorieTarget(String(floorCheck.value));
+        Alert.alert('Calorie target adjusted', explainFloor(floorCheck));
+      }
 
       const aiPatch: Parameters<typeof updateAiSettings>[0] = {
         provider: aiProvider,
@@ -156,6 +167,20 @@ export default function SettingsScreen() {
         Goals, character, and preferences persist in the local settings table. AI keys use
         Secure Store on device — never committed or logged.
       </Text>
+
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/privacy')}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Privacy & health data</Text>
+          <Text style={styles.muted}>What is stored, what leaves the device →</Text>
+        </View>
+      </Pressable>
+
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/export')}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Export data</Text>
+          <Text style={styles.muted}>Download everything as CSV and JSON →</Text>
+        </View>
+      </Pressable>
 
       <Pressable style={styles.charCard} onPress={() => router.push('/settings/character')}>
         <PixelAvatar config={avatar} pose="idle" size={56} />

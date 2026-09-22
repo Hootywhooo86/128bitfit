@@ -14,6 +14,7 @@
       }
     },
     "android": {
+      "package": "com.hootywhooo86.bit128fit",
       "adaptiveIcon": {
         "backgroundColor": "#0a0a0a",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -26,7 +27,9 @@
         "android.permission.POST_NOTIFICATIONS",
         "android.permission.SCHEDULE_EXACT_ALARM",
         "android.permission.VIBRATE",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.health.READ_STEPS",
+        "android.permission.health.WRITE_EXERCISE"
       ]
     },
     "web": {
@@ -35,6 +38,14 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
+        }
+      ],
       "expo-router",
       [
         "expo-splash-screen",
@@ -60,7 +71,10 @@
           "defaultChannel": "rest_timer"
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "react-native-health-connect",
+      "expo-sharing",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true

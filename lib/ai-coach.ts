@@ -3,6 +3,7 @@
  * Supports Anthropic, OpenAI, Gemini, OpenRouter, and custom OpenAI-compatible endpoints.
  * Does not invent fake replies — errors surface to the UI.
  */
+import { AI_TIMEOUT_MS, fetchWithTimeout } from './net';
 
 export type AiProviderId =
   | 'anthropic'
@@ -148,7 +149,7 @@ async function chatOpenAiCompatible(
   baseUrl: string
 ): Promise<string> {
   const url = `${stripTrailingSlash(baseUrl)}/chat/completions`;
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -160,7 +161,7 @@ async function chatOpenAiCompatible(
       temperature: 0.6,
     }),
     signal: req.signal,
-  });
+  }, { timeoutMs: AI_TIMEOUT_MS, label: 'Coach reply' });
   if (!res.ok) {
     throw new AiCoachError(await readErrorBody(res), res.status);
   }
@@ -178,7 +179,7 @@ async function chatAnthropic(req: CoachChatRequest): Promise<string> {
     .filter((m) => m.role !== 'system')
     .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -192,7 +193,7 @@ async function chatAnthropic(req: CoachChatRequest): Promise<string> {
       messages: msgs,
     }),
     signal: req.signal,
-  });
+  }, { timeoutMs: AI_TIMEOUT_MS, label: 'Coach reply' });
   if (!res.ok) {
     throw new AiCoachError(await readErrorBody(res), res.status);
   }
@@ -230,12 +231,12 @@ async function chatGemini(req: CoachChatRequest): Promise<string> {
     body.systemInstruction = { parts: [{ text: system }] };
   }
 
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal: req.signal,
-  });
+  }, { timeoutMs: AI_TIMEOUT_MS, label: 'Coach reply' });
   if (!res.ok) {
     throw new AiCoachError(await readErrorBody(res), res.status);
   }

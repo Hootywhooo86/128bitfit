@@ -148,7 +148,12 @@ export default function TrainScreen() {
 
       <Text style={styles.section}>Starter routines</Text>
       {routines.length === 0 ? (
-        <Text style={styles.muted}>No routines seeded yet.</Text>
+        // User-facing copy, not internal wording: "seeded" means nothing to a
+        // new user, and the library is the one thing that ships populated.
+        <Text style={styles.muted}>
+          No routines yet. Start a freestyle session, or browse the exercise library — it
+          ships with the app and works offline.
+        </Text>
       ) : (
         routines.map((r) => (
           <Pressable

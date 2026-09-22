@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,7 +14,7 @@ import {
 import { AvatarCreator } from '@/components/AvatarCreator';
 import { PixelAvatar } from '@/components/PixelAvatar';
 import { useDb } from '@/db/DatabaseProvider';
-import { updateAppSettings } from '@/db/settings-queries';
+import { previewCalorieTarget, updateAppSettings } from '@/db/settings-queries';
 import { addWeightEntry } from '@/db/weight-queries';
 import {
   DEFAULT_AVATAR,
@@ -25,6 +26,7 @@ import {
   type AvatarConfig,
   type SexOption,
 } from '@/lib/avatar';
+import { explainFloor } from '@/lib/calorie-floor';
 import { colors, spacing } from '@/lib/theme';
 
 const STEPS = ['Basics', 'Avatar', 'Goals', 'Done'] as const;
@@ -102,6 +104,13 @@ export default function OnboardingScreen() {
     if (saving || !ready) return;
     setSaving(true);
     try {
+      // Log the weigh-in first: the calorie floor reads the latest weight to
+      // compute BMR, so saving goals before this would floor against a profile
+      // with no weight in it.
+      if (Number.isFinite(weightNum) && weightNum > 0) {
+        await addWeightEntry({ value: weightNum, unit: units, note: 'Onboarding' });
+      }
+
       await updateAppSettings({
         displayName: displayName.trim() || 'Athlete',
         units,
@@ -115,8 +124,14 @@ export default function OnboardingScreen() {
         showAvatarOnHome: true,
         onboardingComplete: true,
       });
-      if (Number.isFinite(weightNum) && weightNum > 0) {
-        await addWeightEntry({ value: weightNum, unit: units, note: 'Onboarding' });
+      // Weight is logged above, so the floor now sees a full profile. Say so
+      // rather than quietly storing a different number than was typed.
+      const floorCheck = await previewCalorieTarget(Number(calorieTarget) || 2200);
+      if (floorCheck.clamped) {
+        Alert.alert('Calorie target adjusted', explainFloor(floorCheck), [
+          { text: 'OK', onPress: () => router.replace('/(tabs)') },
+        ]);
+        return;
       }
       router.replace('/(tabs)');
     } finally {
