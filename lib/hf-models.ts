@@ -15,6 +15,15 @@ export type HfModel = {
   id: string;
   /** Who serves it, when the router says. Shown so the user can tell them apart. */
   provider: string | null;
+  /**
+   * Whether the model takes images as well as text.
+   *
+   * Straight from the router's `architecture.input_modalities` — not a guess
+   * from the name. Vision on Hugging Face is a property of the model, not the
+   * provider: roughly a third of what the router serves takes images and the
+   * rest does not, so "can Hugging Face see photos" has no single answer.
+   */
+  vision: boolean;
 };
 
 export type HfModelsResult =
@@ -76,17 +85,35 @@ export function parseHfModels(body: unknown): HfModel[] {
       if (typeof p?.provider === 'string') provider = p.provider;
       else if (typeof providers[0] === 'string') provider = providers[0] as string;
     }
-    out.push({ id, provider });
+
+    // A model that does not say it takes images is treated as not taking them.
+    // Claiming a capability the router did not report would send a photo that
+    // comes back as an error, or worse, silently ignored.
+    const modalities = (r.architecture as { input_modalities?: unknown } | undefined)
+      ?.input_modalities;
+    const vision = Array.isArray(modalities) && modalities.includes('image');
+
+    out.push({ id, provider, vision });
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));
 }
 
-/** Case-insensitive substring match on the id, for the picker's search box. */
-export function filterHfModels(models: HfModel[], query: string): HfModel[] {
+/**
+ * Case-insensitive substring match on the id, for the picker's search box.
+ *
+ * `visionOnly` narrows to models that take images, which is what someone who
+ * came here to photograph a recipe actually wants to choose from.
+ */
+export function filterHfModels(
+  models: HfModel[],
+  query: string,
+  visionOnly = false
+): HfModel[] {
+  const pool = visionOnly ? models.filter((m) => m.vision) : models;
   const q = query.trim().toLowerCase();
-  if (!q) return models;
+  if (!q) return pool;
   const terms = q.split(/\s+/);
-  return models.filter((m) => {
+  return pool.filter((m) => {
     const hay = `${m.id} ${m.provider ?? ''}`.toLowerCase();
     return terms.every((t) => hay.includes(t));
   });

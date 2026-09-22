@@ -45,6 +45,8 @@ export default function SettingsScreen() {
 
   const [aiProvider, setAiProvider] = useState<AiProviderId>('anthropic');
   const [aiModel, setAiModel] = useState('');
+  /** null = typed by hand, so nothing is known about its image support. */
+  const [aiModelVision, setAiModelVision] = useState<boolean | null>(null);
   const [aiBaseUrl, setAiBaseUrl] = useState('');
   const [aiKeyDraft, setAiKeyDraft] = useState('');
   const [aiHasKey, setAiHasKey] = useState(false);
@@ -62,6 +64,7 @@ export default function SettingsScreen() {
 
   const applyAi = (s: AiSettings) => {
     setAiProvider(s.provider);
+    setAiModelVision(s.modelVision);
     setAiModel(s.model);
     setAiBaseUrl(s.baseUrl);
     setAiHasKey(s.hasKey);
@@ -91,6 +94,9 @@ export default function SettingsScreen() {
     setAiProvider(id);
     const meta = getProviderMeta(id);
     setAiModel(meta.defaultModel);
+    // A different provider's default model. What the old one could see says
+    // nothing about this one, so forget it rather than carry it over.
+    setAiModelVision(null);
     if (meta.defaultBaseUrl) setAiBaseUrl(meta.defaultBaseUrl);
     else if (!meta.needsBaseUrl) setAiBaseUrl('');
   };
@@ -121,6 +127,7 @@ export default function SettingsScreen() {
         provider: aiProvider,
         model: aiModel,
         baseUrl: aiBaseUrl,
+        modelVision: aiModelVision,
       };
       if (aiKeyDraft.trim()) {
         aiPatch.apiKey = aiKeyDraft;
@@ -300,8 +307,11 @@ export default function SettingsScreen() {
         <HfModelPicker
           visible={pickerOpen}
           apiKey={aiKeyDraft.trim() || null}
-          onPick={(id) => {
-            setAiModel(id);
+          onPick={(m) => {
+            setAiModel(m.id);
+            // Recorded now, while the router's answer is in hand — a photo gets
+            // taken where there may be no signal to ask again.
+            setAiModelVision(m.vision);
             setPickerOpen(false);
           }}
           onClose={() => setPickerOpen(false)}

@@ -5,7 +5,7 @@
  * testable; this is only the call and the error wording.
  */
 import { getAiRuntimeConfig } from '@/db/ai-settings';
-import { AiCoachError, coachChat, providerSupportsVision } from './ai-coach';
+import { AiCoachError, coachChat, getProviderMeta, visionSupport } from './ai-coach';
 import {
   EQUIPMENT_PROMPT,
   equipmentSystemPrompt,
@@ -30,10 +30,19 @@ export async function identifyEquipment(
       message: 'No AI key set. Add one in Settings → AI, or fill the exercise in by hand.',
     };
   }
-  if (!providerSupportsVision(cfg.provider)) {
+  // Same rule as the food photos: on some providers this depends on the model,
+  // so the message names whichever of the two the user has to change.
+  const support = visionSupport(cfg.provider, cfg.modelVision);
+  if (support === 'no') {
     return {
       status: 'unavailable',
-      message: `${cfg.provider} cannot read photos. Switch to Anthropic, OpenAI or Gemini in Settings → AI, or fill it in by hand.`,
+      message: `${getProviderMeta(cfg.provider).label} cannot read photos. Switch to Anthropic, OpenAI, Gemini or a Hugging Face vision model in Settings → AI, or fill it in by hand.`,
+    };
+  }
+  if (support === 'model-cannot') {
+    return {
+      status: 'unavailable',
+      message: `${cfg.model} cannot read photos. Pick a model that can in Settings → AI — the list marks them — or fill it in by hand.`,
     };
   }
 

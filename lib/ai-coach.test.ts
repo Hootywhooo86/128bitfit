@@ -5,6 +5,8 @@ import {
   getProviderMeta,
   isAiProviderId,
   providerSupportsVision,
+  visionSupport,
+  MODEL_DEPENDENT_VISION,
   type AiProviderId,
 } from './ai-coach';
 
@@ -55,23 +57,53 @@ describe('AI providers', () => {
 });
 
 describe('vision support', () => {
-  it('knows which providers can look at a photo', () => {
-    expect(providerSupportsVision('anthropic')).toBe(true);
-    expect(providerSupportsVision('openai')).toBe(true);
-    expect(providerSupportsVision('gemini')).toBe(true);
+  it('knows which providers can always look at a photo', () => {
+    for (const id of ['anthropic', 'openai', 'gemini'] as AiProviderId[]) {
+      expect(visionSupport(id)).toBe('yes');
+      // The model's own capability is irrelevant for these — every model they
+      // serve takes images, so a stale flag must not veto it.
+      expect(visionSupport(id, false)).toBe('yes');
+      expect(providerSupportsVision(id)).toBe(true);
+    }
   });
 
   it('does not claim vision for providers that route to arbitrary models', () => {
-    // A photo sent to one of these is silently dropped by the provider, and the
-    // model is then asked to describe something it never received. The UI has
-    // to be able to say "this provider cannot read photos" instead.
+    // A photo sent to one of these is silently dropped, and the model is then
+    // asked to describe something it never received. The UI has to be able to
+    // say "this provider cannot read photos" instead.
+    expect(visionSupport('openrouter')).toBe('no');
+    expect(visionSupport('custom')).toBe('no');
     expect(providerSupportsVision('openrouter')).toBe(false);
-    expect(providerSupportsVision('huggingface')).toBe(false);
     expect(providerSupportsVision('custom')).toBe(false);
+  });
+
+  it('lets the model decide on Hugging Face', () => {
+    // Its router serves ~140 models and about a third take images. Calling the
+    // whole provider blind locked the user out of a capability they had.
+    expect(visionSupport('huggingface', true)).toBe('yes');
+    expect(providerSupportsVision('huggingface', true)).toBe(true);
+
+    expect(visionSupport('huggingface', false)).toBe('model-cannot');
+    expect(providerSupportsVision('huggingface', false)).toBe(false);
+  });
+
+  it('attempts a hand-typed model rather than refusing it', () => {
+    // Nothing is known about a model id the user typed. Refusing would be the
+    // same mistake in the other direction, and the provider's own error is a
+    // better answer than our guess.
+    expect(visionSupport('huggingface', null)).toBe('unknown');
+    expect(visionSupport('huggingface')).toBe('unknown');
+    expect(providerSupportsVision('huggingface', null)).toBe(true);
+  });
+
+  it('never reports model-dependent for a provider that cannot see at all', () => {
+    expect(visionSupport('openrouter', true)).toBe('no');
+    expect(providerSupportsVision('openrouter', true)).toBe(false);
   });
 
   it('names only real providers as vision-capable', () => {
     const ids = new Set(AI_PROVIDERS.map((p) => p.id));
     for (const id of VISION_PROVIDERS) expect(ids.has(id)).toBe(true);
+    for (const id of MODEL_DEPENDENT_VISION) expect(ids.has(id)).toBe(true);
   });
 });

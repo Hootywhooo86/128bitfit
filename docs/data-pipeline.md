@@ -124,6 +124,12 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Queries: `db/food-queries.ts`; macros helper: `lib/nutrition.ts`
 - Screens: `app/(tabs)/fuel.tsx`, `app/fuel/add.tsx`, `app/fuel/edit/[id].tsx`
 - Barcode: `app/fuel/scan.tsx` + `app/fuel/custom.tsx`; lookup `db/barcode-queries.ts`
+- AI vision: `visionSupport(provider, modelVision)` in `lib/ai-coach.ts`.
+  Anthropic/OpenAI/Gemini always; Hugging Face depends on the model, which the
+  router reports as `architecture.input_modalities` and `parseHfModels` reads
+  into `HfModel.vision`. The flag is saved as `ai_model_vision` when a model is
+  picked, so the check is offline; a hand-typed model is 'unknown' and the call
+  is attempted rather than refused.
 - Label scan: `app/fuel/label.tsx`, two shots — front of pack then nutrition panel.
   The pack shot becomes the food's photo and gives a name guess
   (`lib/package-label.ts`); the panel shot is OCR'd for numbers
