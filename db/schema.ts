@@ -71,7 +71,7 @@ export const workoutSessions = sqliteTable('workout_sessions', {
   routineId: text('routine_id'),
   startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
   endedAt: integer('ended_at', { mode: 'timestamp' }),
-  status: text('status').notNull().default('in_progress'),
+  status: text('status', { enum: SESSION_STATUSES }).notNull().default('in_progress'),
   notes: text('notes'),
 });
 
