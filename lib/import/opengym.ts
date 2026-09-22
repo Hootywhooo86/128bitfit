@@ -36,7 +36,7 @@ import type {
   ImportedWeight,
 } from './parse';
 
-type OgSet = { w?: unknown; r?: unknown; done?: unknown };
+type OgSet = { w?: unknown; r?: unknown; done?: unknown; phase?: unknown };
 type OgEntry = { id?: unknown; sets?: unknown };
 type OgWorkout = { d?: unknown; start?: unknown; name?: unknown; entries?: unknown };
 
@@ -333,6 +333,10 @@ export function parseOpenGym(data: unknown): ImportResult & { openGym?: OpenGymR
           reps,
           rpe: null,
           notes: null,
+          // openGym marks warm-ups; dropping the flag would count them as
+          // working sets, inflating volume and the muscle map and letting a
+          // light warm-up be judged for a personal record.
+          isWarmup: s.phase === 'warmup',
         });
       }
     }

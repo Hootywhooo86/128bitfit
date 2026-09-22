@@ -132,6 +132,18 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
   from `app/train/add-exercise.tsx` with a `sessionId`, which adds the finished
   exercise straight into the running session.
 
+### Personal records
+
+- Rule: `lib/personal-records.ts`. Two kinds kept apart — **heaviest** (a
+  measurement) and **best estimated 1RM** (Epley, capped at 12 reps, always
+  labelled as a formula rather than a lift). Ties do not count; the first ever
+  set of an exercise is not a record; units are never compared across.
+- Queries: `recordBefore()`, `personalRecordsIn(sessionId)` (judged against
+  everything before that session started, one per exercise), and
+  `listPersonalRecords()` for the screen.
+- Shown as 🏆 on the workout summary and at `app/train/records.tsx`.
+- Warm-ups and discarded sessions are excluded — a warm-up is not an attempt.
+
 ### Imported exercises with no muscles
 
 - openGym references its built-in exercises by number and its backup carries

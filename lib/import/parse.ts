@@ -26,6 +26,8 @@ export type ImportedSet = {
   reps: number | null;
   rpe: number | null;
   notes: string | null;
+  /** A warm-up, where the source said so. Not a working set. */
+  isWarmup?: boolean;
 };
 
 /**

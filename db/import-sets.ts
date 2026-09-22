@@ -140,7 +140,7 @@ export async function importSets(rows: ImportedSet[]): Promise<ImportOutcome> {
           // rewritten on the way in; display converts.
           weightUnit: r.weightUnit ?? 'lb',
           completed: true,
-          isWarmup: false,
+          isWarmup: r.isWarmup === true,
           rpe: r.rpe,
         });
         setsAdded += 1;

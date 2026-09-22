@@ -283,3 +283,31 @@ describe('a backup with no sets', () => {
     expect('error' in nothing).toBe(true);
   });
 });
+
+describe('warm-up sets', () => {
+  it('carries the flag rather than counting them as working sets', () => {
+    // openGym marks these. Losing the flag inflates volume and the muscle map,
+    // and lets a light warm-up be judged for a personal record.
+    const r = parseOpenGym({
+      ...backup,
+      workouts: [
+        {
+          d: '2025-01-01',
+          start: 1735689600000,
+          name: 'Test',
+          entries: [
+            {
+              id: '0218',
+              sets: [
+                { w: 80, r: 10, done: true, phase: 'warmup' },
+                { w: 140, r: 8, done: true },
+              ],
+            },
+          ],
+        },
+      ],
+    });
+    if ('error' in r) throw new Error(r.error);
+    expect(r.sets.map((s) => s.isWarmup)).toEqual([true, false]);
+  });
+});
