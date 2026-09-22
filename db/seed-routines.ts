@@ -2,6 +2,7 @@ import { count } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
 import { findExerciseByExactName, findExerciseByNameLike } from './workout-queries';
+import { getSetting, setSetting } from './settings-queries';
 import { routineExercises, routines } from './schema';
 
 type SeedExercise = {
@@ -87,10 +88,29 @@ async function resolveExerciseId(spec: SeedExercise): Promise<string | null> {
 }
 
 /** Seed Push / Pull / Legs / Full Body once when routines table is empty. */
+/**
+ * Set once, the first time the starters are laid down.
+ *
+ * "Seed when the table is empty" resurrected them: delete every routine and
+ * they came straight back on the next visit to Train, which looks exactly like
+ * delete not working. Seeding is a one-time event in the app's life, not a
+ * condition to be maintained — an empty routine list is a legitimate state and
+ * the app has no business arguing with it.
+ */
+const SEEDED_KEY = 'starter_routines_seeded';
+
 export async function ensureStarterRoutines(): Promise<{ seeded: boolean; count: number }> {
   const [row] = await db.select({ n: count() }).from(routines);
-  if ((row?.n ?? 0) > 0) {
-    return { seeded: false, count: row?.n ?? 0 };
+  const existing = row?.n ?? 0;
+
+  if (await getSetting(SEEDED_KEY)) {
+    return { seeded: false, count: existing };
+  }
+  if (existing > 0) {
+    // Routines already here from an import or an older build: nothing to seed,
+    // and the flag is set so a later clear-out is not undone.
+    await setSetting(SEEDED_KEY, '1');
+    return { seeded: false, count: existing };
   }
 
   for (const routine of STARTER) {
@@ -119,6 +139,7 @@ export async function ensureStarterRoutines(): Promise<{ seeded: boolean; count:
     }
   }
 
+  await setSetting(SEEDED_KEY, '1');
   const [after] = await db.select({ n: count() }).from(routines);
   return { seeded: true, count: after?.n ?? 0 };
 }

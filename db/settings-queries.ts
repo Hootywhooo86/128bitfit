@@ -24,7 +24,19 @@ export type AppSettings = DailyGoals & {
   sex: SexOption | null;
   birthday: string | null;
   heightCm: number | null;
+  /** Hold the screen awake while a workout is running. */
+  keepAwake: boolean;
 };
+
+/**
+ * On by default.
+ *
+ * A screen that sleeps between sets means unlocking the phone to log each one,
+ * which is the three-second rule lost to a system setting. Someone who would
+ * rather have the battery can turn it off; nobody should have to turn it on to
+ * make logging work.
+ */
+export const DEFAULT_KEEP_AWAKE = true;
 
 const DEFAULT_DISPLAY_NAME = 'Athlete';
 const DEFAULT_UNITS: WeightUnit = 'lb';
@@ -77,6 +89,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     sexRaw,
     birthdayRaw,
     heightRaw,
+    keepAwakeRaw,
   ] = await Promise.all([
     getSetting('display_name'),
     getSetting('units'),
@@ -84,6 +97,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     getSetting('sex'),
     getSetting('birthday'),
     getSetting('height_cm'),
+    getSetting('keep_awake'),
   ]);
   const units: WeightUnit = unitsRaw === 'kg' ? 'kg' : DEFAULT_UNITS;
   const heightN = heightRaw != null ? Number(heightRaw) : NaN;
@@ -95,6 +109,7 @@ export async function getAppSettings(): Promise<AppSettings> {
     sex: parseSex(sexRaw),
     birthday: birthdayRaw && /^\d{4}-\d{2}-\d{2}$/.test(birthdayRaw) ? birthdayRaw : null,
     heightCm: Number.isFinite(heightN) && heightN > 0 ? heightN : null,
+    keepAwake: parseBool(keepAwakeRaw, DEFAULT_KEEP_AWAKE),
   };
 }
 
@@ -158,6 +173,7 @@ export async function updateAppSettings(patch: {
   sex?: SexOption | null;
   birthday?: string | null;
   heightCm?: number | null;
+  keepAwake?: boolean;
 }): Promise<AppSettings> {
   if (patch.calorieTarget != null) {
     // Non-negotiable #6: the floor is applied here, at the only path into the
@@ -190,6 +206,9 @@ export async function updateAppSettings(patch: {
   if (patch.heightCm !== undefined) {
     if (patch.heightCm == null) await setSetting('height_cm', '');
     else await setSetting('height_cm', String(Math.round(patch.heightCm)));
+  }
+  if (patch.keepAwake != null) {
+    await setSetting('keep_awake', patch.keepAwake ? '1' : '0');
   }
   return getAppSettings();
 }

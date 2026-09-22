@@ -28,12 +28,14 @@ export function HfModelPicker({
 }: {
   visible: boolean;
   apiKey: string | null;
-  onPick: (id: string) => void;
+  /** The model's image support travels with it, so it can be recorded. */
+  onPick: (model: HfModel) => void;
   onClose: () => void;
 }) {
   const [models, setModels] = useState<HfModel[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [visionOnly, setVisionOnly] = useState(false);
 
   useEffect(() => {
     if (!visible) return;
@@ -51,7 +53,8 @@ export function HfModelPicker({
     };
   }, [visible, apiKey]);
 
-  const shown = models ? filterHfModels(models, query) : [];
+  const shown = models ? filterHfModels(models, query, visionOnly) : [];
+  const visionCount = models ? models.filter((m) => m.vision).length : 0;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -73,6 +76,23 @@ export function HfModelPicker({
           autoCorrect={false}
         />
 
+        {/*
+          About a third of what the router serves takes images. Someone who came
+          here to photograph a recipe needs to find those, and someone who did
+          not should not have the list narrowed on them — so it is a filter, off
+          by default, with the count shown.
+        */}
+        {visionCount > 0 ? (
+          <Pressable
+            style={[s.filter, visionOnly && s.filterOn]}
+            onPress={() => setVisionOnly((v) => !v)}
+          >
+            <Text style={[s.filterText, visionOnly && s.filterTextOn]}>
+              ◉ Can read photos ({visionCount})
+            </Text>
+          </Pressable>
+        ) : null}
+
         {models == null && !error ? (
           <View style={s.center}>
             <ActivityIndicator color={colors.accent} />
@@ -92,11 +112,14 @@ export function HfModelPicker({
               keyExtractor={(m) => m.id}
               keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
-                <Pressable style={s.row} onPress={() => onPick(item.id)}>
+                <Pressable style={s.row} onPress={() => onPick(item)}>
                   <Text style={s.rowId} numberOfLines={1}>
                     {item.id}
                   </Text>
-                  {item.provider ? <Text style={s.rowProv}>{item.provider}</Text> : null}
+                  <View style={s.rowMeta}>
+                    {item.provider ? <Text style={s.rowProv}>{item.provider}</Text> : null}
+                    {item.vision ? <Text style={s.rowVision}>◉ reads photos</Text> : null}
+                  </View>
                 </Pressable>
               )}
               ListEmptyComponent={<Text style={s.hint}>Nothing matches that search.</Text>}
@@ -136,5 +159,20 @@ const s = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   rowId: { color: colors.text, fontSize: 14, fontFamily: fonts.body },
-  rowProv: { color: colors.textDim, fontSize: 11.5, marginTop: 3, fontFamily: fonts.body },
+  rowMeta: { flexDirection: 'row', gap: spacing.sm, marginTop: 3 },
+  rowProv: { color: colors.textDim, fontSize: 11.5, fontFamily: fonts.body },
+  rowVision: { color: colors.textMuted, fontSize: 11.5, fontFamily: fonts.body },
+  filter: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    marginBottom: spacing.sm,
+  },
+  filterOn: { borderColor: colors.accent, backgroundColor: colors.track },
+  filterText: { color: colors.textMuted, fontSize: 12, fontFamily: fonts.body },
+  filterTextOn: { color: colors.text, fontWeight: '700' },
 });

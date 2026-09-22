@@ -22,7 +22,10 @@ import {
   type SessionExerciseWithMeta,
 } from '@/db/workout-queries';
 import type { WorkoutSet } from '@/db/schema';
+import { getAppSettings } from '@/db/settings-queries';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
+import { shouldKeepAwake } from '@/lib/session-awake';
+import { useSessionAwake } from '@/lib/use-session-awake';
 import { describeLastPerformance } from '@/lib/set-prefill';
 import { colors, spacing } from '@/lib/theme';
 
@@ -33,8 +36,28 @@ export default function ActiveWorkoutScreen() {
   const [workout, setWorkout] = useState<ActiveWorkout | null>(null);
   const [loading, setLoading] = useState(true);
   const [elapsed, setElapsed] = useState('0:00');
+  const [keepAwake, setKeepAwake] = useState(false);
 
   const sessionId = id ? decodeURIComponent(id) : '';
+
+  // Hold the screen only while this session is genuinely running. Starts false
+  // so the setting is read before anything is locked, and drops the moment the
+  // session stops being in progress — finishing and discarding both go through
+  // that state, so neither has to remember to release it.
+  useSessionAwake(shouldKeepAwake(keepAwake, workout?.session.status));
+
+  useEffect(() => {
+    let alive = true;
+    getAppSettings()
+      .then((settings) => {
+        if (alive) setKeepAwake(settings.keepAwake);
+      })
+      // A setting we could not read is not a reason to hold someone's screen on.
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!sessionId) return;

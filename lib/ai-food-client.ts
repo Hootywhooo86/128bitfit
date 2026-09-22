@@ -10,7 +10,7 @@
  * in one sentence and pointed at the manual form.
  */
 import { getAiRuntimeConfig } from '@/db/ai-settings';
-import { AiCoachError, coachChat, providerSupportsVision } from './ai-coach';
+import { AiCoachError, coachChat, getProviderMeta, visionSupport } from './ai-coach';
 import {
   PHOTO_PROMPT,
   describePrompt,
@@ -50,11 +50,23 @@ export async function estimateFood(
     };
   }
   const needsVision = req.kind === 'photo' || req.kind === 'recipe-photos';
-  if (needsVision && !providerSupportsVision(cfg.provider)) {
-    return {
-      status: 'unavailable',
-      message: `${cfg.provider} cannot read photos. Use Describe or a link instead, or switch provider in Settings → AI.`,
-    };
+  if (needsVision) {
+    // Vision is a property of the model on some providers, not the provider.
+    // The message has to say which of the two is the problem, because the fix
+    // is different: switch provider, or switch model within it.
+    const support = visionSupport(cfg.provider, cfg.modelVision);
+    if (support === 'no') {
+      return {
+        status: 'unavailable',
+        message: `${getProviderMeta(cfg.provider).label} cannot read photos. Use Describe or a link instead, or switch provider in Settings → AI.`,
+      };
+    }
+    if (support === 'model-cannot') {
+      return {
+        status: 'unavailable',
+        message: `${cfg.model} cannot read photos. Pick a model that can in Settings → AI — the list marks them — or use Describe instead.`,
+      };
+    }
   }
   if (req.kind === 'recipe-photos' && req.photos.length === 0) {
     return { status: 'unavailable', message: 'Add at least one photo of the recipe.' };

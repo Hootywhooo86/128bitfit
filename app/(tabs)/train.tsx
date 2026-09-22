@@ -149,6 +149,15 @@ export default function TrainScreen() {
         sub="Start empty and pick as you go"
         onPress={() => void startFreestyle()}
       />
+      {routines.length > 0 ? (
+        <MenuRow
+          icon="✕"
+          name="Manage routines"
+          sub="Delete ones you don't use"
+          value={String(routines.length)}
+          onPress={() => router.push('/train/routines')}
+        />
+      ) : null}
       <MenuRow
         icon="▦"
         name="Exercise library"

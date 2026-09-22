@@ -101,11 +101,67 @@ export type ChatMessage = {
   image?: { base64: string; mimeType: string };
 };
 
-/** Providers that can actually look at a photo. */
+/**
+ * Providers where every model we can reach takes images.
+ *
+ * These three serve one vision-capable family each, so the provider alone
+ * answers the question.
+ */
 export const VISION_PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'gemini'];
 
-export function providerSupportsVision(id: AiProviderId): boolean {
-  return VISION_PROVIDERS.includes(id);
+/**
+ * Providers where it depends which model is selected.
+ *
+ * Hugging Face's router serves ~140 models and roughly a third of them take
+ * images. Treating the provider as blind, which is what this used to do, locked
+ * a user out of the photo features for a capability they had all along;
+ * treating it as sighted would send a photo to a text-only model and get an
+ * error or, worse, a confident answer about an image it never saw. Only the
+ * model id settles it.
+ */
+export const MODEL_DEPENDENT_VISION: AiProviderId[] = ['huggingface'];
+
+export type VisionSupport =
+  /** Send the photo. */
+  | 'yes'
+  /** This provider cannot take one at all. */
+  | 'no'
+  /** This model cannot, but another from the same provider could. */
+  | 'model-cannot'
+  /** A hand-typed model we have no capability data for. Worth attempting. */
+  | 'unknown';
+
+/**
+ * Whether a photo can be sent with this provider and model.
+ *
+ * `modelVision` is what the provider's own catalogue said about the selected
+ * model when it was chosen, or null when it was typed by hand. Unknown is
+ * deliberately not a refusal: blocking a capable model because we lack
+ * metadata about it would be the same mistake in the other direction, and the
+ * provider's own error is a better answer than our guess.
+ */
+export function visionSupport(
+  id: AiProviderId,
+  modelVision?: boolean | null
+): VisionSupport {
+  if (VISION_PROVIDERS.includes(id)) return 'yes';
+  if (!MODEL_DEPENDENT_VISION.includes(id)) return 'no';
+  if (modelVision === true) return 'yes';
+  if (modelVision === false) return 'model-cannot';
+  return 'unknown';
+}
+
+/**
+ * Whether to attempt a photo call at all.
+ *
+ * True for 'unknown' — see visionSupport.
+ */
+export function providerSupportsVision(
+  id: AiProviderId,
+  modelVision?: boolean | null
+): boolean {
+  const support = visionSupport(id, modelVision);
+  return support === 'yes' || support === 'unknown';
 }
 
 export type CoachChatRequest = {

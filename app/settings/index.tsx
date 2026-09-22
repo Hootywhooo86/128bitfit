@@ -41,9 +41,12 @@ export default function SettingsScreen() {
   const [proteinTarget, setProteinTarget] = useState('150');
   const [waterTarget, setWaterTarget] = useState('2500');
   const [units, setUnits] = useState<WeightUnit>('lb');
+  const [keepAwake, setKeepAwake] = useState(true);
 
   const [aiProvider, setAiProvider] = useState<AiProviderId>('anthropic');
   const [aiModel, setAiModel] = useState('');
+  /** null = typed by hand, so nothing is known about its image support. */
+  const [aiModelVision, setAiModelVision] = useState<boolean | null>(null);
   const [aiBaseUrl, setAiBaseUrl] = useState('');
   const [aiKeyDraft, setAiKeyDraft] = useState('');
   const [aiHasKey, setAiHasKey] = useState(false);
@@ -56,10 +59,12 @@ export default function SettingsScreen() {
     setProteinTarget(String(s.proteinTarget));
     setWaterTarget(String(s.waterTargetMl));
     setUnits(s.units);
+    setKeepAwake(s.keepAwake);
   };
 
   const applyAi = (s: AiSettings) => {
     setAiProvider(s.provider);
+    setAiModelVision(s.modelVision);
     setAiModel(s.model);
     setAiBaseUrl(s.baseUrl);
     setAiHasKey(s.hasKey);
@@ -89,6 +94,9 @@ export default function SettingsScreen() {
     setAiProvider(id);
     const meta = getProviderMeta(id);
     setAiModel(meta.defaultModel);
+    // A different provider's default model. What the old one could see says
+    // nothing about this one, so forget it rather than carry it over.
+    setAiModelVision(null);
     if (meta.defaultBaseUrl) setAiBaseUrl(meta.defaultBaseUrl);
     else if (!meta.needsBaseUrl) setAiBaseUrl('');
   };
@@ -107,6 +115,7 @@ export default function SettingsScreen() {
         proteinTarget: Number(proteinTarget) || 150,
         waterTargetMl: Number(waterTarget) || 2500,
         units,
+        keepAwake,
       });
       applyApp(nextApp);
       if (floorCheck.clamped) {
@@ -118,6 +127,7 @@ export default function SettingsScreen() {
         provider: aiProvider,
         model: aiModel,
         baseUrl: aiBaseUrl,
+        modelVision: aiModelVision,
       };
       if (aiKeyDraft.trim()) {
         aiPatch.apiKey = aiKeyDraft;
@@ -234,6 +244,25 @@ export default function SettingsScreen() {
         ))}
       </View>
 
+      <Text style={styles.label}>During a workout</Text>
+      <Pressable
+        style={styles.toggleRow}
+        onPress={() => setKeepAwake((v) => !v)}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: keepAwake }}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.toggleTitle}>Keep the screen on</Text>
+          <Text style={styles.muted}>
+            Stops the phone sleeping between sets while a session is running, so logging one does
+            not start with unlocking it. Released the moment the workout ends.
+          </Text>
+        </View>
+        <View style={[styles.switch, keepAwake && styles.switchOn]}>
+          <View style={[styles.knob, keepAwake && styles.knobOn]} />
+        </View>
+      </Pressable>
+
       <View style={styles.aiCard}>
         <Text style={styles.aiTitle}>AI Coach — Bring your own key</Text>
         <Text style={styles.muted}>
@@ -278,8 +307,11 @@ export default function SettingsScreen() {
         <HfModelPicker
           visible={pickerOpen}
           apiKey={aiKeyDraft.trim() || null}
-          onPick={(id) => {
-            setAiModel(id);
+          onPick={(m) => {
+            setAiModel(m.id);
+            // Recorded now, while the router's answer is in hand — a photo gets
+            // taken where there may be no signal to ask again.
+            setAiModelVision(m.vision);
             setPickerOpen(false);
           }}
           onClose={() => setPickerOpen(false)}
@@ -390,6 +422,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unitChipOn: { borderColor: colors.accent, backgroundColor: colors.track },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    padding: spacing.md,
+  },
+  toggleTitle: { color: colors.text, fontWeight: '700', fontSize: 14, marginBottom: 3 },
+  switch: {
+    width: 46,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: colors.track,
+    borderWidth: 1,
+    borderColor: colors.border,
+    justifyContent: 'center',
+    padding: 2,
+  },
+  switchOn: { backgroundColor: colors.accent, borderColor: colors.accent },
+  knob: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.textMuted,
+  },
+  knobOn: { backgroundColor: colors.onAccent, alignSelf: 'flex-end' },
   unitText: { color: colors.textMuted, fontWeight: '800' },
   unitTextOn: { color: colors.accent },
   save: {

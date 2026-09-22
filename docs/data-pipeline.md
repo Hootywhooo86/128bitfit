@@ -97,8 +97,17 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 
 - Schema: `routines`, `routine_exercises`, `workout_sessions`,
   `session_exercises`, `sets`
-- Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` (once, if empty)
+- Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` — once
+  ever, flagged by the `starter_routines_seeded` setting, never re-seeded when
+  the table is empty (deleting every routine used to bring the starters back).
+- Deleting: sessions in `app/train/history.tsx`, routines in
+  `app/train/routines.tsx`. Both use a visible Delete on the row, never a
+  long-press — the normal tap on a routine starts a workout.
 - Rest timer: `lib/rest-timer.tsx` + `lib/rest-timer-notifications.ts`
+- Screen wake lock: `lib/session-awake.ts` (the rule) + `lib/use-session-awake.ts`
+  (the effect). Held only while a session is `in_progress`, released on unmount.
+  `expo-keep-awake` needs no permission and no config plugin — it sets
+  `FLAG_KEEP_SCREEN_ON`. Setting `keep_awake`, on by default.
 - Screens: `app/(tabs)/train.tsx`, `app/train/active.tsx`,
   `app/train/add-exercise.tsx`, `app/train/summary.tsx`
 
@@ -120,6 +129,23 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Queries: `db/food-queries.ts`; macros helper: `lib/nutrition.ts`
 - Screens: `app/(tabs)/fuel.tsx`, `app/fuel/add.tsx`, `app/fuel/edit/[id].tsx`
 - Barcode: `app/fuel/scan.tsx` + `app/fuel/custom.tsx`; lookup `db/barcode-queries.ts`
+- Sleep is attributed to the day you **wake up**, not the day the session
+  started (`lib/health/sleep.ts`), and `readDays` reads sleep from one day
+  earlier than the rest of the range so a night that began the previous evening
+  is caught. Sleep is also never zero-filled on an empty result, unlike the
+  counters — no session means nobody recorded one.
+- AI vision: `visionSupport(provider, modelVision)` in `lib/ai-coach.ts`.
+  Anthropic/OpenAI/Gemini always; Hugging Face depends on the model, which the
+  router reports as `architecture.input_modalities` and `parseHfModels` reads
+  into `HfModel.vision`. The flag is saved as `ai_model_vision` when a model is
+  picked, so the check is offline; a hand-typed model is 'unknown' and the call
+  is attempted rather than refused.
+- Label scan: `app/fuel/label.tsx`, two shots — front of pack then nutrition panel.
+  The pack shot becomes the food's photo and gives a name guess
+  (`lib/package-label.ts`); the panel shot is OCR'd for numbers
+  (`lib/nutrition-label.ts`) and discarded. Step 1 is skippable, and skipping it
+  falls back to the panel shot as the photo. The name is a guess: it pre-fills
+  an editable field and the form says where it came from.
 - Open Food Facts: `lib/open-food-facts.ts` (per-barcode v2 API); cache table
   `off_food_cache`. ODbL share-alike — per-barcode lookups only, no bulk ingest.
 - Lookup order: local USDA barcode/gtin → OFF cache → OFF API → custom food form
