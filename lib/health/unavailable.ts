@@ -13,6 +13,7 @@ import {
   type HealthGrants,
   type HealthPermissionState,
   type HealthProvider,
+  type HealthWindow,
   type HealthWriteResult,
 } from './types';
 import { eachDay } from './dates';
@@ -43,6 +44,10 @@ export const unavailableProvider: HealthProvider = {
     return eachDay(startDate, endDate).map(emptyHealthDay);
   },
 
+  async readWindow(): Promise<HealthWindow> {
+    return { heartRateAvg: null, heartRateMax: null, activeCalories: null };
+  },
+
   async writeEntries(): Promise<number> {
     return 0;
   },
@@ -57,6 +62,12 @@ export const unavailableProvider: HealthProvider = {
 
   async writeHydration(): Promise<HealthWriteResult> {
     return nothing();
+  },
+
+  async deleteEntries(): Promise<HealthWriteResult> {
+    // Nothing was ever written here, so nothing needs removing. That is a
+    // success, not the NO_PROVIDER failure the writes report.
+    return { written: 0, error: null };
   },
 
   openSettings(): void {

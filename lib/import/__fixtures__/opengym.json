@@ -2,14 +2,192 @@
  "unit": "lb",
  "customEx": [
   {
+   "id": "immtgdwin2gtzm0",
+   "n": "iso-lateral low row",
+   "custom": true,
+   "eq": "custom",
+   "tg": "",
+   "desc": "",
+   "bp": "back"
+  },
+  {
+   "id": "immtgdwin1i79x0",
+   "n": "landmine squat and press",
+   "custom": true,
+   "eq": "custom",
+   "tg": "quadriceps",
+   "desc": "",
+   "bp": "full body",
+   "sm": [
+    "triceps",
+    "hamstring",
+    "calves",
+    "abs"
+   ],
+   "muscleGroups": [
+    "quadriceps",
+    "gluteal",
+    "deltoids",
+    "triceps",
+    "hamstring",
+    "calves",
+    "abs"
+   ],
+   "primaries": [
+    "quadriceps",
+    "gluteal",
+    "deltoids"
+   ],
+   "secondaries": [
+    "triceps",
+    "hamstring",
+    "calves",
+    "abs"
+   ]
+  },
+  {
    "id": "immtgdwimsz93dd",
    "n": "bayesin cable curl",
    "custom": true,
    "eq": "custom",
    "tg": "biceps",
+   "desc": "",
+   "bp": "upper arms",
    "sm": [
     "forearm",
     "abs"
+   ],
+   "muscleGroups": [
+    "biceps",
+    "forearm",
+    "abs"
+   ],
+   "primaries": [
+    "biceps"
+   ],
+   "secondaries": [
+    "forearm",
+    "abs"
+   ]
+  },
+  {
+   "id": "immtgdwimtc9l2t",
+   "n": "triceps rope pushdown",
+   "custom": true,
+   "eq": "custom",
+   "tg": "triceps",
+   "desc": "",
+   "bp": "upper arms",
+   "sm": [
+    "obliques",
+    "abs"
+   ],
+   "muscleGroups": [
+    "triceps",
+    "obliques",
+    "abs"
+   ],
+   "primaries": [
+    "triceps"
+   ],
+   "secondaries": [
+    "obliques",
+    "abs"
+   ]
+  },
+  {
+   "id": "immtgdwimubwif5",
+   "n": "chest supported single arm row",
+   "custom": true,
+   "eq": "custom",
+   "tg": "upper-back",
+   "desc": "",
+   "bp": "back",
+   "sm": [
+    "lower-back"
+   ],
+   "muscleGroups": [
+    "upper-back",
+    "lower-back"
+   ],
+   "primaries": [
+    "upper-back"
+   ],
+   "secondaries": [
+    "lower-back"
+   ]
+  },
+  {
+   "id": "immtgdwimtt02xm",
+   "n": "torso rotation",
+   "custom": true,
+   "eq": "custom",
+   "tg": "",
+   "desc": "",
+   "bp": "waist"
+  },
+  {
+   "id": "cmtyh47eg10xhq",
+   "n": "Sled pull",
+   "bp": "full body",
+   "desc": "Pull the sled",
+   "tg": "gluteal",
+   "sm": [
+    "calves",
+    "lower-back",
+    "abs"
+   ],
+   "muscleGroups": [
+    "gluteal",
+    "hamstring",
+    "calves",
+    "lower-back",
+    "abs"
+   ],
+   "primaries": [
+    "gluteal",
+    "hamstring"
+   ],
+   "secondaries": [
+    "calves",
+    "lower-back",
+    "abs"
+   ],
+   "eq": "custom",
+   "custom": true
+  },
+  {
+   "id": "immtgdwin2kovq8",
+   "n": "sled push",
+   "custom": true,
+   "eq": "custom",
+   "tg": "quadriceps",
+   "desc": "",
+   "bp": "upper legs",
+   "sm": [
+    "gluteal",
+    "calves",
+    "hamstring",
+    "abs",
+    "obliques"
+   ],
+   "muscleGroups": [
+    "quadriceps",
+    "gluteal",
+    "calves",
+    "hamstring",
+    "abs",
+    "obliques"
+   ],
+   "primaries": [
+    "quadriceps"
+   ],
+   "secondaries": [
+    "gluteal",
+    "calves",
+    "hamstring",
+    "abs",
+    "obliques"
    ]
   }
  ],
@@ -77,6 +255,214 @@
    "d": "2024-06-30",
    "name": "Empty",
    "entries": []
+  }
+ ],
+ "routines": [
+  {
+   "id": "mtgdwjyab2ndz",
+   "name": "Day 2",
+   "emoji": "figureStrength",
+   "hevyId": "641e377d-7279-4a36-aee5-2fe93ff2dba8",
+   "ex": [
+    {
+     "id": "0811",
+     "sets": 4,
+     "reps": 8,
+     "weight": 400,
+     "mode": "reps"
+    },
+    {
+     "id": "0562",
+     "sets": 4,
+     "reps": 10,
+     "weight": 115,
+     "mode": "reps"
+    },
+    {
+     "id": "0017",
+     "sets": 3,
+     "reps": 10,
+     "weight": 145,
+     "mode": "reps"
+    },
+    {
+     "id": "0127",
+     "sets": 3,
+     "reps": 10,
+     "weight": 205,
+     "mode": "reps"
+    },
+    {
+     "id": "0979",
+     "sets": 6,
+     "reps": 10,
+     "weight": 50,
+     "mode": "reps"
+    },
+    {
+     "id": "2133",
+     "sets": 3,
+     "min": 20,
+     "speed": 0.2
+    },
+    {
+     "id": "3666",
+     "sets": 1,
+     "min": 5,
+     "speed": 2.4
+    },
+    {
+     "id": "immtgdwin2gtzm0",
+     "sets": 6,
+     "reps": 10,
+     "weight": 90,
+     "mode": "reps"
+    },
+    {
+     "id": "immtgdwin1i79x0",
+     "sets": 4,
+     "reps": 10,
+     "weight": 120,
+     "mode": "reps"
+    }
+   ]
+  },
+  {
+   "id": "mtnckjdi4elci",
+   "name": "Full Body Big Lift Day A",
+   "emoji": "figureStrength",
+   "ex": [
+    {
+     "id": "0009",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 10,
+     "weight": 55,
+     "restSec": 60
+    },
+    {
+     "id": "0017",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 10,
+     "weight": 55,
+     "restSec": 60
+    },
+    {
+     "id": "0085",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 10,
+     "weight": 330,
+     "restSec": 180
+    },
+    {
+     "id": "immtgdwimubwif5",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 10,
+     "weight": 220,
+     "inc": 5,
+     "restSec": 60
+    },
+    {
+     "id": "immtgdwimtc9l2t",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 21,
+     "weight": 45,
+     "note": "7 outside 7 middle 7 inside",
+     "restSec": 60
+    },
+    {
+     "id": "immtgdwin1i79x0",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 10,
+     "weight": 90,
+     "restSec": 60
+    },
+    {
+     "id": "immtgdwimsz93dd",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 10,
+     "weight": 40,
+     "prog": "off",
+     "restSec": 60
+    },
+    {
+     "id": "0602",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 10,
+     "weight": 130,
+     "restSec": 60
+    },
+    {
+     "id": "immtgdwin2kovq8",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 1,
+     "weight": 305,
+     "note": "Sled weight 80lbs"
+    },
+    {
+     "id": "cmtyh47eg10xhq",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 1,
+     "weight": 305,
+     "note": "Sled starting weight 80",
+     "restSec": 90
+    },
+    {
+     "id": "immtgdwimtt02xm",
+     "sets": 3,
+     "mode": "reps",
+     "reps": 10,
+     "weight": 170,
+     "restSec": 60
+    }
+   ],
+   "prog": "off"
+  },
+  {
+   "id": "r_shapes",
+   "name": "Shapes",
+   "emoji": "barbell",
+   "ex": [
+    {
+     "id": "0003",
+     "sets": 3,
+     "mode": "time",
+     "sec": 45,
+     "weight": 0
+    },
+    {
+     "id": "0025",
+     "sets": 4,
+     "reps": 8,
+     "weight": 0
+    }
+   ]
+  }
+ ],
+ "bodyweight": [
+  {
+   "d": "2025-09-07",
+   "w": 288,
+   "t": 1757427286585
+  },
+  {
+   "d": "2025-09-17",
+   "w": 286.8,
+   "t": 1758146874373
+  },
+  {
+   "d": "2025-09-19",
+   "w": 285.1,
+   "t": 1758332166470
   }
  ]
 }

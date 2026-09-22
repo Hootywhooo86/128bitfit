@@ -2,6 +2,7 @@ import { and, asc, count, desc, eq, gte, lt, ne, sql, inArray } from 'drizzle-or
 import { db } from './client';
 import { newId } from './id';
 import { resolveSetSeed, type LastPerformance } from '@/lib/set-prefill';
+import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import {
   exercises,
   routineExercises,
@@ -357,6 +358,29 @@ export async function setSessionStatus(sessionId: string, status: SessionStatus)
 
 export async function completeSession(sessionId: string): Promise<void> {
   await setSessionStatus(sessionId, 'completed');
+
+  // The phone's health store gets the session once it is actually finished —
+  // duration and what was trained, not what it burned. See the note on
+  // HealthWorkoutEntry for why no energy figure goes with it.
+  //
+  // Reading the summary back costs a dozen queries, so it happens after the
+  // status is already saved and off the path of the Finish tap. Nothing here
+  // can throw at the caller: the session is stored either way.
+  void (async () => {
+    try {
+      const summary = await getWorkoutSummary(sessionId);
+      if (!summary?.session.startedAt || !summary.session.endedAt) return;
+      const names = summary.exercises.map((e) => e.name).filter(Boolean);
+      mirrorWorkout({
+        id: sessionId,
+        startedAt: new Date(summary.session.startedAt).getTime(),
+        endedAt: new Date(summary.session.endedAt).getTime(),
+        title: names.length > 0 ? names.slice(0, 3).join(', ') : 'Strength training',
+      });
+    } catch {
+      // Already recorded locally; a failed mirror is not a failed workout.
+    }
+  })();
 }
 
 export async function discardSession(sessionId: string): Promise<void> {
@@ -567,6 +591,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
   }
   await db.delete(sessionExercises).where(eq(sessionExercises.sessionId, sessionId));
   await db.delete(workoutSessions).where(eq(workoutSessions.id, sessionId));
+  mirrorWorkoutRemoved(sessionId);
 }
 
 /** Deletes a routine and its exercise list. Logged sessions are untouched. */

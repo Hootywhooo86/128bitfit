@@ -111,18 +111,56 @@ export function emptyHealthDay(date: string): HealthDay {
   };
 }
 
+/**
+ * Our own id for a record we wrote, carried into the platform store.
+ *
+ * Health Connect calls this a clientRecordId and treats it as a primary key of
+ * ours: writing the same one twice updates the record rather than adding a
+ * second copy, and it lets us delete exactly the record we wrote when the user
+ * deletes the local row. Without it, editing a logged meal leaves the old
+ * version in Health Connect forever and deleting it leaves all of them.
+ */
+export type WithClientId = {
+  /** The local row id. Omitted only where there is no local row to point at. */
+  clientId?: string;
+};
+
+/**
+ * Metrics for one exact time window.
+ *
+ * A day's average heart rate says nothing about what a 50-minute session cost —
+ * it is diluted by sixteen hours of sitting still. Attributing effort to a
+ * workout needs the window, not the day.
+ */
+export type HealthWindow = {
+  heartRateAvg: number | null;
+  heartRateMax: number | null;
+  /** Measured, by whatever recorded it. Never our own estimate. */
+  activeCalories: number | null;
+};
+
 /** A completed workout to push back to the platform's health store. */
-export type HealthWorkoutEntry = {
+export type HealthWorkoutEntry = WithClientId & {
   startedAt: number;
   endedAt: number;
   /** Shown in the health app's own UI. */
   title?: string;
-  /** Kilocalories burned, if the app knows. Omitted rather than estimated. */
-  activeCalories?: number;
 };
 
+/*
+ * Note on calories: a session is written as duration and title only, never with
+ * an energy figure attached.
+ *
+ * The app can estimate what a workout burned (lib/workout-energy.ts) and shows
+ * that estimate, labelled, on the summary screen. Writing it into Health
+ * Connect would strip the label — every other app reading it would treat a
+ * guess from time and body weight as a measurement from a watch. That is the
+ * fake-sync mistake in CLAUDE.md, one layer down, so the estimate stays in our
+ * UI where its caveat travels with it.
+ */
+
 /** A logged meal to push back. Grams and kilocalories, per the platform's units. */
-export type HealthNutritionEntry = {
+export type HealthNutritionEntry = WithClientId & {
   at: number;
   name?: string;
   mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack';
@@ -137,12 +175,12 @@ export type HealthNutritionEntry = {
   sodium?: number | null;
 };
 
-export type HealthWeightEntry = {
+export type HealthWeightEntry = WithClientId & {
   at: number;
   kg: number;
 };
 
-export type HealthHydrationEntry = {
+export type HealthHydrationEntry = WithClientId & {
   at: number;
   ml: number;
 };
@@ -176,10 +214,24 @@ export interface HealthProvider {
    */
   readDays(startDate: string, endDate: string): Promise<HealthDay[]>;
 
+  /** Metrics between two exact instants, for attributing them to one session. */
+  readWindow(startMs: number, endMs: number): Promise<HealthWindow>;
+
   writeEntries(entries: HealthWorkoutEntry[]): Promise<number>;
   writeNutrition(entries: HealthNutritionEntry[]): Promise<HealthWriteResult>;
   writeWeight(entries: HealthWeightEntry[]): Promise<HealthWriteResult>;
   writeHydration(entries: HealthHydrationEntry[]): Promise<HealthWriteResult>;
+
+  /**
+   * Removes records we previously wrote, by the client ids we gave them.
+   *
+   * Only ever touches our own rows: the platform scopes a clientRecordId to the
+   * writing app, so this cannot delete data another app recorded.
+   */
+  deleteEntries(
+    scope: 'nutrition' | 'weight' | 'hydration' | 'exercise',
+    clientIds: string[]
+  ): Promise<HealthWriteResult>;
 
   /** Opens the platform health app so the user can change permissions. */
   openSettings(): void;

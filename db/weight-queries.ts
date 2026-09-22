@@ -3,6 +3,12 @@ import { db } from './client';
 import { newId } from './id';
 import { weightEntries, type WeightEntry } from './schema';
 import type { WeightUnit } from './settings-queries';
+import { mirrorWeight, mirrorWeightRemoved } from '@/lib/health/mirror';
+
+/** Health Connect stores kilograms, whatever the user types in. */
+export function weightInKg(entry: Pick<WeightEntry, 'kgOrLb' | 'unit'>): number {
+  return entry.unit === 'kg' ? entry.kgOrLb : entry.kgOrLb * 0.453592;
+}
 
 export async function addWeightEntry(input: {
   value: number;
@@ -11,13 +17,15 @@ export async function addWeightEntry(input: {
   note?: string | null;
 }): Promise<string> {
   const id = newId('we');
+  const loggedAt = input.loggedAt ?? new Date();
   await db.insert(weightEntries).values({
     id,
     kgOrLb: input.value,
     unit: input.unit,
-    loggedAt: input.loggedAt ?? new Date(),
+    loggedAt,
     note: input.note ?? null,
   });
+  mirrorWeight(id, loggedAt.getTime(), weightInKg({ kgOrLb: input.value, unit: input.unit }));
   return id;
 }
 
@@ -36,6 +44,7 @@ export async function getLatestWeightEntry(): Promise<WeightEntry | null> {
 
 export async function deleteWeightEntry(id: string): Promise<void> {
   await db.delete(weightEntries).where(eq(weightEntries.id, id));
+  mirrorWeightRemoved(id);
 }
 
 export function formatWeight(entry: Pick<WeightEntry, 'kgOrLb' | 'unit'>): string {

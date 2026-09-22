@@ -28,11 +28,71 @@ export type ImportedSet = {
   notes: string | null;
 };
 
+/**
+ * A workout template, as opposed to a workout that happened.
+ *
+ * A CSV of sets has no such thing; only a full backup does. Kept separate from
+ * ImportedSet for that reason — a routine is a plan, and importing one as if it
+ * were training that took place would put lifts on the muscle map that nobody
+ * did.
+ */
+export type ImportedRoutineExercise = {
+  exerciseName: string;
+  targetSets: number | null;
+  targetReps: number | null;
+  restSeconds: number | null;
+  /** Anything the schema has no column for: target weight, cardio settings,
+   *  and whatever the user wrote against the exercise. */
+  notes: string | null;
+};
+
+export type ImportedRoutine = {
+  name: string;
+  notes: string | null;
+  exercises: ImportedRoutineExercise[];
+};
+
+/** An exercise the source app defined itself, with whatever it knew about it. */
+export type ImportedExercise = {
+  name: string;
+  equipment: string | null;
+  /** Already mapped onto this app's muscle groups; unmappable ones are dropped. */
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+  instructions: string[];
+  /** The source's own grouping, e.g. "upper legs". Descriptive, not a muscle. */
+  category: string | null;
+};
+
+/** A weigh-in from the source app's own body-weight log. */
+export type ImportedWeight = {
+  /** Local calendar day, `YYYY-MM-DD`. */
+  date: string;
+  /** Epoch milliseconds when the file gave one, else null. */
+  at: number | null;
+  value: number;
+  unit: 'kg' | 'lb';
+};
+
+/**
+ * Everything in a backup that is not a set.
+ *
+ * Optional throughout: a CSV of sets carries none of it, and an empty list is
+ * a different thing from a format that cannot express the idea at all.
+ */
+export type ImportExtras = {
+  routines: ImportedRoutine[];
+  exercises: ImportedExercise[];
+  weights: ImportedWeight[];
+};
+
 export type ImportReport = {
   sets: ImportedSet[];
   /** One line per row that could not be read, with the reason. */
   skipped: { row: number; reason: string }[];
   format: 'hevy-csv' | 'csv' | 'json';
+  /** Routines, custom exercises and weigh-ins, when the format has them. */
+  extras?: ImportExtras;
 };
 
 export type ImportResult = ImportReport | { error: string };

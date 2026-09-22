@@ -18,9 +18,12 @@ import {
   deleteWeightEntry,
   formatWeight,
   listRecentWeightEntries,
+  weightInKg,
 } from '@/db/weight-queries';
 import { colors, spacing } from '@/lib/theme';
 import { Screen } from '@/components/ui';
+import { healthWeight } from '@/lib/health/use-weight';
+import { formatKg, latestWeight, type WeightReading } from '@/lib/weight-source';
 
 export default function WeightLogScreen() {
   const { ready } = useDb();
@@ -30,17 +33,22 @@ export default function WeightLogScreen() {
   const [value, setValue] = useState('');
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
+  const [fromHealth, setFromHealth] = useState<WeightReading | null>(null);
 
   const refresh = useCallback(async () => {
     if (!ready) return;
     setLoading(true);
     try {
-      const [settings, list] = await Promise.all([
+      const [settings, list, hc] = await Promise.all([
         getAppSettings(),
         listRecentWeightEntries(7),
+        // A scale that writes to Health Connect never touches this app, so its
+        // reading has to be asked for rather than waited for.
+        healthWeight(),
       ]);
       setUnits(settings.units);
       setEntries(list);
+      setFromHealth(hc);
     } finally {
       setLoading(false);
     }
@@ -96,9 +104,31 @@ export default function WeightLogScreen() {
     );
   }
 
+  // The newest figure the phone knows about, from either side.
+  const newestLocal = entries[0];
+  const merged = latestWeight(
+    newestLocal?.loggedAt
+      ? {
+          kg: weightInKg(newestLocal),
+          at: new Date(newestLocal.loggedAt).getTime(),
+        }
+      : null,
+    fromHealth
+  );
+
   return (
     <Screen section="Weight" back>
       <Text style={styles.muted}>Last 7 weigh-ins. Units follow Settings ({units}).</Text>
+
+      {merged.status === 'have' && merged.source === 'health' ? (
+        <View style={styles.hc}>
+          <Text style={styles.hcValue}>{formatKg(merged.kg, units)}</Text>
+          <Text style={styles.hcLabel}>
+            From Health Connect — your scale or another app recorded this. Add a weigh-in below
+            only if you want your own entry too.
+          </Text>
+        </View>
+      ) : null}
 
       <Text style={styles.label}>Weight ({units})</Text>
       <TextInput
@@ -203,6 +233,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     gap: spacing.sm,
   },
+  hc: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  hcValue: { color: colors.text, fontWeight: '800', fontSize: 22 },
+  hcLabel: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 4 },
   weight: { color: colors.accent, fontWeight: '800', fontSize: 18 },
   meta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   deleteHint: { color: colors.textMuted, fontSize: 10 },

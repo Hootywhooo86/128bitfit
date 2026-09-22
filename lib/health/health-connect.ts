@@ -10,6 +10,7 @@
  */
 import {
   SdkAvailabilityStatus,
+  deleteRecordsByUuids,
   getGrantedPermissions,
   getSdkStatus,
   initialize,
@@ -33,6 +34,7 @@ import {
   type HealthProvider,
   type HealthScope,
   type HealthWeightEntry,
+  type HealthWindow,
   type HealthWorkoutEntry,
   type HealthWriteResult,
 } from './types';
@@ -41,6 +43,34 @@ const PERMISSIONS = healthConnectPermissions() as Permission[];
 
 /** Health Connect's strength-training exercise type. */
 const EXERCISE_TYPE_STRENGTH_TRAINING = 70;
+
+/**
+ * RecordingMethod.RECORDING_METHOD_MANUAL_ENTRY. Everything this app writes was
+ * typed in by the user, and saying so lets other apps weigh it accordingly
+ * instead of treating a typed meal like a sensor reading.
+ */
+const MANUAL_ENTRY = 3;
+
+/**
+ * Metadata that ties a Health Connect record back to our local row.
+ *
+ * clientRecordId is a key Health Connect scopes to this app: inserting the same
+ * one again updates the record in place instead of adding a duplicate, which is
+ * what makes editing a logged meal work, and it is how deleteEntries finds the
+ * record to remove. clientRecordVersion rises with the edit so a stale retry
+ * cannot overwrite a newer value.
+ */
+function metadataFor(clientId: string | undefined, version: number) {
+  return clientId
+    ? {
+        metadata: {
+          clientRecordId: clientId,
+          clientRecordVersion: version,
+          recordingMethod: MANUAL_ENTRY,
+        },
+      }
+    : { metadata: { recordingMethod: MANUAL_ENTRY } };
+}
 
 let initialized = false;
 
@@ -264,6 +294,73 @@ export const healthConnectProvider: HealthProvider = {
     return days.map((d) => byDate.get(d)!);
   },
 
+  async readWindow(startMs: number, endMs: number): Promise<HealthWindow> {
+    const none: HealthWindow = {
+      heartRateAvg: null,
+      heartRateMax: null,
+      activeCalories: null,
+    };
+    if (!(endMs > startMs)) return none;
+    try {
+      if (!(await ensureInitialized())) return none;
+      const range = {
+        operator: 'between' as const,
+        startTime: new Date(startMs).toISOString(),
+        endTime: new Date(endMs).toISOString(),
+      };
+      const read = async <T>(recordType: string): Promise<T[] | null> => {
+        try {
+          const { records } = await readRecords(recordType as never, {
+            timeRangeFilter: range,
+          });
+          return records as T[];
+        } catch {
+          return null;
+        }
+      };
+
+      const [hr, active] = await Promise.all([
+        read<{ samples?: { beatsPerMinute?: number }[] }>('HeartRate'),
+        read<{ energy?: { inKilocalories?: number } }>('ActiveCaloriesBurned'),
+      ]);
+
+      const out = { ...none };
+
+      if (hr) {
+        let sum = 0;
+        let n = 0;
+        let max = 0;
+        for (const r of hr) {
+          for (const sample of r.samples ?? []) {
+            const bpm = num(sample.beatsPerMinute);
+            if (bpm == null) continue;
+            sum += bpm;
+            n += 1;
+            max = Math.max(max, bpm);
+          }
+        }
+        // No samples in the window is not a heart rate of zero — it means the
+        // watch was not on. Leave it null.
+        if (n > 0) {
+          out.heartRateAvg = Math.round(sum / n);
+          out.heartRateMax = max;
+        }
+      }
+
+      if (active) {
+        // A granted, empty result genuinely means nothing was burned according
+        // to the platform, which is a reading of zero rather than no reading.
+        let kcal = 0;
+        for (const r of active) kcal += num(r.energy?.inKilocalories) ?? 0;
+        out.activeCalories = kcal;
+      }
+
+      return out;
+    } catch {
+      return none;
+    }
+  },
+
   async writeEntries(entries: HealthWorkoutEntry[]): Promise<number> {
     if (entries.length === 0) return 0;
     try {
@@ -272,15 +369,18 @@ export const healthConnectProvider: HealthProvider = {
         // Health Connect rejects non-positive durations; drop them rather than
         // failing the whole batch.
         .filter((e) => e.endedAt > e.startedAt)
+        // Duration and title only — see the note on HealthWorkoutEntry for why
+        // no energy figure goes with it.
         .map((e) => ({
           recordType: 'ExerciseSession' as const,
           exerciseType: EXERCISE_TYPE_STRENGTH_TRAINING,
           title: e.title,
           startTime: new Date(e.startedAt).toISOString(),
           endTime: new Date(e.endedAt).toISOString(),
+          ...metadataFor(e.clientId, e.endedAt),
         }));
       if (records.length === 0) return 0;
-      const ids = await insertRecords(records);
+      const ids = await insertRecords(records as never);
       return ids.length;
     } catch {
       return 0;
@@ -311,6 +411,7 @@ export const healthConnectProvider: HealthProvider = {
         saturatedFat: g(e.saturatedFat),
         // Labels state sodium in milligrams; Health Connect wants grams.
         sodium: e.sodium == null ? undefined : { inGrams: e.sodium / 1000 },
+        ...metadataFor(e.clientId, e.at),
       }));
       const ids = await insertRecords(records as never);
       return { written: ids.length, error: null };
@@ -331,6 +432,7 @@ export const healthConnectProvider: HealthProvider = {
           recordType: 'Weight' as const,
           time: new Date(e.at).toISOString(),
           weight: { value: e.kg, unit: 'kilograms' as const },
+          ...metadataFor(e.clientId, e.at),
         }));
       if (records.length === 0) return { written: 0, error: null };
       const ids = await insertRecords(records as never);
@@ -353,12 +455,31 @@ export const healthConnectProvider: HealthProvider = {
           startTime: new Date(e.at).toISOString(),
           endTime: new Date(e.at + 60_000).toISOString(),
           volume: { value: e.ml, unit: 'milliliters' as const },
+          ...metadataFor(e.clientId, e.at),
         }));
       if (records.length === 0) return { written: 0, error: null };
       const ids = await insertRecords(records as never);
       return { written: ids.length, error: null };
     } catch (e) {
       return { written: 0, error: writeError(e, 'hydration') };
+    }
+  },
+
+  async deleteEntries(
+    scope: 'nutrition' | 'weight' | 'hydration' | 'exercise',
+    clientIds: string[]
+  ): Promise<HealthWriteResult> {
+    if (clientIds.length === 0) return { written: 0, error: null };
+    try {
+      if (!(await ensureInitialized())) {
+        return { written: 0, error: 'Health Connect is not available on this phone.' };
+      }
+      // By client id only: the uuid list stays empty so this can never reach a
+      // record another app wrote.
+      await deleteRecordsByUuids(SCOPE_RECORDS[scope].recordType as never, [], clientIds);
+      return { written: clientIds.length, error: null };
+    } catch (e) {
+      return { written: 0, error: writeError(e, `the deleted ${scope} entry`) };
     }
   },
 

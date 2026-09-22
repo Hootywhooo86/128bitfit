@@ -12,6 +12,12 @@ import {
   type WaterLog,
 } from './schema';
 import { dayBounds, nutrientsForServings, type Nutrients } from '@/lib/nutrition';
+import {
+  mirrorMeal,
+  mirrorMealRemoved,
+  mirrorWater,
+  mirrorWaterRemoved,
+} from '@/lib/health/mirror';
 
 export const DEFAULT_GOALS = {
   calorie_target: 2200,
@@ -201,12 +207,13 @@ export type LogFoodInput = {
 
 export async function insertFoodLog(input: LogFoodInput): Promise<string> {
   const id = newId('fl');
+  const loggedAt = input.loggedAt ?? new Date();
   await db.insert(foodLogs).values({
     id,
     foodId: input.foodId ?? null,
     customName: input.customName ?? null,
     mealType: input.mealType,
-    loggedAt: input.loggedAt ?? new Date(),
+    loggedAt,
     servings: input.servings,
     servingSize: input.servingSize ?? null,
     servingUnit: input.servingUnit ?? null,
@@ -216,7 +223,48 @@ export async function insertFoodLog(input: LogFoodInput): Promise<string> {
     carb: input.carb,
     notes: input.notes ?? null,
   });
+
+  // The local row is committed; the phone's health store gets a copy in the
+  // background. Every food path goes through this function, so none of them can
+  // forget. See lib/health/mirror.ts.
+  //
+  // Off the caller's path, because naming the entry needs a lookup and the log
+  // is already saved — the screen should not wait on a copy.
+  void (async () => {
+    try {
+      mirrorMeal({
+        id,
+        loggedAt: loggedAt.getTime(),
+        name: await displayNameForLog(input),
+        mealType: input.mealType,
+        calories: input.calories,
+        protein: input.protein,
+        fat: input.fat,
+        carb: input.carb,
+      });
+    } catch {
+      // Already stored locally; a name we could not look up is not a lost meal.
+    }
+  })();
   return id;
+}
+
+/**
+ * What to call this entry in the phone's health app.
+ *
+ * "Food" is the last resort, not the first: an entry the user cannot recognise
+ * in Health Connect is nearly as bad as no entry at all.
+ */
+async function displayNameForLog(input: {
+  customName?: string | null;
+  foodId?: string | null;
+}): Promise<string> {
+  if (input.customName) return input.customName;
+  if (input.foodId) {
+    const food = await getFoodById(input.foodId);
+    if (food?.name) return food.name;
+  }
+  return 'Food';
 }
 
 export async function logFoodFromCatalog(
@@ -260,10 +308,37 @@ export async function updateFoodLog(
   >
 ): Promise<void> {
   await db.update(foodLogs).set(patch).where(eq(foodLogs.id, id));
+
+  // Re-push rather than patch: the client id is the local row id, so Health
+  // Connect replaces its copy instead of ending up with two.
+  void (async () => {
+    try {
+      const row = await getFoodLogById(id);
+      if (!row?.loggedAt) return;
+      mirrorMeal({
+        id: row.id,
+        loggedAt: new Date(row.loggedAt).getTime(),
+        name: await displayNameForLog({
+          customName: row.customName,
+          foodId: row.foodId,
+        }),
+        mealType: row.mealType,
+        calories: row.calories,
+        protein: row.protein,
+        fat: row.fat,
+        carb: row.carb,
+      });
+    } catch {
+      // The edit is saved; only the copy in Health Connect is stale.
+    }
+  })();
 }
 
 export async function deleteFoodLog(id: string): Promise<void> {
   await db.delete(foodLogs).where(eq(foodLogs.id, id));
+  // A meal the user took back should not stay in their health store, skewing
+  // whatever else reads it.
+  mirrorMealRemoved(id);
 }
 
 export async function getFoodLogById(id: string): Promise<FoodLog | null> {
@@ -330,6 +405,8 @@ export async function getWaterTotalForDay(day: Date = new Date()): Promise<numbe
 export async function addWater(ml: number, loggedAt: Date = new Date()): Promise<string> {
   const id = newId('wl');
   await db.insert(waterLogs).values({ id, ml, loggedAt });
+  // Negative amounts are how the UI undoes a tap; there is nothing to mirror.
+  if (ml > 0) mirrorWater(id, loggedAt.getTime(), ml);
   return id;
 }
 
@@ -344,6 +421,7 @@ export async function listWaterLogsForDay(day: Date = new Date()): Promise<Water
 
 export async function deleteWaterLog(id: string): Promise<void> {
   await db.delete(waterLogs).where(eq(waterLogs.id, id));
+  mirrorWaterRemoved(id);
 }
 
 export async function getTodayCalories(): Promise<number> {

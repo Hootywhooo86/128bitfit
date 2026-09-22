@@ -2,6 +2,8 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getWorkoutSummary, type WorkoutSummary } from '@/db/workout-queries';
+import { useWorkoutEnergy } from '@/lib/health/use-workout-energy';
+import type { EnergyResult } from '@/lib/workout-energy';
 import { colors, spacing } from '@/lib/theme';
 
 function formatDuration(ms: number): string {
@@ -19,6 +21,15 @@ export default function WorkoutSummaryScreen() {
   const router = useRouter();
   const [summary, setSummary] = useState<WorkoutSummary | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // The session's own window, so heart rate is the workout's and not the day's.
+  const window = React.useMemo(() => {
+    const started = summary?.session.startedAt;
+    const ended = summary?.session.endedAt;
+    if (!started || !ended) return null;
+    return { startedAt: new Date(started).getTime(), endedAt: new Date(ended).getTime() };
+  }, [summary?.session.startedAt, summary?.session.endedAt]);
+  const energy = useWorkoutEnergy(window);
 
   useEffect(() => {
     if (!id) return;
@@ -61,6 +72,8 @@ export default function WorkoutSummaryScreen() {
           />
         </View>
 
+        <EnergyCard energy={energy} />
+
         <Text style={styles.section}>Exercises</Text>
         {summary.exercises.map((ex, i) => (
           <View key={`${ex.name}-${i}`} style={styles.row}>
@@ -74,6 +87,44 @@ export default function WorkoutSummaryScreen() {
         </Pressable>
       </ScrollView>
     </>
+  );
+}
+
+/**
+ * Energy burned, with its provenance attached.
+ *
+ * A measured figure and an estimate are never rendered the same way: the
+ * estimate carries the word "estimate" and the reason it might be wrong. That
+ * distinction is the whole reason this card exists rather than a fourth number
+ * in the stat row, where it would read as measured like the other three.
+ */
+function EnergyCard({ energy }: { energy: EnergyResult | null }) {
+  // Still reading. A number that appears and then changes is worse than a gap.
+  if (!energy) return null;
+
+  if (energy.status === 'unknown') {
+    return (
+      <View style={styles.energy}>
+        <Text style={styles.energyLabel}>ENERGY</Text>
+        <Text style={styles.energyNote}>
+          No figure for this one — {energy.missing.join(' and ')} missing. Add it and future
+          sessions get one.
+        </Text>
+      </View>
+    );
+  }
+
+  const measured = energy.status === 'measured';
+  return (
+    <View style={styles.energy}>
+      <Text style={styles.energyLabel}>ENERGY</Text>
+      <Text style={styles.energyValue}>
+        {energy.kcal.toLocaleString()} kcal{measured ? '' : ' (estimate)'}
+      </Text>
+      <Text style={styles.energyNote}>
+        {measured ? `Measured by ${energy.source}.` : `${energy.basis}. ${energy.caveat}`}
+      </Text>
+    </View>
   );
 }
 
@@ -102,6 +153,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   statValue: { color: colors.text, fontWeight: '800', fontSize: 18 },
+  energy: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  energyLabel: { color: colors.textMuted, fontSize: 11, letterSpacing: 1, fontWeight: '700' },
+  energyValue: { color: colors.text, fontWeight: '800', fontSize: 22, marginTop: 6 },
+  energyNote: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: 6 },
   statLabel: { color: colors.textMuted, fontSize: 11, marginTop: 4 },
   section: {
     color: colors.textMuted,

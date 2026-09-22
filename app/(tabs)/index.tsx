@@ -4,12 +4,13 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { MuscleLoadCard } from '@/components/MuscleLoadCard';
 import { ReadinessCard } from '@/components/ReadinessCard';
 import { StepsCard } from '@/components/StepsCard';
+import { WeightCard } from '@/components/WeightCard';
 import { Bar, Card, CardHead, Label, MenuRow, Screen, SessionCard, Stat3 } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { addWater, getDayFuelSummary } from '@/db/food-queries';
 import { countRecentSets, getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';
 import { getAppSettings } from '@/db/settings-queries';
-import { formatWeight, getLatestWeightEntry } from '@/db/weight-queries';
+import { getLatestWeightEntry, weightInKg } from '@/db/weight-queries';
 import type { WeightEntry } from '@/db/schema';
 import {
   countCompletedSessions,
@@ -18,7 +19,10 @@ import {
   type WorkoutSummary,
 } from '@/db/workout-queries';
 import { useTodaySteps } from '@/lib/health/use-health';
+import { useLatestWeight } from '@/lib/health/use-weight';
+import { formatKg } from '@/lib/weight-source';
 import { emptyRoles, emptyTally, type MuscleRoles, type MuscleTally } from '@/lib/muscle-load';
+import type { WeightUnit } from '@/db/settings-queries';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
 /**
@@ -41,6 +45,7 @@ export default function HomeScreen() {
   const [inProgress, setInProgress] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
   const [latestWeight, setLatestWeight] = useState<WeightEntry | null>(null);
+  const [units, setUnits] = useState<WeightUnit>('lb');
   const [tally, setTally] = useState<MuscleTally>(emptyTally());
   const [roles, setRoles] = useState<MuscleRoles>(emptyRoles());
   const [recentSets, setRecentSets] = useState<number | null>(null);
@@ -49,7 +54,7 @@ export default function HomeScreen() {
     if (!ready) return;
     try {
       const since = periodFor(7).since;
-      const [, fuel, workout, active, weight, count, t, r, rs] = await Promise.all([
+      const [appSettings, fuel, workout, active, weight, count, t, r, rs] = await Promise.all([
         getAppSettings(),
         getDayFuelSummary(new Date()),
         getLastCompletedWorkoutSummary(),
@@ -60,6 +65,7 @@ export default function HomeScreen() {
         getMuscleRoles(since),
         countRecentSets(2),
       ]);
+      setUnits(appSettings.units);
       setCalories(fuel.logs.length > 0 ? fuel.totals.calories : null);
       setWaterMl(fuel.waterMl);
       setWaterTarget(fuel.goals.waterTargetMl);
@@ -160,24 +166,11 @@ export default function HomeScreen() {
       </Card>
 
       <Label>PROGRESS</Label>
-      {latestWeight ? (
-        <Card onPress={() => router.push('/home/weight')}>
-          <View style={s.jtop}>
-            <Text style={s.pct}>{formatWeight(latestWeight)}</Text>
-            <Text style={s.rem}>Latest weigh-in</Text>
-          </View>
-          <Text style={s.note}>
-            Two more weigh-ins and there is a trend worth showing.
-          </Text>
-        </Card>
-      ) : (
-        <MenuRow
-          icon="◷"
-          name="Log your first weigh-in"
-          sub="The weight journey needs a starting point"
-          onPress={() => router.push('/home/weight')}
-        />
-      )}
+      <WeightCard
+        local={latestWeight}
+        units={units}
+        onPress={() => router.push('/home/weight')}
+      />
 
       <Stat3
         items={[
