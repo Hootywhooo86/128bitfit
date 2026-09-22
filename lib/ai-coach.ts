@@ -91,7 +91,22 @@ export function isAiProviderId(v: string): v is AiProviderId {
 export type ChatMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  /**
+   * A photo to send alongside the text, base64 with no data: prefix.
+   *
+   * Only Anthropic, OpenAI and Gemini take images. Any other provider gets the
+   * text alone and the caller is told, rather than the image being dropped
+   * silently and the model asked to describe a photo it never received.
+   */
+  image?: { base64: string; mimeType: string };
 };
+
+/** Providers that can actually look at a photo. */
+export const VISION_PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'gemini'];
+
+export function providerSupportsVision(id: AiProviderId): boolean {
+  return VISION_PROVIDERS.includes(id);
+}
 
 export type CoachChatRequest = {
   provider: AiProviderId;
@@ -172,7 +187,20 @@ async function chatOpenAiCompatible(
     },
     body: JSON.stringify({
       model: req.model,
-      messages: req.messages,
+      messages: req.messages.map((m) =>
+        m.image
+          ? {
+              role: m.role,
+              content: [
+                { type: 'text', text: m.content },
+                {
+                  type: 'image_url',
+                  image_url: { url: `data:${m.image.mimeType};base64,${m.image.base64}` },
+                },
+              ],
+            }
+          : { role: m.role, content: m.content }
+      ),
       temperature: 0.6,
     }),
     signal: req.signal,
@@ -192,7 +220,22 @@ async function chatAnthropic(req: CoachChatRequest): Promise<string> {
   const system = req.messages.find((m) => m.role === 'system')?.content ?? '';
   const msgs = req.messages
     .filter((m) => m.role !== 'system')
-    .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+    .map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.image
+        ? [
+            {
+              type: 'image' as const,
+              source: {
+                type: 'base64' as const,
+                media_type: m.image.mimeType,
+                data: m.image.base64,
+              },
+            },
+            { type: 'text' as const, text: m.content },
+          ]
+        : m.content,
+    }));
 
   const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -230,7 +273,12 @@ async function chatGemini(req: CoachChatRequest): Promise<string> {
     .filter((m) => m.role !== 'system')
     .map((m) => ({
       role: m.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: m.content }],
+      parts: m.image
+        ? [
+            { inline_data: { mime_type: m.image.mimeType, data: m.image.base64 } },
+            { text: m.content },
+          ]
+        : [{ text: m.content }],
     }));
 
   const model = encodeURIComponent(req.model);

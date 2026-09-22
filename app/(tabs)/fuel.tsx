@@ -72,10 +72,12 @@ export default function FuelScreen() {
 
       <QuickActions
         items={[
-          { icon: '◉', label: 'PHOTO', onPress: () => router.push('/fuel/label') },
+          // AI first: describing a meal or photographing it is the fastest way
+          // in for anything the catalog does not have.
+          { icon: '✦', label: 'AI', onPress: () => router.push('/fuel/ai') },
           { icon: '▣', label: 'SCAN', onPress: () => router.push('/fuel/scan') },
           { icon: '⌕', label: 'SEARCH', onPress: () => router.push('/fuel/add') },
-          { icon: '↺', label: 'RECENT', onPress: () => router.push('/fuel/add') },
+          { icon: '◉', label: 'LABEL', onPress: () => router.push('/fuel/label') },
           { icon: '✎', label: 'CUSTOM', onPress: () => router.push('/fuel/custom') },
         ]}
       />
