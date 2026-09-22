@@ -1,106 +1,121 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import {
-  BACK_RECTS,
-  FRONT_RECTS,
-  GRID_H,
-  GRID_W,
-  type Rect,
-} from '@/lib/muscle-figure';
-import {
-  MUSCLE_LABELS,
-  loadLevel,
-  type MuscleGroup,
-  type MuscleTally,
-} from '@/lib/muscle-load';
-import { colors, muscleHeat, spacing } from '@/lib/theme';
+import { Image, StyleSheet, Text, View } from 'react-native';
+import { BACK_MASKS, FIGURE, FRONT_MASKS } from '@/lib/figure-assets';
+import { MUSCLE_LABELS, type MuscleGroup, type MuscleRoles } from '@/lib/muscle-load';
+import { colors, muscleRole, spacing } from '@/lib/theme';
 
 /**
- * Pixel-block muscle map.
+ * The muscle map.
  *
- * Blocks rather than anatomical SVG: it matches the app's pixel aesthetic, it
- * needs no artwork, and at this size a realistic figure reads as mush anyway.
- * Colour here is load and nothing else — see lib/theme.ts.
+ * A front and a back view of the same figure, with a muscle tinted only once it
+ * has actually been trained: red where it was the target, yellow where it only
+ * assisted. Everything else is left as the plain figure, which is honest —
+ * nothing logged, nothing coloured — and it visibly wants filling in.
+ *
+ * Each muscle is a separate alpha mask stacked over the base artwork and tinted
+ * with `tintColor`. Only the trained ones are rendered, so a typical session
+ * costs a handful of images rather than one per muscle.
  */
 
-function colourFor(tally: MuscleTally, m: MuscleGroup | null): string {
-  if (m == null) return colors.accentDim;
-  return muscleHeat[loadLevel(tally[m])];
-}
+function Figure({
+  view,
+  roles,
+  width,
+}: {
+  view: 'front' | 'back';
+  roles: MuscleRoles;
+  width: number;
+}) {
+  const spec = FIGURE[view];
+  const masks = view === 'front' ? FRONT_MASKS : BACK_MASKS;
+  const height = (width * spec.height) / spec.width;
 
-function Figure({ blocks, tally, width }: { blocks: Rect[]; tally: MuscleTally; width: number }) {
-  const cell = width / GRID_W;
   return (
-    <View style={{ width, height: cell * GRID_H }}>
-      {blocks.map((b, i) => (
-        <View
-          key={i}
-          style={{
-            position: 'absolute',
-            left: b.x * cell,
-            top: b.y * cell,
-            width: b.w * cell,
-            height: b.h * cell,
-            backgroundColor: colourFor(tally, b.m),
-          }}
-        />
-      ))}
+    <View style={{ width, height }}>
+      <Image source={spec.base} style={{ width, height }} resizeMode="contain" />
+      {(Object.keys(masks) as MuscleGroup[]).map((m) => {
+        const role = roles[m];
+        if (role === 'none') return null;
+        return (
+          <Image
+            key={m}
+            source={masks[m]}
+            style={[StyleSheet.absoluteFill, { width, height, opacity: 0.72 }]}
+            resizeMode="contain"
+            tintColor={muscleRole[role]}
+          />
+        );
+      })}
     </View>
   );
 }
 
 export function MuscleMap({
-  tally,
-  width = 128,
+  roles,
+  width = 150,
   showLegend = true,
 }: {
-  tally: MuscleTally;
+  roles: MuscleRoles;
   width?: number;
   showLegend?: boolean;
 }) {
+  const worked = (Object.keys(roles) as MuscleGroup[]).filter((m) => roles[m] !== 'none');
+
   return (
     <View style={styles.wrap}>
       <View style={styles.figures}>
         <View style={styles.figureCol}>
-          <Figure blocks={FRONT_RECTS} tally={tally} width={width} />
+          <Figure view="front" roles={roles} width={width} />
           <Text style={styles.caption}>Front</Text>
         </View>
         <View style={styles.figureCol}>
-          <Figure blocks={BACK_RECTS} tally={tally} width={width} />
+          <Figure view="back" roles={roles} width={width} />
           <Text style={styles.caption}>Back</Text>
         </View>
       </View>
 
       {showLegend ? (
-        <View style={styles.legend}>
-          {(
-            [
-              ['none', 'Untrained'],
-              ['light', '1–3 sets'],
-              ['medium', '4–7'],
-              ['heavy', '8+'],
-            ] as const
-          ).map(([level, label]) => (
-            <View key={level} style={styles.legendItem}>
-              <View style={[styles.swatch, { backgroundColor: muscleHeat[level] }]} />
-              <Text style={styles.legendText}>{label}</Text>
+        worked.length === 0 ? (
+          <Text style={styles.empty}>
+            Nothing trained yet. Log a session and the muscles you worked colour in.
+          </Text>
+        ) : (
+          <>
+            <View style={styles.legend}>
+              <View style={styles.legendItem}>
+                <View style={[styles.swatch, { backgroundColor: muscleRole.primary }]} />
+                <Text style={styles.legendText}>Targeted</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.swatch, { backgroundColor: muscleRole.secondary }]} />
+                <Text style={styles.legendText}>Assisted</Text>
+              </View>
             </View>
-          ))}
-        </View>
+            <Text style={styles.worked}>
+              {worked.map((m) => MUSCLE_LABELS[m]).join(' · ')}
+            </Text>
+          </>
+        )
       ) : null}
     </View>
   );
 }
 
-export { MUSCLE_LABELS };
-
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
-  figures: { flexDirection: 'row', justifyContent: 'center', gap: spacing.lg },
+  figures: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md },
   figureCol: { alignItems: 'center', gap: 4 },
-  caption: { color: colors.textMuted, fontSize: 11, letterSpacing: 1 },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: spacing.sm },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  caption: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  legend: { flexDirection: 'row', justifyContent: 'center', gap: spacing.md },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   swatch: { width: 10, height: 10, borderRadius: 2 },
-  legendText: { color: colors.textMuted, fontSize: 11 },
+  legendText: { color: colors.textMuted, fontSize: 12 },
+  worked: { color: colors.textMuted, fontSize: 12, textAlign: 'center', lineHeight: 18 },
+  empty: { color: colors.textMuted, fontSize: 13, textAlign: 'center', lineHeight: 19 },
 });

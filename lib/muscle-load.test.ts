@@ -5,6 +5,7 @@ import {
   SECONDARY_SET_WEIGHT,
   emptyTally,
   loadLevel,
+  muscleRoles,
   neglectedMuscles,
   rankMuscles,
   tallyMuscleSets,
@@ -138,5 +139,42 @@ describe('presentation', () => {
       expect(MUSCLE_LABELS[m]).toBeTruthy();
       expect(MUSCLE_LABELS[m]).not.toBe(m === 'neck' ? '' : undefined);
     }
+  });
+});
+
+describe('primary vs secondary, which is what the map colours by', () => {
+  const entry = (
+    completedSets: number,
+    primaryMuscles: string[],
+    secondaryMuscles: string[] = []
+  ) => ({ completedSets, primaryMuscles, secondaryMuscles });
+
+  it('marks a targeted muscle primary and an assisting one secondary', () => {
+    const r = muscleRoles([entry(3, ['chest'], ['triceps', 'shoulders'])]);
+    expect(r.chest).toBe('primary');
+    expect(r.triceps).toBe('secondary');
+    expect(r.shoulders).toBe('secondary');
+    expect(r.calves).toBe('none');
+  });
+
+  it('promotes a muscle that was secondary earlier and primary later', () => {
+    const r = muscleRoles([entry(3, ['chest'], ['triceps']), entry(3, ['triceps'])]);
+    expect(r.triceps).toBe('primary');
+  });
+
+  it('does not demote a muscle that was primary earlier', () => {
+    const r = muscleRoles([entry(3, ['triceps']), entry(3, ['chest'], ['triceps'])]);
+    expect(r.triceps).toBe('primary');
+  });
+
+  it('ignores an exercise with no completed sets', () => {
+    // Starting an exercise and logging nothing is not training that muscle.
+    expect(muscleRoles([entry(0, ['chest'], ['triceps'])]).chest).toBe('none');
+  });
+
+  it('ignores a muscle name that is not a known group', () => {
+    const r = muscleRoles([entry(3, ['chest', 'brachioradialis'], ['spleen'])]);
+    expect(r.chest).toBe('primary');
+    expect(Object.values(r).filter((v) => v !== 'none')).toEqual(['primary']);
   });
 });

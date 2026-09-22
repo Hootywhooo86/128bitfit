@@ -15,9 +15,9 @@ import { WaterProgress } from '@/components/WaterProgress';
 import { WeekStrip } from '@/components/WeekStrip';
 import { useDb } from '@/db/DatabaseProvider';
 import { getDayFuelSummary } from '@/db/food-queries';
-import { getMuscleTally, periodFor } from '@/db/muscle-queries';
+import { getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';
 import { getAppSettings } from '@/db/settings-queries';
-import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
+import { emptyTally, type MuscleTally, emptyRoles, type MuscleRoles } from '@/lib/muscle-load';
 import { formatWeight, getLatestWeightEntry } from '@/db/weight-queries';
 import {
   getLastCompletedWorkoutSummary,
@@ -60,6 +60,7 @@ export default function HomeScreen() {
   const [latestWeight, setLatestWeight] = useState<WeightEntry | null>(null);
   const [week, setWeek] = useState<TrainingDayDot[]>([]);
   const [muscleTally, setMuscleTally] = useState<MuscleTally>(emptyTally());
+  const [muscleRoleMap, setMuscleRoleMap] = useState<MuscleRoles>(emptyRoles());
 
   const refresh = useCallback(async () => {
     if (!ready) return;
@@ -76,6 +77,7 @@ export default function HomeScreen() {
       setCalories(fuel.logs.length > 0 ? fuel.totals.calories : null);
       setCalorieTarget(fuel.goals.calorieTarget);
       setMuscleTally(await getMuscleTally(periodFor(7).since));
+      setMuscleRoleMap(await getMuscleRoles(periodFor(7).since));
       setWaterMl(fuel.waterMl);
       setWaterTarget(fuel.goals.waterTargetMl);
       setLastWorkout(workout);
@@ -120,7 +122,7 @@ export default function HomeScreen() {
       <StepsCard />
 
       <Text style={styles.section}>Muscle load</Text>
-      <MuscleLoadCard tally={muscleTally} />
+      <MuscleLoadCard tally={muscleTally} roles={muscleRoleMap} />
 
       <Text style={styles.section}>Last workout</Text>
       {lastWorkout ? (
