@@ -1,6 +1,10 @@
 /**
  * BYO-key fitness coach client.
- * Supports Anthropic, OpenAI, Gemini, OpenRouter, and custom OpenAI-compatible endpoints.
+ *
+ * Anthropic, OpenAI, Gemini, OpenRouter, Hugging Face, and any custom
+ * OpenAI-compatible endpoint. Keys go straight to the provider and never touch
+ * our servers.
+ *
  * Does not invent fake replies — errors surface to the UI.
  */
 import { AI_TIMEOUT_MS, fetchWithTimeout } from './net';
@@ -10,6 +14,7 @@ export type AiProviderId =
   | 'openai'
   | 'gemini'
   | 'openrouter'
+  | 'huggingface'
   | 'custom';
 
 export type AiProviderMeta = {
@@ -54,6 +59,16 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     defaultBaseUrl: 'https://openrouter.ai/api/v1',
     needsBaseUrl: false,
     hint: 'Key from openrouter.ai — OpenAI-compatible',
+  },
+  {
+    id: 'huggingface',
+    // The Inference Providers router speaks the OpenAI chat-completions API, so
+    // it needs no client of its own — only its own base URL and key.
+    label: 'Hugging Face',
+    defaultModel: 'meta-llama/Llama-3.3-70B-Instruct',
+    defaultBaseUrl: 'https://router.huggingface.co/v1',
+    needsBaseUrl: false,
+    hint: 'Access token from huggingface.co/settings/tokens',
   },
   {
     id: 'custom',
@@ -276,6 +291,12 @@ export async function coachChat(req: CoachChatRequest): Promise<CoachChatResult>
     case 'openrouter': {
       const base =
         req.baseUrl?.trim() || getProviderMeta('openrouter').defaultBaseUrl!;
+      content = await chatOpenAiCompatible(req, base);
+      break;
+    }
+    case 'huggingface': {
+      const base =
+        req.baseUrl?.trim() || getProviderMeta('huggingface').defaultBaseUrl!;
       content = await chatOpenAiCompatible(req, base);
       break;
     }
