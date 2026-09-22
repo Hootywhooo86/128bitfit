@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, MenuRow, Note, Screen } from '@/components/ui';
 import { importSets, type ImportOutcome } from '@/db/import-sets';
+import type { OpenGymReport } from '@/lib/import/opengym';
 import { parseImport, type ImportReport } from '@/lib/import/parse';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
@@ -19,7 +20,9 @@ export default function ImportScreen() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [report, setReport] = useState<(ImportReport & { filename: string }) | null>(null);
+  const [report, setReport] = useState<
+    (ImportReport & { filename: string; openGym?: OpenGymReport }) | null
+  >(null);
   const [done, setDone] = useState<ImportOutcome | null>(null);
 
   const choose = async () => {
@@ -78,7 +81,12 @@ export default function ImportScreen() {
         onPress={() => void choose()}
       />
       <MenuRow icon="▦" name="Any CSV of sets" sub="Needs a date and an exercise column" onPress={() => void choose()} />
-      <MenuRow icon="⌗" name="JSON export" sub="This app's export, or an array of sets" onPress={() => void choose()} />
+      <MenuRow
+        icon="⌗"
+        name="JSON export"
+        sub="openGym backup, this app's export, or an array of sets"
+        onPress={() => void choose()}
+      />
 
       {busy ? (
         <View style={s.center}>
@@ -104,6 +112,22 @@ export default function ImportScreen() {
               {new Set(report.sets.map((x) => x.exerciseName)).size} exercises ·{' '}
               {new Set(report.sets.map((x) => x.date)).size} days
             </Text>
+
+            {report.openGym && report.openGym.unnamedIds.length > 0 ? (
+              <View style={s.skipped}>
+                <Text style={s.skippedH}>
+                  {report.openGym.unnamedIds.length} exercises come in numbered
+                </Text>
+                <Text style={s.skippedL}>
+                  openGym&apos;s backup stores its built-in exercises by id and does not include
+                  their names, so they import as &quot;openGym 0218&quot; and so on. Every set,
+                  date, weight and rep is kept — rename them in the library when you spot them.
+                </Text>
+                <Text style={s.skippedL}>
+                  {report.openGym.namedCount} of your own custom exercises keep their names.
+                </Text>
+              </View>
+            ) : null}
 
             {report.skipped.length > 0 ? (
               <View style={s.skipped}>

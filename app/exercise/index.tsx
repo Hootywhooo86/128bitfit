@@ -79,6 +79,12 @@ export default function ExerciseLibraryScreen() {
         ))}
       </ScrollView>
 
+      <Link href="/exercise/new" asChild>
+        <Pressable style={styles.addBtn}>
+          <Text style={styles.addBtnText}>+ Add exercise — photograph the machine</Text>
+        </Pressable>
+      </Link>
+
       <Text style={styles.count}>
         {loading ? 'Searching…' : `${items.length} exercise${items.length === 1 ? '' : 's'}`}
       </Text>
@@ -134,6 +140,16 @@ function Chip({
 }
 
 const styles = StyleSheet.create({
+  addBtn: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  addBtnText: { color: colors.text, fontSize: 13, fontWeight: '600' },
   container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   search: {
     backgroundColor: colors.surface,

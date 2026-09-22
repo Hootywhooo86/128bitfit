@@ -574,3 +574,32 @@ export async function deleteRoutine(routineId: string): Promise<void> {
   await db.delete(routineExercises).where(eq(routineExercises.routineId, routineId));
   await db.delete(routines).where(eq(routines.id, routineId));
 }
+
+export type CustomExerciseInput = {
+  name: string;
+  equipment: string | null;
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+  instructions: string[];
+};
+
+/**
+ * Saves a user-made exercise into the library.
+ *
+ * Muscles are stored as the app's own group names, already mapped — the muscle
+ * map's coverage is closed and a free-text muscle would simply never light up.
+ */
+export async function createCustomExercise(input: CustomExerciseInput): Promise<string> {
+  const id = newId('ex');
+  await db.insert(exercises).values({
+    id,
+    name: input.name.trim(),
+    equipment: input.equipment?.trim() || null,
+    category: 'custom',
+    primaryMuscles: JSON.stringify(input.primaryMuscles),
+    secondaryMuscles: JSON.stringify(input.secondaryMuscles),
+    instructions: JSON.stringify(input.instructions),
+    images: '[]',
+  });
+  return id;
+}

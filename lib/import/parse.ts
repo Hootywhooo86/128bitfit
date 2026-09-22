@@ -1,3 +1,4 @@
+import { isOpenGymBackup, parseOpenGym } from './opengym';
 /**
  * Reading a workout history out of someone else's export.
  *
@@ -35,6 +36,8 @@ export type ImportReport = {
 };
 
 export type ImportResult = ImportReport | { error: string };
+
+/* eslint-disable-next-line import/first */
 
 /** RFC4180-ish: quoted fields, doubled quotes, embedded newlines and commas. */
 export function parseCsv(text: string): string[][] {
@@ -332,6 +335,10 @@ export function parseSetJson(text: string): ImportResult {
   } catch {
     return { error: 'That file is not valid JSON.' };
   }
+
+  // openGym writes its own shape — ids instead of names, a top-level unit —
+  // and needs its own reader rather than a looser generic one.
+  if (isOpenGymBackup(data)) return parseOpenGym(data);
 
   let rows = findSetRows(data);
   if (!rows) {
