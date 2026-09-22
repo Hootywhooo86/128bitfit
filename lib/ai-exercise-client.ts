@@ -6,7 +6,7 @@
  */
 import { getAiRuntimeConfig } from '@/db/ai-settings';
 import { AiCoachError, getProviderMeta, visionSupport } from './ai-coach';
-import { callVision } from './ai-vision-call';
+import { callWithRotation } from './ai-rotate';
 import {
   EQUIPMENT_PROMPT,
   equipmentSystemPrompt,
@@ -49,7 +49,7 @@ export async function identifyEquipment(
 
   try {
     // Rotates through the Hugging Face vision chain when a model runs out.
-    const res = await callVision([
+    const res = await callWithRotation([
         { role: 'system', content: equipmentSystemPrompt() },
         { role: 'user', content: EQUIPMENT_PROMPT, image: { base64, mimeType } },
       ], signal);

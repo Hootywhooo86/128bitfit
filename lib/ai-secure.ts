@@ -4,6 +4,7 @@
  */
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { sanitizeApiKey } from './api-key';
 
 const STORE_KEY = 'bitfit_ai_api_key';
 
@@ -19,15 +20,21 @@ async function secureAvailable(): Promise<boolean> {
   }
 }
 
+/**
+ * Sanitised on the way out as well as in.
+ *
+ * A key stored by an earlier build was only trimmed, so one with an interior
+ * newline is sitting in the keystore right now, breaking every request. Doing
+ * it here repairs those without the user having to notice and re-paste.
+ */
 export async function getAiApiKey(): Promise<string | null> {
   try {
     if (await secureAvailable()) {
-      const v = await SecureStore.getItemAsync(STORE_KEY);
-      return v && v.trim() ? v.trim() : null;
+      return sanitizeApiKey(await SecureStore.getItemAsync(STORE_KEY));
     }
-    return memoryKey && memoryKey.trim() ? memoryKey.trim() : null;
+    return sanitizeApiKey(memoryKey);
   } catch {
-    return memoryKey && memoryKey.trim() ? memoryKey.trim() : null;
+    return sanitizeApiKey(memoryKey);
   }
 }
 
@@ -54,7 +61,9 @@ export class AiKeyStoreError extends Error {}
  * distinguishes that from success.
  */
 export async function setAiApiKey(key: string): Promise<void> {
-  const trimmed = key.trim();
+  // Not trim(): a pasted key routinely carries a whole extra line, and trim
+  // cannot see a newline with text behind it. See lib/api-key.ts.
+  const trimmed = sanitizeApiKey(key) ?? '';
   memoryKey = trimmed || null;
 
   if (!(await secureAvailable())) {

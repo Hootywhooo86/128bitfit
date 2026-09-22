@@ -182,7 +182,11 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
   live providers first) with a snapshot fallback. A 401/403 never rotates — the
   key is the same everywhere. Only Hugging Face rotates; the other providers
   serve one vision family each.
-- API keys: `lib/ai-secure.ts` reads the key back after writing it and throws
+- API keys: `lib/api-key.ts` sanitises a pasted key (first non-empty line, all
+  whitespace and zero-width characters stripped) on both save and read, so a
+  key already stored broken is repaired without re-pasting.
+  `describeKeyProblem()` validates before the key reaches a header.
+  `lib/ai-secure.ts` reads the key back after writing it and throws
   `AiKeyStoreError` if it did not stick. It used to swallow the failure, so the
   key lived in memory until the app closed and then vanished silently.
 - Label scan: `app/fuel/label.tsx`, two shots — front of pack then nutrition panel.

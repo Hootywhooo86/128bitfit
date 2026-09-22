@@ -8,6 +8,7 @@
  * Does not invent fake replies — errors surface to the UI.
  */
 import { AI_TIMEOUT_MS, fetchWithTimeout } from './net';
+import { describeKeyProblem } from './api-key';
 
 export type AiProviderId =
   | 'anthropic'
@@ -372,8 +373,12 @@ async function chatGemini(req: CoachChatRequest): Promise<string> {
 
 /** Single-shot coach completion (no fake responses). */
 export async function coachChat(req: CoachChatRequest): Promise<CoachChatResult> {
-  if (!req.apiKey.trim()) {
-    throw new AiCoachError('No API key configured');
+  const keyProblem = describeKeyProblem(req.apiKey);
+  if (keyProblem) {
+    // Checked here so the failure is a sentence the user can act on. Without
+    // it Android throws IllegalArgumentException naming a byte offset into a
+    // string the user never sees.
+    throw new AiCoachError(keyProblem, 401);
   }
   if (!req.model.trim()) {
     throw new AiCoachError('No model name configured');
