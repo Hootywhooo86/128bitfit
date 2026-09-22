@@ -21,7 +21,8 @@ import {
 } from 'react-native-health-connect';
 import type { Permission } from 'react-native-health-connect';
 import { SCOPE_RECORDS, healthConnectPermissions, type Direction } from './scopes';
-import { dayKey, eachDay, endOfLocalDay, startOfLocalDay } from './dates';
+import { dayKey, eachDay, endOfLocalDay, previousDay, startOfLocalDay } from './dates';
+import { sleepMinutesByWakeDay } from './sleep';
 import {
   HEALTH_SCOPES,
   emptyHealthDay,
@@ -191,7 +192,14 @@ export const healthConnectProvider: HealthProvider = {
         tryRead<{ startTime: string; energy?: { inKilocalories?: number } }>('ActiveCaloriesBurned', startDate, endDate),
         tryRead<{ startTime: string; energy?: { inKilocalories?: number } }>('TotalCaloriesBurned', startDate, endDate),
         tryRead<{ startTime: string; distance?: { inMeters?: number } }>('Distance', startDate, endDate),
-        tryRead<{ startTime: string; endTime: string }>('SleepSession', startDate, endDate),
+        // One day earlier than the rest: a night that ends inside the range
+        // may have begun the evening before it, and reading from the range's
+        // own start would miss the session entirely rather than misfile it.
+        tryRead<{ startTime: string; endTime: string }>(
+          'SleepSession',
+          previousDay(startDate),
+          endDate
+        ),
         tryRead<{ time: string; weight?: { inKilograms?: number } }>('Weight', startDate, endDate),
         tryRead<{ time: string; percentage?: number }>('BodyFat', startDate, endDate),
         tryRead<{ startTime: string; volume?: { inMilliliters?: number } }>('Hydration', startDate, endDate),
@@ -241,9 +249,13 @@ export const healthConnectProvider: HealthProvider = {
       // card read "0h 0m of 7h" with the worst possible grade against it, which
       // is the app inventing a measurement and then judging the user for it.
       // A night with no reading stays null and the card says so.
-      for (const r of sleep) {
-        const mins = (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 60000;
-        addTo('sleepMinutes', dayOf(r), mins > 0 ? Math.round(mins) : null);
+      // Keyed by the morning of waking, not the evening of starting — see
+      // ./sleep, where that rule lives so it can be tested. A night that ends
+      // before the range (the one the widened read pulled in) has no entry in
+      // byDate and is dropped.
+      for (const [day, minutes] of sleepMinutesByWakeDay(sleep)) {
+        const bucket = byDate.get(day);
+        if (bucket) bucket.sleepMinutes = minutes;
       }
     }
 

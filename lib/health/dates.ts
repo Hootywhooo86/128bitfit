@@ -45,3 +45,15 @@ export function eachDay(startDate: string, endDate: string): string[] {
 export function today(): string {
   return dayKey(new Date());
 }
+
+/**
+ * The local calendar day before this one.
+ *
+ * Built by stepping a local Date rather than by arithmetic on the string, so
+ * month ends, leap days and DST all come out right.
+ */
+export function previousDay(date: string): string {
+  const d = startOfLocalDay(date);
+  d.setDate(d.getDate() - 1);
+  return dayKey(d);
+}

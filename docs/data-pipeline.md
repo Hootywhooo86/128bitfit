@@ -124,6 +124,11 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Queries: `db/food-queries.ts`; macros helper: `lib/nutrition.ts`
 - Screens: `app/(tabs)/fuel.tsx`, `app/fuel/add.tsx`, `app/fuel/edit/[id].tsx`
 - Barcode: `app/fuel/scan.tsx` + `app/fuel/custom.tsx`; lookup `db/barcode-queries.ts`
+- Sleep is attributed to the day you **wake up**, not the day the session
+  started (`lib/health/sleep.ts`), and `readDays` reads sleep from one day
+  earlier than the rest of the range so a night that began the previous evening
+  is caught. Sleep is also never zero-filled on an empty result, unlike the
+  counters — no session means nobody recorded one.
 - AI vision: `visionSupport(provider, modelVision)` in `lib/ai-coach.ts`.
   Anthropic/OpenAI/Gemini always; Hugging Face depends on the model, which the
   router reports as `architecture.input_modalities` and `parseHfModels` reads
