@@ -123,6 +123,15 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
   the completion signal
 - iOS Silent / Focus may mute the notification sound
 
+### Exercise search
+
+- `listExercises` matches name, both muscle columns, equipment and category —
+  "chest" finds the bench press, "hamstrings" finds 277 exercises where a name
+  match alone found none. Name matches rank first so "row" still leads with rows.
+- Custom exercises: `app/exercise/new.tsx`, reachable from the library **and**
+  from `app/train/add-exercise.tsx` with a `sessionId`, which adds the finished
+  exercise straight into the running session.
+
 ### Fuel / nutrition logging
 
 - Schema: `food_logs`, `water_logs`, `settings` (calorie/protein/water targets)

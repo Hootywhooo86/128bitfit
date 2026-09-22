@@ -1,4 +1,4 @@
-import { and, asc, count, eq, like, sql } from 'drizzle-orm';
+import { and, asc, count, eq, like, or, sql } from 'drizzle-orm';
 import { db } from './client';
 import { exercises, type Exercise } from './schema';
 
@@ -8,24 +8,58 @@ export type ExerciseFilters = {
   primaryMuscle?: string | null;
 };
 
+/**
+ * Search matches the muscles worked, not only the name.
+ *
+ * "chest" should find the bench press. Matching names alone meant the only way
+ * to find every exercise for a body part was to already know what they were
+ * called, which is backwards — the library exists for the case where you do
+ * not. Equipment and category match too, so "cable" and "stretching" work.
+ *
+ * Name matches still come first. Someone typing "row" wants the rows, not
+ * every exercise that happens to involve the lats, and burying the obvious
+ * answer under forty others is its own kind of broken.
+ */
 export async function listExercises(filters: ExerciseFilters = {}): Promise<Exercise[]> {
   const clauses = [];
-  if (filters.search?.trim()) {
-    clauses.push(like(exercises.name, `%${filters.search.trim()}%`));
+  const term = filters.search?.trim() ?? '';
+  if (term) {
+    const q = `%${term}%`;
+    clauses.push(
+      or(
+        like(exercises.name, q),
+        // Both muscle columns are JSON array text; a LIKE is good enough
+        // offline and avoids a json_each per row on every keystroke.
+        like(exercises.primaryMuscles, q),
+        like(exercises.secondaryMuscles, q),
+        like(exercises.equipment, q),
+        like(exercises.category, q)
+      )
+    );
   }
   if (filters.equipment) {
     clauses.push(eq(exercises.equipment, filters.equipment));
   }
   if (filters.primaryMuscle) {
-    // primary_muscles stored as JSON array text — LIKE match is good enough offline
+    // Quoted, so "lats" cannot match "latissimus" in some other entry.
     clauses.push(like(exercises.primaryMuscles, `%"${filters.primaryMuscle}"%`));
   }
   const where = clauses.length ? and(...clauses) : undefined;
+
+  // SQLite's LIKE is case-insensitive for ASCII, so this needs no lowering.
+  const rank = term
+    ? sql`case
+          when ${exercises.name} like ${`%${term}%`} then 0
+          when ${exercises.primaryMuscles} like ${`%${term}%`} then 1
+          else 2
+        end`
+    : sql`0`;
+
   return db
     .select()
     .from(exercises)
     .where(where)
-    .orderBy(asc(exercises.name))
+    .orderBy(rank, asc(exercises.name))
     .limit(500);
 }
 

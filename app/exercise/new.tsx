@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,7 +11,7 @@ import {
   View,
 } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
-import { createCustomExercise } from '@/db/workout-queries';
+import { addExerciseToSession, createCustomExercise } from '@/db/workout-queries';
 import { identifyEquipment } from '@/lib/ai-exercise-client';
 import { MUSCLE_GROUPS, MUSCLE_LABELS, type MuscleGroup } from '@/lib/muscle-load';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
@@ -23,9 +23,18 @@ import { colors, fonts, radius, spacing } from '@/lib/theme';
  * unfamiliar machine can be confidently wrong, and a wrongly-tagged exercise
  * would colour the muscle map with training that never happened — so every
  * field stays editable and the muscles are chips the user can toggle.
+ *
+ * Reachable from the library and, with a sessionId, from the middle of a
+ * workout — which is where someone actually meets a machine they cannot name.
+ * It used to be library-only, so the feature existed and could not be got at
+ * from the one screen that needed it.
  */
 export default function NewExerciseScreen() {
   const router = useRouter();
+  // Set when this was opened from a live workout, so the finished exercise can
+  // go straight into that session instead of only into the library.
+  const { sessionId } = useLocalSearchParams<{ sessionId?: string }>();
+  const sid = sessionId ? decodeURIComponent(sessionId) : '';
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
 
@@ -94,7 +103,7 @@ export default function NewExerciseScreen() {
     }
     setBusy(true);
     try {
-      await createCustomExercise({
+      const id = await createCustomExercise({
         name,
         equipment: equipment.trim() || null,
         primaryMuscles: primary,
@@ -104,6 +113,23 @@ export default function NewExerciseScreen() {
           .map((l) => l.trim())
           .filter(Boolean),
       });
+
+      // Reached from a live workout: the point was to add this machine to the
+      // session, so do that and go back to it. Dropping the user in the
+      // library instead would make them find it again and lose their place.
+      if (sid) {
+        await addExerciseToSession(sid, id, { targetSets: 3, targetReps: 10 });
+        const back = { pathname: '/train/active' as const, params: { id: sid } };
+        // Pop back to the session rather than stacking a second copy of it.
+        // Already saved and already added by this point, so a router that
+        // cannot find it in the stack must not cost the user the exercise.
+        try {
+          router.dismissTo(back);
+        } catch {
+          router.replace(back);
+        }
+        return;
+      }
       router.replace('/exercise');
     } catch (e) {
       Alert.alert('Save failed', e instanceof Error ? e.message : String(e));
