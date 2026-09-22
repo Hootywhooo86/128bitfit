@@ -472,9 +472,34 @@ The meal is chosen from the time of day, so a morning entry lands in Breakfast.
 OpenRouter, Hugging Face or a custom endpoint says so rather than sending a
 photo that gets silently dropped and asking the model to describe it.
 
-**One compromise, recorded.** `food_logs` stores macros `NOT NULL DEFAULT 0`, so
-a macro nobody estimated has to land as `0`, which would read as "this meal had
-no fat". The row's note therefore names them: `AI estimate · not estimated: fat`.
+**Macros are nullable.** `food_logs.protein/fat/carb` used to be
+`NOT NULL DEFAULT 0`, so a macro nobody estimated read as "this meal had no
+fat". They are now nullable: `null` is "nobody knows", `0` is "the food has
+none". Migration `0007` rebuilds the table and puts the truth back into rows the
+AI estimator wrote, which recorded the unestimated macros in their note.
+
+A day's total is the sum of what is known, and `DayFuelSummary.partial` flags
+any macro where at least one log had no figure. Fuel shows that as a leading
+`+`, so the number reads as a floor rather than a complete total, and an
+individual log with an unknown macro shows a dash.
+
+### Recipes
+
+The AI screen's third mode. Up to five photos — a page, a packet, the pan — read
+as **one** recipe, so an ingredient appearing in two photos is not counted
+twice, or a link to a recipe page. Ingredients come back per serving, using the
+serving count the user gives, so one serving is what gets logged. The link
+prompt tells the model to say it could not open the page rather than answering
+from memory of a similar recipe, which would be a recipe the user never chose.
+
+### Hugging Face models
+
+Hugging Face hosts hundreds of thousands of models and the set its router can
+actually serve changes weekly, so there is no hardcoded list. `lib/hf-models.ts`
+asks the router at open time and `components/HfModelPicker.tsx` makes it
+searchable. Sending the user's token returns what *they* can reach, which is
+the more useful answer. The model field stays typeable, so failing to load the
+list costs a convenience, not the feature.
 
 ### The app icon
 
@@ -484,6 +509,50 @@ the largest whole-pixel size that fits each icon's safe area, so the letters
 stay crisp rather than anti-aliasing to mush. The adaptive foreground uses a
 tighter safe area (52% vs 72%) because Android masks the outer third away and a
 clipped wordmark is unreadable.
+
+### Importing a history from another app
+
+Settings → **Import exercises**. Three shapes: Hevy's CSV, a generic CSV with a
+date and an exercise column, and a JSON export (this app's, or an array of
+sets).
+
+`lib/import/parse.ts` is pure — text in, rows out — and holds a hand-written
+CSV reader, because quoted fields, doubled quotes, embedded newlines and
+Excel's BOM all appear in real exports. What it guarantees, each tested and
+mutation-checked:
+
+- A row that cannot be read is **reported with its line number and reason**,
+  never silently dropped. An importer that quietly loses half a training
+  history is worse than one that refuses the file.
+- A field that is absent stays `null` — an unsupplied weight or RPE is not 0.
+- The weight unit comes from the column name (`weight_kg` / `weight_lbs`) or a
+  unit column, and is left `null` rather than assumed.
+- A slashed date is resolved when one field is over 12; otherwise the US
+  reading is taken, which is what these exports use.
+
+The screen reads the file and shows what it found — set count, exercises, days,
+and every unreadable row — before anything is written. A history import is not
+reversible from inside the app.
+
+`db/import-sets.ts` writes it: one completed session per imported day, so the
+muscle map, history and PRs see the same shape as sets logged in the app. An
+exercise the library does not have is **created**, not dropped, with no muscles
+attached — guessing them would colour the muscle map with training that may not
+have happened. Sessions carry an `[imported YYYY-MM-DD]` marker, so running the
+same file twice leaves the second run alone rather than doubling the history.
+
+### Sharing a food back
+
+A custom food can be offered to the shared database. There is no server and
+there should not be a secret in a sideloaded app, so `lib/community-food.ts`
+posts nothing: it builds a pre-filled GitHub issue and opens it in the browser,
+and the user submits it under their own account. Nothing leaves the phone until
+they press the button on GitHub, and it is opt-in per food.
+
+The payload is built field by field rather than spread from the row, so a
+future column on `foods` cannot start leaking into a public issue just by
+existing. Tested: the local photo path, internal ids and any unrecognised
+nutrient key stay out, and an unknown nutrient is sent as `null` rather than 0.
 
 ### Privacy & Health Connect compliance
 

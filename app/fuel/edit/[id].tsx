@@ -17,12 +17,7 @@ import {
   updateFoodLog,
 } from '@/db/food-queries';
 import { MEAL_TYPES, type Food, type FoodLog, type MealType } from '@/db/schema';
-import {
-  formatGrams,
-  formatKcal,
-  nutrientsForServings,
-  nutrientsPerServing,
-} from '@/lib/nutrition';
+import { formatGrams, formatKcal, formatOptionalGrams, nutrientsForServings, nutrientsPerServing } from '@/lib/nutrition';
 import { colors, spacing } from '@/lib/theme';
 
 const MEAL_LABELS: Record<MealType, string> = {
@@ -73,20 +68,24 @@ export default function EditFoodLogScreen() {
 
   const preview = useMemo(() => {
     if (food) return nutrientsForServings(food, servingsNum);
+    // Scaling an unknown macro leaves it unknown: two servings of a food whose
+    // fat nobody recorded still has no fat figure, not 0 g.
+    const scaled = (v: number | null | undefined, scale: number) =>
+      v == null ? null : v * scale;
     if (!log || !log.servings || log.servings <= 0) {
       return {
         calories: log?.calories ?? 0,
-        protein: log?.protein ?? 0,
-        fat: log?.fat ?? 0,
-        carb: log?.carb ?? 0,
+        protein: log?.protein ?? null,
+        fat: log?.fat ?? null,
+        carb: log?.carb ?? null,
       };
     }
     const scale = servingsNum / log.servings;
     return {
       calories: (log.calories ?? 0) * scale,
-      protein: (log.protein ?? 0) * scale,
-      fat: (log.fat ?? 0) * scale,
-      carb: (log.carb ?? 0) * scale,
+      protein: scaled(log.protein, scale),
+      fat: scaled(log.fat, scale),
+      carb: scaled(log.carb, scale),
     };
   }, [food, log, servingsNum]);
 
@@ -199,8 +198,8 @@ export default function EditFoodLogScreen() {
       <View style={styles.previewCard}>
         <Text style={styles.previewCal}>{formatKcal(preview.calories)} kcal</Text>
         <Text style={styles.previewMacros}>
-          P {formatGrams(preview.protein)} · C {formatGrams(preview.carb)} · F{' '}
-          {formatGrams(preview.fat)}
+          P {formatOptionalGrams(preview.protein)} · C {formatOptionalGrams(preview.carb)} · F{' '}
+          {formatOptionalGrams(preview.fat)}
         </Text>
       </View>
 

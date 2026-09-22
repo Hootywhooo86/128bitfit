@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react';
 import {
   Alert,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,7 @@ import { PhotoCapture } from '@/components/PhotoCapture';
 import { insertCustomFood, newCustomFoodId } from '@/db/barcode-queries';
 import { logFoodFromCatalog } from '@/db/food-queries';
 import { MEAL_TYPES, type MealType } from '@/db/schema';
+import { buildFoodSubmission } from '@/lib/community-food';
 import { saveFoodPhoto } from '@/lib/food-photo-store';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
 import type { LabelReading } from '@/lib/nutrition-label';
@@ -155,7 +157,24 @@ export default function CustomFoodScreen() {
         addedSugars: reading?.fields.addedSugars ?? null,
       }, id);
       await logFoodFromCatalog(food, { servings: servingsNum, mealType });
-      router.replace('/(tabs)/fuel');
+
+      // Offering it to the shared database is opt-in, per food, and nothing
+      // leaves the phone until the user submits the issue GitHub opens.
+      Alert.alert(
+        'Share this food?',
+        'Offer these nutrition facts to the shared food database. It opens a pre-filled GitHub issue you submit yourself — your logs and settings are never included.',
+        [
+          { text: 'No thanks', style: 'cancel', onPress: () => router.replace('/(tabs)/fuel') },
+          {
+            text: 'Share',
+            onPress: () => {
+              void Linking.openURL(buildFoodSubmission(food).url);
+              router.replace('/(tabs)/fuel');
+            },
+          },
+        ]
+      );
+      return;
     } catch (e) {
       Alert.alert('Save failed', e instanceof Error ? e.message : String(e));
     } finally {

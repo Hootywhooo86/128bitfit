@@ -33,7 +33,13 @@ export type FoodLogWithName = FoodLog & { displayName: string; photoUri: string 
 
 export type DayFuelSummary = {
   goals: DailyGoals;
+  /** Sum of what is known. See `partial`. */
   totals: Nutrients;
+  /**
+   * True where at least one of the day's logs has an unknown value for that
+   * macro, so the total is a floor rather than a figure. The UI marks it.
+   */
+  partial: { protein: boolean; fat: boolean; carb: boolean };
   waterMl: number;
   logs: FoodLogWithName[];
   byMeal: Record<MealType, FoodLogWithName[]>;
@@ -152,6 +158,10 @@ export async function getDayFuelSummary(day: Date = new Date()): Promise<DayFuel
   const goals = await ensureDefaultGoals();
   const logs = await listFoodLogsForDay(day);
   const totals: Nutrients = { calories: 0, protein: 0, fat: 0, carb: 0 };
+  // A day's total is only the sum of what is known. If any log has an unknown
+  // macro the total is a floor, not a figure, and the UI has to be able to say
+  // so rather than presenting it as complete.
+  const partial = { protein: false, fat: false, carb: false };
   const byMeal: Record<MealType, FoodLogWithName[]> = {
     breakfast: [],
     lunch: [],
@@ -160,15 +170,17 @@ export async function getDayFuelSummary(day: Date = new Date()): Promise<DayFuel
   };
   for (const log of logs) {
     totals.calories += log.calories ?? 0;
-    totals.protein += log.protein ?? 0;
-    totals.fat += log.fat ?? 0;
-    totals.carb += log.carb ?? 0;
+    for (const k of ['protein', 'fat', 'carb'] as const) {
+      const v = log[k];
+      if (v == null) partial[k] = true;
+      else totals[k] += v;
+    }
     const mt = (log.mealType as MealType) || 'snack';
     if (byMeal[mt]) byMeal[mt].push(log);
     else byMeal.snack.push(log);
   }
   const waterMl = await getWaterTotalForDay(day);
-  return { goals, totals, waterMl, logs, byMeal };
+  return { goals, totals, partial, waterMl, logs, byMeal };
 }
 
 export type LogFoodInput = {
@@ -180,9 +192,10 @@ export type LogFoodInput = {
   servingSize?: number | null;
   servingUnit?: string | null;
   calories: number;
-  protein: number;
-  fat: number;
-  carb: number;
+  /** null means unknown. 0 means the food genuinely has none of it. */
+  protein: number | null;
+  fat: number | null;
+  carb: number | null;
   notes?: string | null;
 };
 
