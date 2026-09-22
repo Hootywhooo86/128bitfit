@@ -68,6 +68,8 @@ const SYNONYMS: Record<string, MuscleGroup> = {
   hamstring: 'hamstrings',
   'biceps femoris': 'hamstrings',
   glute: 'glutes',
+  gluteal: 'glutes',
+  gluteals: 'glutes',
   'gluteus maximus': 'glutes',
   'gluteus medius': 'abductors',
   'gluteus minimus': 'abductors',
@@ -107,7 +109,10 @@ const KNOWN = new Set<string>(MUSCLE_GROUPS);
 
 /** Maps one model-supplied muscle name onto a group, or null if it cannot. */
 export function toMuscleGroup(raw: string): MuscleGroup | null {
-  const t = raw.trim().toLowerCase().replace(/\s+/g, ' ');
+  // Hyphens and underscores collapse to spaces: openGym writes "upper-back"
+  // and "lower-back" where the table below says "upper back". Two names for one
+  // muscle is not a reason to leave it off the map.
+  const t = raw.trim().toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ');
   if (!t) return null;
   if (KNOWN.has(t)) return t as MuscleGroup;
   if (SYNONYMS[t]) return SYNONYMS[t];

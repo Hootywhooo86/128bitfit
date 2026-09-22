@@ -23,6 +23,7 @@ import {
   pushMeals,
   pushWater,
   pushWeight,
+  pushWeights,
   pushWorkout,
   removeMeals,
   removeWaters,
@@ -90,6 +91,12 @@ export function mirrorMealRemoved(id: string): void {
 
 export function mirrorWeight(id: string, at: number, kg: number): void {
   fire('your weigh-in', () => pushWeight(at, kg, id));
+}
+
+/** A whole imported history at once. See pushWeights. */
+export function mirrorWeights(entries: { id: string; at: number; kg: number }[]): void {
+  if (entries.length === 0) return;
+  fire('your imported weigh-ins', () => pushWeights(entries));
 }
 
 export function mirrorWeightRemoved(id: string): void {

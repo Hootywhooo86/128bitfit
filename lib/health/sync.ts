@@ -65,10 +65,24 @@ export async function pushMeals(logs: FoodLogForHealth[]): Promise<HealthWriteRe
 }
 
 export async function pushWeight(at: number, kg: number, id?: string): Promise<HealthWriteResult> {
-  if (!(kg > 0)) return NOTHING;
+  return pushWeights([{ id, at, kg }]);
+}
+
+/**
+ * Several weigh-ins at once, for an import.
+ *
+ * One grant check and one write for the whole batch: importing a year of
+ * weigh-ins one at a time would be hundreds of round trips for something the
+ * platform takes in a single call.
+ */
+export async function pushWeights(
+  entries: { id?: string; at: number; kg: number }[]
+): Promise<HealthWriteResult> {
+  const usable = entries.filter((e) => e.kg > 0);
+  if (usable.length === 0) return NOTHING;
   const grants = await health.getGrants();
   if (!grants.write.includes('weight')) return NOTHING;
-  return health.writeWeight([{ clientId: id, at, kg }]);
+  return health.writeWeight(usable.map((e) => ({ clientId: e.id, at: e.at, kg: e.kg })));
 }
 
 export async function pushWater(at: number, ml: number, id?: string): Promise<HealthWriteResult> {

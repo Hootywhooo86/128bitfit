@@ -4,9 +4,10 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, MenuRow, Note, Screen } from '@/components/ui';
+import { importExtras, type ExtrasOutcome } from '@/db/import-extras';
 import { importSets, type ImportOutcome } from '@/db/import-sets';
 import type { OpenGymReport } from '@/lib/import/opengym';
-import { parseImport, type ImportReport } from '@/lib/import/parse';
+import { parseImport, type ImportExtras, type ImportReport } from '@/lib/import/parse';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
 /**
@@ -24,6 +25,7 @@ export default function ImportScreen() {
     (ImportReport & { filename: string; openGym?: OpenGymReport }) | null
   >(null);
   const [done, setDone] = useState<ImportOutcome | null>(null);
+  const [doneExtras, setDoneExtras] = useState<ExtrasOutcome | null>(null);
 
   const choose = async () => {
     if (busy) return;
@@ -31,6 +33,7 @@ export default function ImportScreen() {
     setError(null);
     setReport(null);
     setDone(null);
+    setDoneExtras(null);
     try {
       const res = await DocumentPicker.getDocumentAsync({
         type: ['text/csv', 'text/comma-separated-values', 'application/json', 'text/plain', '*/*'],
@@ -57,6 +60,10 @@ export default function ImportScreen() {
     setBusy(true);
     try {
       setDone(await importSets(report.sets));
+      // Routines, custom exercises and weigh-ins, when the file had them.
+      // After the sets, so a routine links to an exercise the history has
+      // already created rather than making a second row for the same name.
+      if (report.extras) setDoneExtras(await importExtras(report.extras));
       setReport(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The import failed.');
@@ -84,7 +91,7 @@ export default function ImportScreen() {
       <MenuRow
         icon="⌗"
         name="JSON export"
-        sub="openGym backup, this app's export, or an array of sets"
+        sub="openGym backup — history, routines, custom exercises and weigh-ins"
         onPress={() => void choose()}
       />
 
@@ -112,6 +119,8 @@ export default function ImportScreen() {
               {new Set(report.sets.map((x) => x.exerciseName)).size} exercises ·{' '}
               {new Set(report.sets.map((x) => x.date)).size} days
             </Text>
+
+            {report.extras ? <ExtrasFound extras={report.extras} og={report.openGym} /> : null}
 
             {report.openGym && report.openGym.unnamedIds.length > 0 ? (
               <View style={s.skipped}>
@@ -148,7 +157,12 @@ export default function ImportScreen() {
           </Card>
 
           <Pressable style={s.primary} onPress={() => void commit()}>
-            <Text style={s.primaryT}>IMPORT {report.sets.length} SETS</Text>
+            <Text style={s.primaryT}>
+              IMPORT {report.sets.length} SETS
+              {report.extras && report.extras.routines.length > 0
+                ? ` + ${report.extras.routines.length} ROUTINES`
+                : ''}
+            </Text>
           </Pressable>
         </>
       ) : null}
@@ -166,6 +180,7 @@ export default function ImportScreen() {
                 {done.duplicatesSkipped} already imported, left alone
               </Text>
             ) : null}
+            {doneExtras ? <ExtrasDone done={doneExtras} /> : null}
           </Card>
           <Pressable style={s.primary} onPress={() => router.replace('/(tabs)/train')}>
             <Text style={s.primaryT}>OPEN TRAIN</Text>
@@ -173,6 +188,77 @@ export default function ImportScreen() {
         </>
       ) : null}
     </Screen>
+  );
+}
+
+/**
+ * What else is in the file besides sets.
+ *
+ * Listed before the import runs, because a routine is a different kind of thing
+ * from a logged set and the user should know both are coming. Only what is
+ * actually there is mentioned — a file with no routines says nothing about
+ * routines rather than reporting a zero.
+ */
+function ExtrasFound({ extras, og }: { extras: ImportExtras; og?: OpenGymReport }) {
+  const lines: string[] = [];
+  if (extras.routines.length > 0) {
+    const n = extras.routines.reduce((t, r) => t + r.exercises.length, 0);
+    lines.push(`${extras.routines.length} routines · ${n} exercises between them`);
+  }
+  if (extras.exercises.length > 0) lines.push(`${extras.exercises.length} exercises you created`);
+  if (extras.weights.length > 0) lines.push(`${extras.weights.length} weigh-ins`);
+  if (lines.length === 0) return null;
+
+  return (
+    <View style={s.skipped}>
+      <Text style={s.skippedH}>Also in this file</Text>
+      {lines.map((l) => (
+        <Text key={l} style={s.skippedL}>
+          {l}
+        </Text>
+      ))}
+      {extras.routines.length > 0 ? (
+        <Text style={s.skippedL}>
+          {extras.routines.map((r) => r.name).join(', ')}
+        </Text>
+      ) : null}
+      {og && og.exercisesWithoutMuscles > 0 ? (
+        <Text style={s.skippedL}>
+          {og.exercisesWithoutMuscles} of them have no muscles recorded in the backup. They come
+          in blank rather than guessed — tag them in the library and they start colouring the
+          muscle map.
+        </Text>
+      ) : null}
+      <Text style={s.skippedL}>
+        Routines are plans, not training. They will not appear on the muscle map until you run
+        one.
+      </Text>
+    </View>
+  );
+}
+
+/** The same again, after the write, reporting what actually landed. */
+function ExtrasDone({ done }: { done: ExtrasOutcome }) {
+  const lines: string[] = [];
+  if (done.routinesAdded > 0) lines.push(`${done.routinesAdded} routines added`);
+  if (done.routinesSkipped > 0) {
+    lines.push(`${done.routinesSkipped} routines already had that name, left alone`);
+  }
+  if (done.exercisesFilledIn > 0) {
+    lines.push(`${done.exercisesFilledIn} exercises gained the muscles they were missing`);
+  }
+  if (done.weightsAdded > 0) lines.push(`${done.weightsAdded} weigh-ins added`);
+  if (done.weightsSkipped > 0) lines.push(`${done.weightsSkipped} weigh-ins already recorded`);
+  if (lines.length === 0) return null;
+
+  return (
+    <View style={s.skipped}>
+      {lines.map((l) => (
+        <Text key={l} style={s.skippedL}>
+          {l}
+        </Text>
+      ))}
+    </View>
   );
 }
 

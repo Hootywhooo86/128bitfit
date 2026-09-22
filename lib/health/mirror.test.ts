@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const pushMeals = vi.fn();
 const pushWater = vi.fn();
 const pushWeight = vi.fn();
+const pushWeights = vi.fn();
 const pushWorkout = vi.fn();
 const removeMeals = vi.fn();
 const removeWaters = vi.fn();
@@ -16,6 +17,7 @@ vi.mock('./sync', () => ({
   pushMeals,
   pushWater,
   pushWeight,
+  pushWeights,
   pushWorkout,
   removeMeals,
   removeWaters,
@@ -30,6 +32,7 @@ const {
   mirrorMealRemoved,
   mirrorWater,
   mirrorWeight,
+  mirrorWeights,
   mirrorWorkout,
   subscribeMirror,
 } = await import('./mirror');
@@ -51,7 +54,7 @@ const settle = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
   clearMirrorFailure();
-  for (const fn of [pushMeals, pushWater, pushWeight, pushWorkout, removeMeals, removeWaters, removeWeights, removeWorkouts]) {
+  for (const fn of [pushMeals, pushWater, pushWeight, pushWeights, pushWorkout, removeMeals, removeWaters, removeWeights, removeWorkouts]) {
     fn.mockReset();
     fn.mockResolvedValue(ok);
   }
@@ -66,6 +69,21 @@ describe('mirroring a local write', () => {
     mirrorWater('wl_3', 99, 250);
     await settle();
     expect(pushWater).toHaveBeenCalledWith(99, 250, 'wl_3');
+  });
+
+  it('sends an imported history as one batch, and skips an empty one', async () => {
+    const batch = [
+      { id: 'we_1', at: 1, kg: 80 },
+      { id: 'we_2', at: 2, kg: 79 },
+    ];
+    mirrorWeights(batch);
+    await settle();
+    expect(pushWeights).toHaveBeenCalledTimes(1);
+    expect(pushWeights).toHaveBeenCalledWith(batch);
+
+    mirrorWeights([]);
+    await settle();
+    expect(pushWeights).toHaveBeenCalledTimes(1);
   });
 
   it('records nothing when the push succeeds', async () => {
