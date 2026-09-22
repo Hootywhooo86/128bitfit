@@ -397,6 +397,11 @@ body in near-black, fills for whatever the session worked, then the line art on
 top. The lines have to be last or a filled muscle would erase its own
 definition.
 
+The figure is a **silhouette**: no skin tone, no shading, just the muscle
+outlines on near-black. The only colour on it is the training — red where a
+muscle was the exercise's target, yellow where it assisted. An untrained figure
+is entirely uncoloured, which is the honest first-run state.
+
 - `lib/figure-assets.ts` `require()`s every asset **statically**. Metro resolves
   asset paths at build time, so a computed `require` bundles nothing and the map
   would render no colour at all.
@@ -407,14 +412,23 @@ definition.
   on the view it is visible from — glutes on the back, pecs on the front.
   Drawing a muscle on the wrong view colours the wrong part of the body, which
   is worse than not colouring it.
-- Region polygons are authored in fractions of the figure's bounding box against
+- **Regions come from the artwork, not from a polygon.** Hand-drawn polygons
+  never line up: they spill over a drawn edge or stop short of one, and the
+  first version visibly did both. The masks are now built by watershed — seeded
+  inside each muscle, with the artwork's own gradient as the elevation, so a
+  region grows until it reaches a line the artist drew and stops there.
+- A watershed alone is not enough either: the detected edges have gaps, so a
+  single seed floods a whole limb. Each grown region is therefore kept only
+  where it stays inside its anatomical polygon, slightly dilated. The polygon
+  says roughly where, the watershed says exactly to which edge. Anything no
+  polygon claims is seeded as background, so nothing floods into the head,
+  hands, feet or trunks.
+- Seed polygons are authored in fractions of the figure's bounding box against
   measured landmarks (chin 0.13, nipple 0.27, navel 0.40, crotch 0.55, knee
   0.70, ankle 0.90). Only the left half is authored; the generator mirrors it.
-- The line art is derived from the shaded artwork with a Canny pass, not from
-  the labelled line drawing. Every attempt to strip labels and leader lines off
-  a line drawing either left the leaders or took the anatomy with them; the
-  shaded version had already been cleaned by segmenting on saturation, so
-  edge-detecting that gives clean lines with nothing to strip.
+- The glutes are the one region still shaped by its polygon rather than the
+  art: the trunks are a flat area with no lines under them, so there is no
+  contour for the watershed to find.
 - **Provenance:** the base artwork was supplied by the project owner, not
   generated here. It is third-party work and its licence has not been
   established — that needs settling before any Play submission.
