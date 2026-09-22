@@ -39,10 +39,17 @@ export function Screen({
     />
   );
   if (!scroll) {
+    // Fills the height rather than sizing to content, so a screen whose body is
+    // a list or a camera has a bounded parent to lay itself out in.
+    //
+    // The scrolling variant reserves 104px at the bottom to clear the tab bar,
+    // which a non-scrolling screen does not want: its content is already
+    // bounded, so that padding is just dead space above the keyboard. These are
+    // pushed screens with no tab bar under them.
     return (
       <View style={s.screen}>
         {bar}
-        <View style={s.main}>{children}</View>
+        <View style={[s.main, s.fill, s.noTabGap]}>{children}</View>
       </View>
     );
   }
@@ -252,6 +259,8 @@ export function Note({ children }: { children: React.ReactNode }) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   main: { padding: spacing.md, paddingBottom: 104 },
+  fill: { flex: 1 },
+  noTabGap: { paddingBottom: spacing.md },
   lblWrap: { marginTop: spacing.lg, marginBottom: 10 },
   lbl: {
     fontFamily: fonts.pixel,

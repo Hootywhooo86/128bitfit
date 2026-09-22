@@ -14,6 +14,7 @@ import {
 import { DateField } from '@/components/DateField';
 import { useDb } from '@/db/DatabaseProvider';
 import { previewCalorieTarget, updateAppSettings } from '@/db/settings-queries';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addWeightEntry } from '@/db/weight-queries';
 import {
   ageFromBirthday,
@@ -38,6 +39,7 @@ const SEX_OPTIONS: { id: SexOption; label: string }[] = [
 
 export default function OnboardingScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { ready } = useDb();
   const [stepIdx, setStepIdx] = useState(0);
   const step = STEPS[stepIdx];
@@ -149,7 +151,10 @@ export default function OnboardingScreen() {
     >
       <ScrollView
         style={styles.container}
-        contentContainerStyle={{ paddingBottom: 48 }}
+        // Onboarding has no top bar of its own and the stack header is off, so
+        // nothing else reserves the status bar. Without this the brand line
+        // renders behind the clock — the first thing a new user ever sees.
+        contentContainerStyle={{ paddingTop: insets.top, paddingBottom: 48 }}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.brand}>128BIT FIT</Text>

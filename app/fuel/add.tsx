@@ -221,7 +221,11 @@ export default function AddFoodScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    // Wrapped in Screen like every other screen. Without it this branch drew
+    // from the very top of the display, so the search field sat under the
+    // status bar with its placeholder behind the clock — the stack header is
+    // off app-wide and nothing else was reserving the inset.
+    <Screen section="Add food" back scroll={false}>
       <TextInput
         style={styles.search}
         placeholder="Search foods…"
@@ -301,12 +305,11 @@ export default function AddFoodScreen() {
           )}
         </View>
       )}
-    </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   search: {
     backgroundColor: colors.surface,
     borderWidth: 1,
