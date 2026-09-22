@@ -43,6 +43,13 @@
       "when": 1789882843379,
       "tag": "0005_blue_mulholland_black",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1790049417707,
+      "tag": "0006_misty_power_pack",
+      "breakpoints": true
     }
   ]
 }

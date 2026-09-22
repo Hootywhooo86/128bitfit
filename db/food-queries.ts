@@ -29,7 +29,7 @@ export type DailyGoals = {
   waterTargetMl: number;
 };
 
-export type FoodLogWithName = FoodLog & { displayName: string };
+export type FoodLogWithName = FoodLog & { displayName: string; photoUri: string | null };
 
 export type DayFuelSummary = {
   goals: DailyGoals;
@@ -122,6 +122,7 @@ export async function listFoodLogsForDay(day: Date = new Date()): Promise<FoodLo
       carb: foodLogs.carb,
       notes: foodLogs.notes,
       foodName: foods.name,
+      photoUri: foods.photoUri,
     })
     .from(foodLogs)
     .leftJoin(foods, eq(foodLogs.foodId, foods.id))
@@ -143,6 +144,7 @@ export async function listFoodLogsForDay(day: Date = new Date()): Promise<FoodLo
     carb: r.carb,
     notes: r.notes,
     displayName: r.customName || r.foodName || 'Food',
+    photoUri: r.photoUri ?? null,
   }));
 }
 

@@ -263,11 +263,23 @@ export type CustomFoodInput = {
   sugars?: number | null;
   saturatedFat?: number | null;
   sodium?: number | null;
+  transFat?: number | null;
+  cholesterol?: number | null;
+  addedSugars?: number | null;
+  /** Already copied into the document directory by saveFoodPhoto. */
+  photoUri?: string | null;
 };
 
 /** Insert a user-defined food (e.g. barcode miss). */
-export async function insertCustomFood(input: CustomFoodInput): Promise<Food> {
-  const id = newId('custom');
+/** Id for a custom food, so a photo can be filed under it before the insert. */
+export function newCustomFoodId(): string {
+  return newId('custom');
+}
+
+export async function insertCustomFood(
+  input: CustomFoodInput,
+  id: string = newId('custom')
+): Promise<Food> {
   const barcode = input.barcode ? normalizeBarcode(input.barcode) || null : null;
   const nutrients = {
     calories: input.calories ?? null,
@@ -278,6 +290,9 @@ export async function insertCustomFood(input: CustomFoodInput): Promise<Food> {
     sugars: input.sugars ?? null,
     saturated_fat: input.saturatedFat ?? null,
     sodium: input.sodium ?? null,
+    trans_fat: input.transFat ?? null,
+    cholesterol: input.cholesterol ?? null,
+    added_sugars: input.addedSugars ?? null,
   };
   await db.insert(foods).values({
     id,
@@ -292,6 +307,7 @@ export async function insertCustomFood(input: CustomFoodInput): Promise<Food> {
     servingUnit: input.servingUnit ?? 'serving',
     nutritionBasis: input.nutritionBasis ?? 'per_serving',
     nutrients: JSON.stringify(nutrients),
+    photoUri: input.photoUri ?? null,
   });
   const rows = await db.select().from(foods).where(eq(foods.id, id)).limit(1);
   return rows[0]!;

@@ -394,6 +394,78 @@ Two things about web, both load-bearing:
 - Glutes are drawn on the back only; on the front that region is hip structure.
   Colouring it there merged the hips and quads into one mass.
 
+### Adding a food the catalog does not have
+
+Three ways in, from the Fuel tab. They exist because the bundled USDA data is
+whole foods and Open Food Facts is barcoded packaging — between them they miss
+the deli counter, the bakery, and anything homemade.
+
+| Route | Screen | What it does |
+| --- | --- | --- |
+| Barcode | `app/fuel/scan.tsx` | local USDA → cached OFF → live OFF → falls through to custom |
+| Nutrition panel | `app/fuel/label.tsx` | photographs the panel, reads it, fills the form |
+| By hand | `app/fuel/custom.tsx` | the form itself |
+
+All three end at the same form, and nothing is written until the user saves it.
+
+**Reading the panel.** `lib/ocr.ts` wraps ML Kit's on-device text recogniser —
+lazily required in a `try`/`catch`, exactly like `lib/health`, because the
+native module resolves at import time and throws where it is not registered
+(web, Expo Go, any build predating the dependency). A build without it says so
+and offers the manual form rather than showing a dead button.
+
+`lib/nutrition-label.ts` turns the recognised text into numbers and is pure —
+no camera, no OCR engine, no database — so the parsing is tested off-device.
+What it guarantees:
+
+- **A row it cannot read stays missing**, never `0`. A label that does not list
+  fibre and a label whose fibre line was too blurry are different facts, and a
+  `0` would claim the first when it might be the second. The screen says how
+  many rows were unreadable.
+- **The amount column, not the %DV column.** It takes the first number carrying
+  a unit; a bare number is accepted only when the row has no unit-bearing
+  number at all, which is how the calories row reads. A row printed as a
+  percentage only is reported unread — `Sodium 7% of 2300` must not become
+  2300&nbsp;mg.
+- **Specific rows beat general ones.** `Saturated Fat 1g` is not fat, and
+  `Includes 10g Added Sugars` is not sugars. Row order in `ROWS` is what
+  enforces this and is tested directly.
+- **Units are converted, not assumed** — sodium and cholesterol are kept in mg,
+  everything else in g, both directions.
+- **First match wins**, so the per-serving column is taken over the
+  per-container column printed below it.
+- An ingredient list names nutrients without stating any, so it is skipped:
+  `INGREDIENTS: OATS, SUGAR` is not a sugars reading.
+
+Everything read is a *reading*, not a measurement. It lands in the form behind a
+banner saying so, and the user confirms before anything is saved. This is the
+same rule as the Health Connect one — the app never presents an estimate as a
+measurement — applied to a camera instead of a sensor.
+
+An earlier version "repaired" OCR digit confusions (`O`→`0`, `S`→`5`) when a row
+had no readable number. It was deleted: it read `Trans Fat --g` as 5 by turning
+the `S` in "Trans" into a digit, and `INGREDIENTS` into `1NGRED1ENT5`. Inventing
+a number is worse than admitting the row was not legible.
+
+**Photos.** A custom food can carry a picture of the packet. `expo-camera`
+writes to the cache directory, which Android clears whenever it wants space, so
+`lib/food-photo-store.ts` copies it into the document directory before the food
+row is written — and the food id is minted first, so a photo that fails to copy
+leaves a food with no photo rather than a row pointing at nothing. One photo per
+food: re-shooting replaces it instead of leaving orphans. The path maths is in
+`lib/food-photo.ts` and is tested, including that a hostile food id cannot
+escape the photo directory.
+
+The camera is a `Modal` (`components/PhotoCapture.tsx`), not a route: handing a
+photo back from a pushed screen means either setting params on a screen that is
+mid-transition or replacing the form, and replacing the form throws away
+everything already typed into it.
+
+**APK size.** `@react-native-ml-kit/text-recognition` depends on the Chinese,
+Japanese, Korean and Devanagari recognisers unconditionally, each bundling its
+own model. `plugins/with-latin-only-mlkit.js` excludes them — a config plugin
+rather than an edit to `android/app/build.gradle`, which `prebuild` regenerates.
+
 ### Privacy & Health Connect compliance
 
 - Policy: `docs/privacy-policy.md`. In-app screen: `app/settings/privacy.tsx`,

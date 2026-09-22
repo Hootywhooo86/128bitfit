@@ -74,7 +74,8 @@
       "expo-secure-store",
       "react-native-health-connect",
       "expo-sharing",
-      "expo-build-properties"
+      "expo-build-properties",
+      "./plugins/with-latin-only-mlkit"
     ],
     "experiments": {
       "typedRoutes": true

@@ -38,6 +38,11 @@ export const foods = sqliteTable('foods', {
   nutritionBasis: text('nutrition_basis'),
   /** JSON map of nutrient key → number | null */
   nutrients: text('nutrients').notNull().default('{}'),
+  /**
+   * Photo of a custom food, as a file:// URI under the app's document
+   * directory. Null for catalog foods and for custom foods added without one.
+   */
+  photoUri: text('photo_uri'),
 });
 
 export const routines = sqliteTable('routines', {
