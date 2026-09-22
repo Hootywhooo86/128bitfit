@@ -2,10 +2,12 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { MuscleLoadCard } from '@/components/MuscleLoadCard';
+import { ReadinessCard } from '@/components/ReadinessCard';
+import { StepsCard } from '@/components/StepsCard';
 import { Bar, Card, CardHead, Label, MenuRow, Screen, SessionCard, Stat3 } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { addWater, getDayFuelSummary } from '@/db/food-queries';
-import { getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';
+import { countRecentSets, getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';
 import { getAppSettings } from '@/db/settings-queries';
 import { formatWeight, getLatestWeightEntry } from '@/db/weight-queries';
 import type { WeightEntry } from '@/db/schema';
@@ -15,6 +17,7 @@ import {
   getLastCompletedWorkoutSummary,
   type WorkoutSummary,
 } from '@/db/workout-queries';
+import { useTodaySteps } from '@/lib/health/use-health';
 import { emptyRoles, emptyTally, type MuscleRoles, type MuscleTally } from '@/lib/muscle-load';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
@@ -29,6 +32,7 @@ export default function HomeScreen() {
   const { ready } = useDb();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const { state: healthState } = useTodaySteps();
 
   const [calories, setCalories] = useState<number | null>(null);
   const [waterMl, setWaterMl] = useState(0);
@@ -39,12 +43,13 @@ export default function HomeScreen() {
   const [latestWeight, setLatestWeight] = useState<WeightEntry | null>(null);
   const [tally, setTally] = useState<MuscleTally>(emptyTally());
   const [roles, setRoles] = useState<MuscleRoles>(emptyRoles());
+  const [recentSets, setRecentSets] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     if (!ready) return;
     try {
       const since = periodFor(7).since;
-      const [, fuel, workout, active, weight, count, t, r] = await Promise.all([
+      const [, fuel, workout, active, weight, count, t, r, rs] = await Promise.all([
         getAppSettings(),
         getDayFuelSummary(new Date()),
         getLastCompletedWorkoutSummary(),
@@ -53,6 +58,7 @@ export default function HomeScreen() {
         countCompletedSessions(),
         getMuscleTally(since),
         getMuscleRoles(since),
+        countRecentSets(2),
       ]);
       setCalories(fuel.logs.length > 0 ? fuel.totals.calories : null);
       setWaterMl(fuel.waterMl);
@@ -63,6 +69,7 @@ export default function HomeScreen() {
       setSessionCount(count);
       setTally(t);
       setRoles(r);
+      setRecentSets(rs);
     } finally {
       setLoading(false);
     }
@@ -111,13 +118,23 @@ export default function HomeScreen() {
       <Label>TODAY</Label>
       <Stat3
         items={[
-          // Steps come from Health Connect; until it is connected there is no
-          // reading, and a dash says that where a 0 would lie.
-          { value: null, label: 'STEPS' },
+          // A real reading from Health Connect. 0 steps is a reading and shows
+          // as 0; not connected shows a dash, and the card below offers to
+          // connect. These are different facts — see CLAUDE.md.
+          {
+            value: healthState.status === 'ready' && healthState.steps != null
+              ? healthState.steps.toLocaleString()
+              : null,
+            label: 'STEPS',
+          },
           { value: calories == null ? null : Math.round(calories).toLocaleString(), label: 'KCAL' },
           { value: waterMl > 0 ? `${(waterMl / 1000).toFixed(1)}L` : null, label: 'WATER' },
         ]}
       />
+
+      {healthState.status !== 'ready' ? <StepsCard /> : null}
+
+      <ReadinessCard recentSets={recentSets} />
 
       <Label>WATER</Label>
       <Card>

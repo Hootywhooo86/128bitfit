@@ -239,7 +239,7 @@ function findSetRows(data: unknown): unknown[] | null {
   if (Array.isArray(data)) return data;
   if (!data || typeof data !== 'object') return null;
   const o = data as Record<string, unknown>;
-  for (const key of ['sets', 'workouts', 'rows', 'data']) {
+  for (const key of ['sets', 'workouts', 'sessions', 'rows', 'data', 'history']) {
     if (Array.isArray(o[key])) return o[key] as unknown[];
   }
   const tables = o.tables;
@@ -248,6 +248,80 @@ function findSetRows(data: unknown): unknown[] | null {
     if (Array.isArray(t.sets)) return t.sets as unknown[];
   }
   return null;
+}
+
+/**
+ * Flattens a nested export: workouts, each with exercises, each with sets.
+ *
+ * This is the shape most apps actually write — openGym among them — and the
+ * first version of this importer only handled a flat array of sets, so those
+ * files came back as "no sets found". The date comes from the workout and the
+ * exercise name from the exercise, because the set itself carries neither.
+ */
+function flattenWorkouts(rows: unknown[]): Record<string, unknown>[] | null {
+  const out: Record<string, unknown>[] = [];
+  let sawNesting = false;
+
+  for (const w of rows) {
+    if (!w || typeof w !== 'object') continue;
+    const workout = w as Record<string, unknown>;
+    const exList =
+      (Array.isArray(workout.exercises) && workout.exercises) ||
+      (Array.isArray(workout.entries) && workout.entries) ||
+      (Array.isArray(workout.items) && workout.items) ||
+      null;
+    if (!exList) continue;
+    sawNesting = true;
+
+    const workoutDate =
+      pickStr(workout, 'date', 'startedAt', 'start_time', 'startTime', 'performed_at', 'created_at');
+    const workoutName = pickStr(workout, 'name', 'title', 'routine', 'workoutName');
+
+    for (const e of exList) {
+      if (!e || typeof e !== 'object') continue;
+      const ex = e as Record<string, unknown>;
+      const exerciseName =
+        pickStr(ex, 'name', 'exercise', 'exerciseName', 'title') ??
+        (typeof ex.exercise === 'object' && ex.exercise
+          ? pickStr(ex.exercise as Record<string, unknown>, 'name', 'title')
+          : undefined);
+
+      const setList =
+        (Array.isArray(ex.sets) && ex.sets) ||
+        (Array.isArray(ex.logs) && ex.logs) ||
+        (Array.isArray(ex.entries) && ex.entries) ||
+        null;
+
+      // An exercise with no set list is still one performance of it.
+      const asSets: unknown[] = setList ?? [ex];
+
+      for (const [i, st] of asSets.entries()) {
+        if (!st || typeof st !== 'object') continue;
+        const set = st as Record<string, unknown>;
+        out.push({
+          ...set,
+          exerciseName: exerciseName ?? pickStr(set, 'exerciseName', 'exercise', 'name'),
+          date: pickStr(set, 'date', 'startedAt', 'start_time') ?? workoutDate,
+          workoutName,
+          setIndex: typeof set.setIndex === 'number' ? set.setIndex : i + 1,
+        });
+      }
+    }
+  }
+  return sawNesting ? out : null;
+}
+
+function pickStr(o: Record<string, unknown>, ...keys: string[]): string | undefined {
+  for (const k of keys) {
+    const v = o[k];
+    if (typeof v === 'string' && v.trim()) return v;
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      // Epoch timestamps turn up as numbers in these exports.
+      const d = new Date(v > 1e12 ? v : v * 1000);
+      if (!Number.isNaN(d.getTime())) return d.toISOString();
+    }
+  }
+  return undefined;
 }
 
 /** This app's own JSON export, or anything with the same set shape. */
@@ -259,13 +333,17 @@ export function parseSetJson(text: string): ImportResult {
     return { error: 'That file is not valid JSON.' };
   }
 
-  const rows = findSetRows(data);
+  let rows = findSetRows(data);
   if (!rows) {
     return {
       error:
-        'No sets found in that JSON. Expected an array of sets, or an export with a "sets" table.',
+        'No sets found in that JSON. Expected an array of sets, a nested workouts export, or an export with a "sets" table.',
     };
   }
+  // A nested export — workouts containing exercises containing sets — is
+  // flattened first. Most apps write that shape, not a flat set list.
+  const flattened = flattenWorkouts(rows);
+  if (flattened && flattened.length > 0) rows = flattened;
 
   const sets: ImportedSet[] = [];
   const skipped: { row: number; reason: string }[] = [];

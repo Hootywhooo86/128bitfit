@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, lt, ne, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, lt, ne, sql, inArray } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
 import { resolveSetSeed, type LastPerformance } from '@/lib/set-prefill';
@@ -481,3 +481,96 @@ export async function getTrainingWeekStrip(now: Date = new Date()): Promise<Trai
 }
 
 export { and, asc, desc, eq };
+
+export type SessionListItem = {
+  id: string;
+  startedAt: Date | null;
+  endedAt: Date | null;
+  status: SessionStatus;
+  exerciseCount: number;
+  completedSets: number;
+  /** Up to three exercise names, for the row's subtitle. */
+  names: string[];
+};
+
+/**
+ * Sessions for the history screen, newest first.
+ *
+ * Includes discarded ones: a workout the user abandoned is still theirs to see
+ * and delete. Only `completed` feeds the muscle map and the coach.
+ */
+export async function listSessions(limit = 100): Promise<SessionListItem[]> {
+  const sessions = await db
+    .select()
+    .from(workoutSessions)
+    .orderBy(desc(workoutSessions.startedAt))
+    .limit(limit);
+  if (sessions.length === 0) return [];
+
+  const ids = sessions.map((s) => s.id);
+  const rows = await db
+    .select({
+      sessionId: sessionExercises.sessionId,
+      exerciseName: exercises.name,
+      completed: sets.completed,
+      setId: sets.id,
+    })
+    .from(sessionExercises)
+    .leftJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
+    .leftJoin(sets, eq(sets.sessionExerciseId, sessionExercises.id))
+    .where(inArray(sessionExercises.sessionId, ids));
+
+  const byId = new Map<string, { names: Set<string>; done: number }>();
+  for (const r of rows) {
+    const agg = byId.get(r.sessionId) ?? { names: new Set<string>(), done: 0 };
+    if (r.exerciseName) agg.names.add(r.exerciseName);
+    if (r.setId && r.completed) agg.done += 1;
+    byId.set(r.sessionId, agg);
+  }
+
+  return sessions.map((s) => {
+    const agg = byId.get(s.id);
+    const names = agg ? [...agg.names] : [];
+    return {
+      id: s.id,
+      startedAt: s.startedAt ?? null,
+      endedAt: s.endedAt ?? null,
+      status: s.status as SessionStatus,
+      exerciseCount: names.length,
+      completedSets: agg?.done ?? 0,
+      names: names.slice(0, 3),
+    };
+  });
+}
+
+/**
+ * Deletes a workout and everything under it.
+ *
+ * Done by hand rather than by foreign key: the schema declares no cascades, so
+ * deleting only the session would leave its exercises and sets behind as rows
+ * nothing points at, still counted by anything that queries sets directly.
+ * Sets go first so a failure part-way never orphans them.
+ */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const links = await db
+    .select({ id: sessionExercises.id })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.sessionId, sessionId));
+
+  if (links.length > 0) {
+    await db.delete(sets).where(
+      inArray(
+        sets.sessionExerciseId,
+        links.map((l) => l.id)
+      )
+    );
+  }
+  await db.delete(sessionExercises).where(eq(sessionExercises.sessionId, sessionId));
+  await db.delete(workoutSessions).where(eq(workoutSessions.id, sessionId));
+}
+
+/** Deletes a routine and its exercise list. Logged sessions are untouched. */
+export async function deleteRoutine(routineId: string): Promise<void> {
+  await db.delete(routineExercises).where(eq(routineExercises.routineId, routineId));
+  await db.delete(routines).where(eq(routines.id, routineId));
+}

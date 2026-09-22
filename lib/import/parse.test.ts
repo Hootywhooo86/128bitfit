@@ -161,3 +161,85 @@ describe('picking a parser', () => {
     expect(r.format).toBe('json');
   });
 });
+
+describe('nested exports (workouts → exercises → sets)', () => {
+  // The shape most apps actually write. A flat-array-only parser reported
+  // "no sets found" for every one of them.
+  const nested = JSON.stringify({
+    workouts: [
+      {
+        name: 'Leg Day',
+        date: '2025-04-02T17:30:00Z',
+        exercises: [
+          {
+            name: 'Back Squat',
+            sets: [
+              { weight: 100, reps: 5, unit: 'kg' },
+              { weight: 105, reps: 3, unit: 'kg' },
+            ],
+          },
+          { name: 'Leg Press', sets: [{ weight: 200, reps: 10, unit: 'kg' }] },
+        ],
+      },
+    ],
+  });
+
+  it('flattens it into sets', () => {
+    const r = parseSetJson(nested);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.sets).toHaveLength(3);
+    expect(r.sets.map((s) => s.exerciseName)).toEqual(['Back Squat', 'Back Squat', 'Leg Press']);
+  });
+
+  it('inherits the date from the workout, since a set has none', () => {
+    const r = parseSetJson(nested);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.sets.every((s) => s.date === '2025-04-02')).toBe(true);
+  });
+
+  it('numbers the sets within their exercise', () => {
+    const r = parseSetJson(nested);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.sets.map((s) => s.setIndex)).toEqual([1, 2, 1]);
+  });
+
+  it('carries the workout name through', () => {
+    const r = parseSetJson(nested);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.sets[0].workoutName).toBe('Leg Day');
+  });
+
+  it('reads an epoch timestamp', () => {
+    const epoch = JSON.stringify([
+      {
+        title: 'Push',
+        startedAt: 1743600000,
+        exercises: [{ exercise: 'Bench', sets: [{ weight: 80, reps: 5 }] }],
+      },
+    ]);
+    const r = parseSetJson(epoch);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.sets[0].date).toMatch(/^2025-/);
+    expect(r.sets[0].exerciseName).toBe('Bench');
+  });
+
+  it('handles an exercise with no set list as one performance', () => {
+    const flat = JSON.stringify({
+      workouts: [
+        { date: '2025-01-05', exercises: [{ name: 'Plank', reps: 1, weight: null }] },
+      ],
+    });
+    const r = parseSetJson(flat);
+    if ('error' in r) throw new Error(r.error);
+    expect(r.sets).toHaveLength(1);
+    expect(r.sets[0].exerciseName).toBe('Plank');
+  });
+
+  it('still reads a flat array of sets', () => {
+    const r = parseSetJson(
+      JSON.stringify([{ exerciseName: 'Row', date: '2025-01-01', reps: 8, weight: 60 }])
+    );
+    if ('error' in r) throw new Error(r.error);
+    expect(r.sets).toHaveLength(1);
+  });
+});

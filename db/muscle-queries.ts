@@ -82,3 +82,36 @@ function parseList(raw: string | null): string[] {
     return [];
   }
 }
+
+/**
+ * Completed sets in the last N days, as a training-load signal for readiness.
+ *
+ * Returns null when nothing has been logged at all: no history is not the same
+ * as a rest day, and readiness must not read it as one.
+ */
+export async function countRecentSets(days = 2): Promise<number | null> {
+  const since = new Date();
+  since.setHours(0, 0, 0, 0);
+  since.setDate(since.getDate() - (days - 1));
+
+  const rows = await db
+    .select({ n: sql<number>`count(${sets.id})` })
+    .from(sets)
+    .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+    .innerJoin(workoutSessions, eq(sessionExercises.sessionId, workoutSessions.id))
+    .where(
+      and(
+        eq(sets.completed, true),
+        eq(workoutSessions.status, 'completed'),
+        gte(workoutSessions.startedAt, since)
+      )
+    );
+
+  const anySession = await db
+    .select({ n: sql<number>`count(*)` })
+    .from(workoutSessions)
+    .where(eq(workoutSessions.status, 'completed'));
+  if (Number(anySession[0]?.n ?? 0) === 0) return null;
+
+  return Number(rows[0]?.n ?? 0);
+}
