@@ -124,6 +124,12 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Queries: `db/food-queries.ts`; macros helper: `lib/nutrition.ts`
 - Screens: `app/(tabs)/fuel.tsx`, `app/fuel/add.tsx`, `app/fuel/edit/[id].tsx`
 - Barcode: `app/fuel/scan.tsx` + `app/fuel/custom.tsx`; lookup `db/barcode-queries.ts`
+- Label scan: `app/fuel/label.tsx`, two shots — front of pack then nutrition panel.
+  The pack shot becomes the food's photo and gives a name guess
+  (`lib/package-label.ts`); the panel shot is OCR'd for numbers
+  (`lib/nutrition-label.ts`) and discarded. Step 1 is skippable, and skipping it
+  falls back to the panel shot as the photo. The name is a guess: it pre-fills
+  an editable field and the form says where it came from.
 - Open Food Facts: `lib/open-food-facts.ts` (per-barcode v2 API); cache table
   `off_food_cache`. ODbL share-alike — per-barcode lookups only, no bulk ingest.
 - Lookup order: local USDA barcode/gtin → OFF cache → OFF API → custom food form

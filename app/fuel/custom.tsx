@@ -64,12 +64,14 @@ export default function CustomFoodScreen() {
     message?: string;
     fromLabel?: string;
     photoUri?: string;
+    /** Read off the front of the pack. A guess, and editable — never saved as read. */
+    nameGuess?: string;
     reading?: string;
   }>();
   const reading = useMemo(() => readingFromParams(params.reading), [params.reading]);
   const f = reading?.fields ?? {};
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState(params.nameGuess?.trim() ?? '');
   const [brand, setBrand] = useState('');
   const [barcode, setBarcode] = useState(params.barcode ?? '');
   const [photoUri, setPhotoUri] = useState<string | null>(params.photoUri ?? null);
@@ -226,6 +228,12 @@ export default function CustomFoodScreen() {
       )}
 
       <Field label="Name *" value={name} onChangeText={setName} />
+      {params.nameGuess?.trim() ? (
+        <Text style={styles.guessNote}>
+          Name read off the package photo. Check it — the camera gets this wrong often enough
+          that it is worth a glance.
+        </Text>
+      ) : null}
       <Field label="Brand" value={brand} onChangeText={setBrand} />
       <Field
         label="Barcode"
@@ -347,6 +355,13 @@ const styles = StyleSheet.create({
   },
   readTitle: { color: colors.text, fontWeight: '800' },
   photoRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center', marginBottom: spacing.md },
+  guessNote: {
+    color: colors.textMuted,
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: -6,
+    marginBottom: spacing.sm,
+  },
   photo: {
     width: 84,
     height: 84,
