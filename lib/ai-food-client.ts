@@ -11,6 +11,7 @@
  */
 import { getAiRuntimeConfig } from '@/db/ai-settings';
 import { AiCoachError, coachChat, getProviderMeta, visionSupport } from './ai-coach';
+import { callVision } from './ai-vision-call';
 import {
   PHOTO_PROMPT,
   describePrompt,
@@ -72,14 +73,25 @@ export async function estimateFood(
     return { status: 'unavailable', message: 'Add at least one photo of the recipe.' };
   }
 
+  const messages: ChatMessage[] = [
+    { role: 'system', content: systemPrompt() },
+    ...userMessages(req),
+  ];
+
   try {
+    // A photo request rotates through the Hugging Face vision chain when a
+    // model runs out; everything else is one call, as before.
+    if (needsVision) {
+      const attempt = await callVision(messages, signal);
+      return parseAiFood(attempt.content);
+    }
     const result = await coachChat({
       provider: cfg.provider,
       apiKey: cfg.apiKey,
       model: cfg.model,
       baseUrl: cfg.baseUrl,
       signal,
-      messages: [{ role: 'system', content: systemPrompt() }, ...userMessages(req)],
+      messages,
     });
     return parseAiFood(result.content);
   } catch (e) {
