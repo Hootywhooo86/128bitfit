@@ -1,0 +1,82 @@
+{
+ "unit": "lb",
+ "customEx": [
+  {
+   "id": "immtgdwimsz93dd",
+   "n": "bayesin cable curl",
+   "custom": true,
+   "eq": "custom",
+   "tg": "biceps",
+   "sm": [
+    "forearm",
+    "abs"
+   ]
+  }
+ ],
+ "workouts": [
+  {
+   "id": "w1",
+   "d": "2024-06-24",
+   "start": 1719248992000,
+   "end": 1719251527000,
+   "routineId": null,
+   "name": "2. Back and Biceps",
+   "entries": [
+    {
+     "id": "0218",
+     "sets": [
+      {
+       "w": 70,
+       "r": 10,
+       "done": true
+      },
+      {
+       "w": 90,
+       "r": 10,
+       "done": true
+      }
+     ],
+     "topW": 90
+    },
+    {
+     "id": "immtgdwimsz93dd",
+     "sets": [
+      {
+       "w": 25,
+       "r": 12,
+       "done": true
+      },
+      {
+       "w": 25,
+       "r": 8,
+       "done": false
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "w2",
+   "start": 1719335392000,
+   "name": "Legs",
+   "entries": [
+    {
+     "id": "0009",
+     "sets": [
+      {
+       "w": 135,
+       "r": 5,
+       "done": true
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "w3",
+   "d": "2024-06-30",
+   "name": "Empty",
+   "entries": []
+  }
+ ]
+}

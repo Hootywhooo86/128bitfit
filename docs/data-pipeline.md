@@ -563,6 +563,49 @@ future column on `foods` cannot start leaking into a public issue just by
 existing. Tested: the local photo path, internal ids and any unrecognised
 nutrient key stay out, and an unknown nutrient is sent as `null` rather than 0.
 
+### Identifying equipment from a photo
+
+Exercise library → **Add exercise**. Photograph the machine and the model says
+what it is, which muscles it works, and how to use it. It fills the form in; it
+saves nothing. A model looking at an unfamiliar machine can be confidently
+wrong, and a wrongly tagged exercise colours the wrong muscles on the map.
+
+`lib/ai-exercise.ts` is pure and holds the part that matters: **mapping the
+model's muscle names onto the app's 17 groups**. A model will answer
+"pectoralis major", "rear delts" or "gastrocnemius"; the map has artwork for a
+closed list and a free-text muscle would simply never light up. Synonyms are
+mapped, anything unmappable is **reported to the user, not dropped silently**,
+and a muscle cannot end up in both the primary and secondary list.
+
+`gluteus medius` maps to `abductors`, not `glutes` — they are different regions
+on the map and colouring the wrong one is worse than colouring neither.
+
+### openGym backups
+
+openGym writes its own shape and needs its own reader (`lib/import/opengym.ts`):
+
+```
+{ unit: "lb",
+  customEx: [{ id, n, ... }],
+  workouts: [{ d: "2024-06-24", start, name,
+               entries: [{ id, sets: [{ w, r, done }] }] }] }
+```
+
+Two awkward parts:
+
+- **An entry names its exercise by id, not by name.** Custom exercises are
+  defined in `customEx`; the built-in ones reference openGym's own catalogue,
+  which the backup does not contain. Those import as `openGym 0218` so the
+  sets, dates, weights and reps — the part worth having — are not thrown away
+  over a missing label. The import screen says how many came in numbered.
+- **The weight unit is one top-level setting**, not per set.
+
+Sets with `done: false` are planned-but-not-performed and are skipped:
+importing them would invent training that did not happen.
+
+Checked against a real 736 KB backup: 4,263 sets over 196 days, nothing
+skipped, 31 of 114 exercises named from `customEx`.
+
 ### Privacy & Health Connect compliance
 
 - Policy: `docs/privacy-policy.md`. In-app screen: `app/settings/privacy.tsx`,
