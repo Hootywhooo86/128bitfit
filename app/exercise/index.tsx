@@ -55,7 +55,7 @@ export default function ExerciseLibraryScreen() {
     <View style={styles.container}>
       <TextInput
         style={styles.search}
-        placeholder="Search exercises…"
+        placeholder="Search name, muscle or equipment…"
         placeholderTextColor={colors.textMuted}
         value={search}
         onChangeText={setSearch}

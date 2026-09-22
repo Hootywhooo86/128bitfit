@@ -123,6 +123,41 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
   the completion signal
 - iOS Silent / Focus may mute the notification sound
 
+### Exercise search
+
+- `listExercises` matches name, both muscle columns, equipment and category —
+  "chest" finds the bench press, "hamstrings" finds 277 exercises where a name
+  match alone found none. Name matches rank first so "row" still leads with rows.
+- Custom exercises: `app/exercise/new.tsx`, reachable from the library **and**
+  from `app/train/add-exercise.tsx` with a `sessionId`, which adds the finished
+  exercise straight into the running session.
+
+### Personal records
+
+- Rule: `lib/personal-records.ts`. Two kinds kept apart — **heaviest** (a
+  measurement) and **best estimated 1RM** (Epley, capped at 12 reps, always
+  labelled as a formula rather than a lift). Ties do not count; the first ever
+  set of an exercise is not a record; units are never compared across.
+- Queries: `recordBefore()`, `personalRecordsIn(sessionId)` (judged against
+  everything before that session started, one per exercise), and
+  `listPersonalRecords()` for the screen.
+- Shown as 🏆 on the workout summary and at `app/train/records.tsx`.
+- Warm-ups and discarded sessions are excluded — a warm-up is not an attempt.
+
+### Imported exercises with no muscles
+
+- openGym references its built-in exercises by number and its backup carries
+  neither names nor muscles, so they import as `openGym 0577` with `[]` muscles
+  and colour nothing on the map. On a real backup: 101 exercises, 3,956 sets,
+  93% of the history.
+- `listUntaggedExercises()` finds them (sets logged, no muscles), ordered by set
+  count. `mergeExerciseInto(from, to)` re-points `session_exercises` and
+  `routine_exercises` then deletes the placeholder, so the history keeps its
+  weights and dates and the map fills in retroactively.
+- Screen: `app/train/match-imported.tsx`, linked from the muscle card on Home
+  whenever untagged exercises exist — a grey map with a full history has to say
+  why.
+
 ### Fuel / nutrition logging
 
 - Schema: `food_logs`, `water_logs`, `settings` (calorie/protein/water targets)

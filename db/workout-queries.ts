@@ -4,6 +4,13 @@ import { newId } from './id';
 import { resolveSetSeed, type LastPerformance } from '@/lib/set-prefill';
 import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import {
+  prFor,
+  recordFrom,
+  type ExerciseRecord,
+  type PrKind,
+  type RecordSet,
+} from '@/lib/personal-records';
+import {
   exercises,
   routineExercises,
   routines,
@@ -648,6 +655,253 @@ export async function deleteSession(sessionId: string): Promise<void> {
 export async function deleteRoutine(routineId: string): Promise<void> {
   await db.delete(routineExercises).where(eq(routineExercises.routineId, routineId));
   await db.delete(routines).where(eq(routines.id, routineId));
+}
+
+/** An exercise with sets logged against it but no idea what it works. */
+export type UntaggedExercise = {
+  id: string;
+  name: string;
+  /** Completed sets logged against it — the cost of leaving it untagged. */
+  setCount: number;
+};
+
+/**
+ * Exercises that colour nothing on the muscle map.
+ *
+ * openGym's backup references its built-in exercises by number and does not
+ * include their names or muscles, so they import as "openGym 0577" with an
+ * empty muscle list. The map then has nothing to colour and looks broken when
+ * it is merely honest — on a real backup that was 101 exercises and 93% of the
+ * sets.
+ *
+ * Ordered by set count, heaviest first, because matching a handful of these
+ * fixes most of the map: the top twelve alone covered 1,558 sets.
+ */
+export async function listUntaggedExercises(): Promise<UntaggedExercise[]> {
+  const rows = await db
+    .select({
+      id: exercises.id,
+      name: exercises.name,
+      primaryMuscles: exercises.primaryMuscles,
+      secondaryMuscles: exercises.secondaryMuscles,
+      setCount: sql<number>`count(${sets.id})`,
+    })
+    .from(exercises)
+    .innerJoin(sessionExercises, eq(sessionExercises.exerciseId, exercises.id))
+    .leftJoin(
+      sets,
+      and(eq(sets.sessionExerciseId, sessionExercises.id), eq(sets.completed, true))
+    )
+    .groupBy(exercises.id);
+
+  const isEmpty = (json: string | null) => {
+    if (!json) return true;
+    try {
+      const v = JSON.parse(json);
+      return !Array.isArray(v) || v.length === 0;
+    } catch {
+      return true;
+    }
+  };
+
+  return rows
+    .filter((r) => isEmpty(r.primaryMuscles) && isEmpty(r.secondaryMuscles))
+    .map((r) => ({ id: r.id, name: r.name, setCount: Number(r.setCount ?? 0) }))
+    .sort((a, b) => b.setCount - a.setCount || a.name.localeCompare(b.name));
+}
+
+/**
+ * Points everything logged against one exercise at another, then removes the
+ * first.
+ *
+ * Used to say "openGym 0577 was actually the leg press": the sets keep their
+ * weights, reps and dates and simply belong to an exercise the app knows the
+ * muscles for, so the map fills in retroactively. Routines that referenced it
+ * follow too, or they would point at a row that no longer exists.
+ *
+ * Nothing is merged into itself, and nothing is invented — this only ever
+ * re-points existing rows.
+ */
+export async function mergeExerciseInto(fromId: string, toId: string): Promise<void> {
+  if (fromId === toId) return;
+  await db
+    .update(sessionExercises)
+    .set({ exerciseId: toId })
+    .where(eq(sessionExercises.exerciseId, fromId));
+  await db
+    .update(routineExercises)
+    .set({ exerciseId: toId })
+    .where(eq(routineExercises.exerciseId, fromId));
+  await db.delete(exercises).where(eq(exercises.id, fromId));
+}
+
+/**
+ * The record an exercise held before a given moment.
+ *
+ * `before` excludes the set being judged and everything after it, or a set
+ * would beat itself and every lift would be a trophy. Warm-ups are left out:
+ * they are not attempts at anything.
+ */
+export async function recordBefore(
+  exerciseId: string,
+  before: Date | null
+): Promise<ExerciseRecord> {
+  const rows = await db
+    .select({
+      weight: sets.weight,
+      reps: sets.reps,
+      unit: sets.weightUnit,
+    })
+    .from(sets)
+    .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+    .innerJoin(workoutSessions, eq(sessionExercises.sessionId, workoutSessions.id))
+    .where(
+      and(
+        eq(sessionExercises.exerciseId, exerciseId),
+        eq(sets.completed, true),
+        eq(sets.isWarmup, false),
+        eq(workoutSessions.status, 'completed'),
+        ...(before ? [lt(workoutSessions.startedAt, before)] : [])
+      )
+    );
+
+  return recordFrom(
+    rows.map((r) => ({
+      weight: r.weight,
+      reps: r.reps,
+      unit: r.unit === 'kg' ? ('kg' as const) : ('lb' as const),
+    }))
+  );
+}
+
+export type SessionPr = {
+  exerciseId: string;
+  exerciseName: string;
+  set: { weight: number | null; reps: number | null; unit: 'kg' | 'lb' };
+  kinds: PrKind[];
+  note: string;
+};
+
+/**
+ * Which sets in a finished session were records.
+ *
+ * Judged against everything logged before that session started, so a session's
+ * own later sets cannot make its earlier ones look worse and re-running the
+ * same session gives the same answer every time.
+ *
+ * One record per exercise: three sets of a new best is one achievement, and
+ * three trophies for it would make the word meaningless.
+ */
+export async function personalRecordsIn(sessionId: string): Promise<SessionPr[]> {
+  const [session] = await db
+    .select({ startedAt: workoutSessions.startedAt })
+    .from(workoutSessions)
+    .where(eq(workoutSessions.id, sessionId))
+    .limit(1);
+  if (!session) return [];
+
+  const rows = await db
+    .select({
+      exerciseId: sessionExercises.exerciseId,
+      exerciseName: exercises.name,
+      weight: sets.weight,
+      reps: sets.reps,
+      unit: sets.weightUnit,
+    })
+    .from(sets)
+    .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+    .leftJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
+    .where(
+      and(
+        eq(sessionExercises.sessionId, sessionId),
+        eq(sets.completed, true),
+        eq(sets.isWarmup, false)
+      )
+    );
+
+  const byExercise = new Map<string, typeof rows>();
+  for (const r of rows) {
+    const list = byExercise.get(r.exerciseId) ?? [];
+    list.push(r);
+    byExercise.set(r.exerciseId, list);
+  }
+
+  const out: SessionPr[] = [];
+  for (const [exerciseId, list] of byExercise) {
+    const previous = await recordBefore(exerciseId, session.startedAt ?? null);
+    let best: SessionPr | null = null;
+    for (const r of list) {
+      const set = {
+        weight: r.weight,
+        reps: r.reps,
+        unit: r.unit === 'kg' ? ('kg' as const) : ('lb' as const),
+      };
+      const pr = prFor(set, previous);
+      if (pr.kinds.length === 0 || !pr.note) continue;
+      // Keep the heaviest of the session's records for this exercise.
+      if (best == null || (set.weight ?? 0) > (best.set.weight ?? 0)) {
+        best = {
+          exerciseId,
+          exerciseName: r.exerciseName ?? 'Exercise',
+          set,
+          kinds: pr.kinds,
+          note: pr.note,
+        };
+      }
+    }
+    if (best) out.push(best);
+  }
+  return out.sort((a, b) => a.exerciseName.localeCompare(b.exerciseName));
+}
+
+export type ExerciseBest = {
+  exerciseId: string;
+  name: string;
+  record: ExerciseRecord;
+};
+
+/** Every exercise's best, heaviest first, for the Personal records screen. */
+export async function listPersonalRecords(): Promise<ExerciseBest[]> {
+  const rows = await db
+    .select({
+      exerciseId: sessionExercises.exerciseId,
+      name: exercises.name,
+      weight: sets.weight,
+      reps: sets.reps,
+      unit: sets.weightUnit,
+    })
+    .from(sets)
+    .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+    .innerJoin(workoutSessions, eq(sessionExercises.sessionId, workoutSessions.id))
+    .leftJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
+    .where(
+      and(
+        eq(sets.completed, true),
+        eq(sets.isWarmup, false),
+        eq(workoutSessions.status, 'completed')
+      )
+    );
+
+  const grouped = new Map<string, { name: string; sets: RecordSet[] }>();
+  for (const r of rows) {
+    const g = grouped.get(r.exerciseId) ?? { name: r.name ?? 'Exercise', sets: [] };
+    g.sets.push({
+      weight: r.weight,
+      reps: r.reps,
+      unit: r.unit === 'kg' ? 'kg' : 'lb',
+    });
+    grouped.set(r.exerciseId, g);
+  }
+
+  return [...grouped.entries()]
+    .map(([exerciseId, g]) => ({ exerciseId, name: g.name, record: recordFrom(g.sets) }))
+    .filter((e) => e.record.heaviest != null)
+    .sort(
+      (a, b) =>
+        (b.record.bestEstimate?.oneRepMax ?? 0) - (a.record.bestEstimate?.oneRepMax ?? 0) ||
+        (b.record.heaviest?.weight ?? 0) - (a.record.heaviest?.weight ?? 0) ||
+        a.name.localeCompare(b.name)
+    );
 }
 
 export type CustomExerciseInput = {

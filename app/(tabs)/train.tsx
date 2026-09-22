@@ -174,6 +174,12 @@ export default function TrainScreen() {
         onPress={() => router.push('/train/history')}
       />
       <MenuRow
+        icon="▲"
+        name="Personal records"
+        sub="Best lifts and estimated 1RM"
+        onPress={() => router.push('/train/records')}
+      />
+      <MenuRow
         icon="◍"
         name="Muscle map"
         sub="What you've hit, and what you haven't"

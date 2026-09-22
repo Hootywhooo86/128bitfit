@@ -1,7 +1,12 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { getWorkoutSummary, type WorkoutSummary } from '@/db/workout-queries';
+import {
+  getWorkoutSummary,
+  personalRecordsIn,
+  type SessionPr,
+  type WorkoutSummary,
+} from '@/db/workout-queries';
 import { useWorkoutEnergy } from '@/lib/health/use-workout-energy';
 import type { EnergyResult } from '@/lib/workout-energy';
 import { colors, spacing } from '@/lib/theme';
@@ -20,6 +25,7 @@ export default function WorkoutSummaryScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [summary, setSummary] = useState<WorkoutSummary | null>(null);
+  const [prs, setPrs] = useState<SessionPr[]>([]);
   const [loading, setLoading] = useState(true);
 
   // The session's own window, so heart rate is the workout's and not the day's.
@@ -34,9 +40,13 @@ export default function WorkoutSummaryScreen() {
   useEffect(() => {
     if (!id) return;
     (async () => {
-      const s = await getWorkoutSummary(decodeURIComponent(id));
+      const sid = decodeURIComponent(id);
+      const s = await getWorkoutSummary(sid);
       setSummary(s);
       setLoading(false);
+      // After the summary renders: a record is worth waiting a beat for, and
+      // the session is already saved either way.
+      setPrs(await personalRecordsIn(sid).catch(() => []));
     })();
   }, [id]);
 
@@ -72,6 +82,8 @@ export default function WorkoutSummaryScreen() {
           />
         </View>
 
+        <PrCard prs={prs} />
+
         <EnergyCard energy={energy} />
 
         <Text style={styles.section}>Exercises</Text>
@@ -87,6 +99,37 @@ export default function WorkoutSummaryScreen() {
         </Pressable>
       </ScrollView>
     </>
+  );
+}
+
+/**
+ * The records set in this session.
+ *
+ * Nothing at all when there were none — a card saying "no personal records
+ * today" on an ordinary session would turn every workout into a small failure,
+ * and most workouts are not records. That is the point of one.
+ */
+function PrCard({ prs }: { prs: SessionPr[] }) {
+  if (prs.length === 0) return null;
+
+  return (
+    <View style={styles.pr}>
+      <Text style={styles.prHead}>
+        🏆 {prs.length} PERSONAL RECORD{prs.length === 1 ? '' : 'S'}
+      </Text>
+      {prs.map((pr) => (
+        <View key={pr.exerciseId} style={styles.prRow}>
+          <Text style={styles.prName}>{pr.exerciseName}</Text>
+          <Text style={styles.prNote}>{pr.note}</Text>
+        </View>
+      ))}
+      {prs.some((p) => p.kinds.includes('estimate') && !p.kinds.includes('weight')) ? (
+        <Text style={styles.prFoot}>
+          An estimated one-rep max is a formula applied to a set you did do, not a lift you have
+          made. It is here because it is the fairest way to compare sets at different reps.
+        </Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -161,6 +204,20 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.lg,
   },
+  pr: {
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.borderBright,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+    gap: spacing.sm,
+  },
+  prHead: { color: colors.text, fontSize: 12, letterSpacing: 1, fontWeight: '800' },
+  prRow: { gap: 2 },
+  prName: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  prNote: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18 },
+  prFoot: { color: colors.textDim, fontSize: 11.5, lineHeight: 16 },
   energyLabel: { color: colors.textMuted, fontSize: 11, letterSpacing: 1, fontWeight: '700' },
   energyValue: { color: colors.text, fontWeight: '800', fontSize: 22, marginTop: 6 },
   energyNote: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: 6 },
