@@ -1,0 +1,75 @@
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { colors, fonts } from '@/lib/theme';
+
+/**
+ * The app's top bar, from prototype/app-shell.html `.bar`.
+ *
+ * Always "128BIT FIT" with the section name beneath it in pixel type, never the
+ * route's name — the prototype's identity is the brand sitting above every
+ * screen, and a stock navigation header reading "Fuel" is what made the ported
+ * app stop looking like the prototype.
+ */
+export function TopBar({
+  section,
+  onBack,
+  right = 'gear',
+}: {
+  section: string;
+  onBack?: () => void;
+  right?: 'gear' | 'none';
+}) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={[s.bar, { paddingTop: insets.top, height: 62 + insets.top }]}>
+      <View style={s.side}>
+        {onBack ? (
+          <Pressable style={s.btn} onPress={onBack} hitSlop={8}>
+            <Text style={s.btnT}>‹</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      <View style={s.mid}>
+        <Text style={s.ttl}>128BIT FIT</Text>
+        <Text style={s.sub}>{section.toUpperCase()}</Text>
+      </View>
+
+      <View style={[s.side, s.right]}>
+        {right === 'gear' ? (
+          <Pressable style={s.btn} onPress={() => router.push('/settings')} hitSlop={8}>
+            <Text style={s.btnT}>⚙</Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingHorizontal: 6,
+  },
+  side: { width: 54, alignItems: 'flex-start', justifyContent: 'center' },
+  right: { alignItems: 'flex-end' },
+  btn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
+  btnT: { color: colors.text, fontSize: 24, lineHeight: 28 },
+  mid: { flex: 1, alignItems: 'center' },
+  ttl: { fontFamily: fonts.pixel, fontSize: 12.5, letterSpacing: 1, color: colors.text },
+  sub: {
+    fontFamily: fonts.pixel,
+    fontSize: 9,
+    color: colors.textDim,
+    marginTop: 5,
+    letterSpacing: 1.5,
+  },
+});

@@ -30,6 +30,7 @@ import {
 } from '@/lib/nutrition';
 import { OFF_LICENSE_NOTE } from '@/lib/open-food-facts';
 import { colors, spacing } from '@/lib/theme';
+import { Screen } from '@/components/ui';
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -138,7 +139,7 @@ export default function AddFoodScreen() {
       ? `${selected.servingSize ?? ''} ${selected.servingUnit}`.trim()
       : 'serving';
     return (
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
+      <Screen section="Add food" back>
         <Pressable onPress={() => setSelected(null)} style={styles.backLink}>
           <Text style={styles.backLinkText}>← Back to search</Text>
         </Pressable>
@@ -215,7 +216,7 @@ export default function AddFoodScreen() {
         >
           <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Log food'}</Text>
         </Pressable>
-      </ScrollView>
+      </Screen>
     );
   }
 

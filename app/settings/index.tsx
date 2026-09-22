@@ -27,6 +27,7 @@ import {
 import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
 import { explainFloor } from '@/lib/calorie-floor';
 import { colors, spacing } from '@/lib/theme';
+import { Screen } from '@/components/ui';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -154,7 +155,7 @@ export default function SettingsScreen() {
   const providerMeta = getProviderMeta(aiProvider);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
+    <Screen section="Settings" back>
       <Text style={styles.muted}>
         Goals and preferences persist in the local settings table. AI keys use
         Secure Store on device — never committed or logged.
@@ -322,7 +323,7 @@ export default function SettingsScreen() {
           barcode results stay on-device only — no bulk OFF import.
         </Text>
       </View>
-    </ScrollView>
+    </Screen>
   );
 }
 
@@ -363,7 +364,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     alignItems: 'center',
   },
-  unitChipOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  unitChipOn: { borderColor: colors.accent, backgroundColor: colors.track },
   unitText: { color: colors.textMuted, fontWeight: '800' },
   unitTextOn: { color: colors.accent },
   save: {
@@ -403,7 +404,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surfaceAlt,
   },
-  providerChipOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  providerChipOn: { borderColor: colors.accent, backgroundColor: colors.track },
   providerText: { color: colors.textMuted, fontWeight: '700', fontSize: 12 },
   providerTextOn: { color: colors.accent },
   hint: { color: colors.textMuted, fontSize: 12, marginTop: 8, lineHeight: 16 },

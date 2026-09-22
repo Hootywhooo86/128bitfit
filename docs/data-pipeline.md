@@ -135,6 +135,33 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
 - Coach builds a SQLite context pack and calls the selected provider. Real
   responses only — if there is no key, show the stub UX, never invented output.
 
+### The shell and the design system
+
+`prototype/app-shell.html` is the visual spec — CLAUDE.md says so — and the
+first port of these screens did not follow it. It used stock navigation headers
+showing the route name, react-navigation's default tab bar, and per-screen
+one-off styles. The result was a generic dark app rather than this one.
+
+The fix was to stop styling screens individually:
+
+- **`lib/theme.ts`** holds the prototype's `:root` variables verbatim. If a
+  value here and a value there disagree, the prototype is right.
+- **`components/ui.tsx`** is one component per prototype CSS class, and each
+  names its counterpart: `Screen` (`main`), `Label` (`.lbl`), `Card` (`.card`),
+  `CardHead` (`.ch`), `MenuRow` (`.mrow`), `Stat3` (`.st3`),
+  `SessionCard` (`.sess`), `MacroBar` (`.mac`), `Bar` (`.jbar`),
+  `QuickActions` (`.qa`), `Note` (`.note`). Screens are assembled from these.
+- **`components/TopBar.tsx`** (`.bar`) always reads `128BIT FIT` with the
+  section beneath it in pixel type — never the route's name. The stock header
+  is off by default in `app/_layout.tsx`; a screen not yet ported re-enables a
+  styled one rather than being left with no way back.
+- **Fonts.** Silkscreen for section labels, headers and tab labels; Inter for
+  body text. The first frame is held until both load, so labels do not reflow
+  from the system font.
+
+Two typefaces, two jobs: pixel type never runs as body text, and body type
+never appears in a section label.
+
 ### Zero vs no data
 
 - The rule from CLAUDE.md's empty-state table: `0` claims a measurement was
@@ -364,34 +391,33 @@ Two things about web, both load-bearing:
 
 #### The artwork
 
-`assets/figure/` holds a front and a back view of one figure, plus one alpha
-mask per muscle per view — 13 each. `components/MuscleMap.tsx` stacks the masks
-the session actually worked over the base image and tints each with
-`tintColor`. Only trained muscles render, so a typical session costs a handful
-of images rather than 26.
+`assets/figure/` holds, per view, a body silhouette, the line art, and one alpha
+mask per muscle — 13 each. `components/MuscleMap.tsx` stacks three layers: the
+body in near-black, fills for whatever the session worked, then the line art on
+top. The lines have to be last or a filled muscle would erase its own
+definition.
 
-- `lib/figure-assets.ts` `require()`s every mask **statically**. Metro resolves
+- `lib/figure-assets.ts` `require()`s every asset **statically**. Metro resolves
   asset paths at build time, so a computed `require` bundles nothing and the map
-  would silently render no colour at all.
+  would render no colour at all.
 - `assets/figure/figure.json` records which muscles each view carries, and
   `lib/figure-assets.test.ts` asserts against it: every muscle in the shipped
   exercise data is a known group, every known group has artwork on at least one
   view, the artwork names nothing that is not a known group, and each muscle is
-  on the view it is actually visible from — glutes on the back, pecs on the
-  front. Drawing a muscle on the wrong view colours the wrong part of the body,
-  which is worse than not colouring it.
-- Region polygons are authored in fractions of the figure's bounding box,
-  against measured landmarks (chin 0.13, nipple 0.27, navel 0.40, crotch 0.55,
-  knee 0.70, ankle 0.90) rather than guessed. Only the left half is authored;
-  the generator mirrors it.
+  on the view it is visible from — glutes on the back, pecs on the front.
+  Drawing a muscle on the wrong view colours the wrong part of the body, which
+  is worse than not colouring it.
+- Region polygons are authored in fractions of the figure's bounding box against
+  measured landmarks (chin 0.13, nipple 0.27, navel 0.40, crotch 0.55, knee
+  0.70, ankle 0.90). Only the left half is authored; the generator mirrors it.
+- The line art is derived from the shaded artwork with a Canny pass, not from
+  the labelled line drawing. Every attempt to strip labels and leader lines off
+  a line drawing either left the leaders or took the anatomy with them; the
+  shaded version had already been cleaned by segmenting on saturation, so
+  edge-detecting that gives clean lines with nothing to strip.
 - **Provenance:** the base artwork was supplied by the project owner, not
   generated here. It is third-party work and its licence has not been
   established — that needs settling before any Play submission.
-
-An earlier version drew the figure procedurally, as overlapping ovals
-rasterised to a 48x76 grid. It is gone. It read as blocks at every size that
-mattered, and no amount of geometry fixed that: the problem was the resolution,
-not the shapes.
 
 ### Privacy & Health Connect compliance
 
@@ -442,12 +468,20 @@ and a working in-app rationale screen:
 - Local calendar days come from `lib/health/dates.ts`. Use it rather than
   `toISOString()`, which is UTC and shifts the day boundary west of Greenwich.
 
-### Pixel avatar + onboarding
+### Onboarding and body data
 
-- Settings keys: `onboarding_complete`, `avatar_config` (JSON),
-  `show_avatar_on_home`, `sex`, `birthday`, `height_cm`
-- `lib/avatar.ts` (palettes + Mifflin–St Jeor helpers),
-  `components/PixelAvatar.tsx`, `components/AvatarCreator.tsx`
+- Settings keys: `onboarding_complete`, `sex`, `birthday`, `height_cm`, `units`
+- `lib/body.ts` — age, unit conversion, Mifflin–St Jeor BMR, TDEE and the target
+  suggestions. The calorie floor depends on it.
 - Gate: `components/OnboardingGate.tsx` → `app/onboarding/index.tsx`
-  (Basics → Avatar → Goals → Done)
-- Renderer poses: `idle` / `curl` / `eat` / `think`; Home uses idle
+  (Basics → Goals → Done). Basics collects the imperial/metric choice, sex,
+  birthday, height and weight.
+- Birthday uses the OS date picker (`components/DateField.tsx`). `lib/birthday.ts`
+  is pure and tested: it builds the ISO string from the **local** calendar, not
+  `toISOString()`, and rejects dates that do not exist rather than letting `Date`
+  roll `2026-02-31` into March.
+
+**The pixel avatar is gone.** It was cosmetic, it did not look good at any size,
+and the muscle map is the figure that means something because it is driven by
+logged sets. `lib/avatar.ts` was split when it went: the palettes and body-type
+metrics were deleted and the energy maths moved to `lib/body.ts`.

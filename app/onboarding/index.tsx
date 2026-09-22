@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surface,
   },
-  stepDotOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  stepDotOn: { borderColor: colors.accent, backgroundColor: colors.track },
   stepDotText: { color: colors.textMuted, fontWeight: '800', fontSize: 12 },
   stepDotTextOn: { color: colors.accent },
   stepLabel: {
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
-  chipOn: { borderColor: colors.accent, backgroundColor: colors.accentDim },
+  chipOn: { borderColor: colors.accent, backgroundColor: colors.track },
   chipText: { color: colors.textMuted, fontWeight: '700' },
   chipTextOn: { color: colors.accent },
   hint: { color: colors.textMuted, fontSize: 13, lineHeight: 18, marginTop: spacing.sm },

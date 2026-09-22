@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { getAiSettings } from '@/db/ai-settings';
+import { Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { countCompletedSessions } from '@/db/workout-queries';
 import { colors, spacing } from '@/lib/theme';
@@ -45,10 +46,9 @@ export default function CoachScreen() {
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
+    <Screen section="Coach">
       <View style={styles.headerRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Coach</Text>
           <Text style={styles.muted}>
             {hasKey
               ? `Bring your own key · ${providerLine}. Context is built from local SQLite before each request.`
@@ -94,7 +94,7 @@ export default function CoachScreen() {
           <Text style={styles.cta}>Open →</Text>
         </Pressable>
       ))}
-    </ScrollView>
+    </Screen>
   );
 }
 
@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   },
   gearText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   byoCard: {
-    backgroundColor: colors.accentDim,
+    backgroundColor: colors.track,
     borderRadius: 12,
     padding: spacing.md,
     borderWidth: 1,

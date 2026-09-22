@@ -358,7 +358,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  checkOn: { backgroundColor: colors.accentDim, borderColor: colors.accent },
+  checkOn: { backgroundColor: colors.track, borderColor: colors.accent },
   checkText: { color: colors.accent, fontWeight: '800', fontSize: 16 },
   doneText: { color: colors.accent },
   addSetBtn: { marginTop: 8, paddingVertical: 8 },

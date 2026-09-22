@@ -1,58 +1,62 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { Text } from 'react-native';
-import { colors } from '@/lib/theme';
+import { StyleSheet, Text } from 'react-native';
+import { colors, fonts } from '@/lib/theme';
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
-  return (
-    <Text style={{ fontSize: 11, color: focused ? colors.accent : colors.textMuted, fontWeight: '700' }}>
-      {label}
-    </Text>
-  );
+/**
+ * Bottom tabs from prototype/app-shell.html `.tabs`: four pixel-type words, no
+ * icons, the active one in white. Each screen draws its own TopBar, so the
+ * stock header is off everywhere.
+ */
+function TabLabel({ label, focused }: { label: string; focused: boolean }) {
+  return <Text style={[s.tab, focused && s.tabOn]}>{label}</Text>;
 }
 
 export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: colors.surface },
-        headerTintColor: colors.text,
+        headerShown: false,
+        sceneStyle: { backgroundColor: colors.bg },
         tabBarStyle: {
-          backgroundColor: colors.surface,
+          backgroundColor: '#080808',
           borderTopColor: colors.border,
+          borderTopWidth: 1,
+          height: 74,
+          paddingTop: 10,
+          elevation: 0,
         },
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textMuted,
+        tabBarShowLabel: false,
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: 'Home',
-          tabBarIcon: ({ focused }) => <TabIcon label="⌂" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="train"
-        options={{
-          title: 'Train',
-          tabBarIcon: ({ focused }) => <TabIcon label="⚡" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="fuel"
-        options={{
-          title: 'Fuel',
-          tabBarIcon: ({ focused }) => <TabIcon label="◈" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="coach"
-        options={{
-          title: 'Coach',
-          tabBarIcon: ({ focused }) => <TabIcon label="◆" focused={focused} />,
-        }}
-      />
+      {(
+        [
+          ['index', 'HOME'],
+          ['train', 'TRAIN'],
+          ['fuel', 'FUEL'],
+          ['coach', 'COACH'],
+        ] as const
+      ).map(([name, label]) => (
+        <Tabs.Screen
+          key={name}
+          name={name}
+          options={{
+            tabBarIcon: ({ focused }) => <TabLabel label={label} focused={focused} />,
+          }}
+        />
+      ))}
     </Tabs>
   );
 }
+
+const s = StyleSheet.create({
+  tab: {
+    fontFamily: fonts.pixel,
+    fontSize: 11.5,
+    letterSpacing: 1,
+    color: colors.textDim,
+    textAlign: 'center',
+    width: 90,
+  },
+  tabOn: { color: colors.accent },
+});

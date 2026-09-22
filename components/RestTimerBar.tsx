@@ -30,7 +30,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.accentDim,
+    backgroundColor: colors.track,
     borderColor: colors.accent,
     borderWidth: 1,
     borderRadius: 12,

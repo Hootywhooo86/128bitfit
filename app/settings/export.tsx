@@ -12,6 +12,7 @@ import {
 import * as Sharing from 'expo-sharing';
 import { runExport, type ExportResult } from '@/lib/export';
 import { colors, spacing } from '@/lib/theme';
+import { Screen } from '@/components/ui';
 
 function formatSize(bytes: number | null): string {
   if (bytes == null) return '';
@@ -52,7 +53,7 @@ export default function ExportScreen() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
+    <Screen section="Export" back>
       <Stack.Screen options={{ title: 'Export data' }} />
 
       <Text style={styles.muted}>
@@ -96,7 +97,7 @@ export default function ExportScreen() {
           </Text>
         </>
       ) : null}
-    </ScrollView>
+    </Screen>
   );
 }
 
