@@ -6,7 +6,7 @@ import {
   clampCalorieTarget,
   explainFloor,
 } from './calorie-floor';
-import type { CalorieProfile } from './avatar';
+import type { CalorieProfile } from './body';
 
 /**
  * CLAUDE.md non-negotiable #6. This is a safety rail, not a feature: the tests

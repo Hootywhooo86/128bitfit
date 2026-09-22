@@ -1,13 +1,10 @@
 import { desc, eq } from 'drizzle-orm';
 import {
-  DEFAULT_AVATAR,
   ageFromBirthday,
-  normalizeAvatar,
   toMetric,
-  type AvatarConfig,
   type CalorieProfile,
   type SexOption,
-} from '@/lib/avatar';
+} from '@/lib/body';
 import { clampCalorieTarget, type ClampedTarget } from '@/lib/calorie-floor';
 import { db } from './client';
 import { settings, weightEntries } from './schema';
@@ -24,8 +21,6 @@ export type AppSettings = DailyGoals & {
   displayName: string;
   units: WeightUnit;
   onboardingComplete: boolean;
-  showAvatarOnHome: boolean;
-  avatar: AvatarConfig;
   sex: SexOption | null;
   birthday: string | null;
   heightCm: number | null;
@@ -64,29 +59,12 @@ function parseSex(raw: string | null): SexOption | null {
   return SEX_VALUES.includes(raw as SexOption) ? (raw as SexOption) : null;
 }
 
-function parseAvatar(raw: string | null): AvatarConfig {
-  if (!raw) return { ...DEFAULT_AVATAR };
-  try {
-    return normalizeAvatar(JSON.parse(raw) as Partial<AvatarConfig>);
-  } catch {
-    return { ...DEFAULT_AVATAR };
-  }
-}
-
 export async function isOnboardingComplete(): Promise<boolean> {
   return parseBool(await getSetting('onboarding_complete'), false);
 }
 
 export async function markOnboardingComplete(): Promise<void> {
   await setSetting('onboarding_complete', '1');
-}
-
-export async function getAvatarConfig(): Promise<AvatarConfig> {
-  return parseAvatar(await getSetting('avatar_config'));
-}
-
-export async function setAvatarConfig(config: AvatarConfig): Promise<void> {
-  await setSetting('avatar_config', JSON.stringify(normalizeAvatar(config)));
 }
 
 export async function getAppSettings(): Promise<AppSettings> {
@@ -96,8 +74,6 @@ export async function getAppSettings(): Promise<AppSettings> {
     name,
     unitsRaw,
     onboardingRaw,
-    showAvatarRaw,
-    avatarRaw,
     sexRaw,
     birthdayRaw,
     heightRaw,
@@ -105,8 +81,6 @@ export async function getAppSettings(): Promise<AppSettings> {
     getSetting('display_name'),
     getSetting('units'),
     getSetting('onboarding_complete'),
-    getSetting('show_avatar_on_home'),
-    getSetting('avatar_config'),
     getSetting('sex'),
     getSetting('birthday'),
     getSetting('height_cm'),
@@ -118,8 +92,6 @@ export async function getAppSettings(): Promise<AppSettings> {
     displayName: (name && name.trim()) || DEFAULT_DISPLAY_NAME,
     units,
     onboardingComplete: parseBool(onboardingRaw, false),
-    showAvatarOnHome: parseBool(showAvatarRaw, true),
-    avatar: parseAvatar(avatarRaw),
     sex: parseSex(sexRaw),
     birthday: birthdayRaw && /^\d{4}-\d{2}-\d{2}$/.test(birthdayRaw) ? birthdayRaw : null,
     heightCm: Number.isFinite(heightN) && heightN > 0 ? heightN : null,
@@ -183,8 +155,6 @@ export async function updateAppSettings(patch: {
   displayName?: string;
   units?: WeightUnit;
   onboardingComplete?: boolean;
-  showAvatarOnHome?: boolean;
-  avatar?: AvatarConfig;
   sex?: SexOption | null;
   birthday?: string | null;
   heightCm?: number | null;
@@ -209,12 +179,6 @@ export async function updateAppSettings(patch: {
   }
   if (patch.onboardingComplete != null) {
     await setSetting('onboarding_complete', patch.onboardingComplete ? '1' : '0');
-  }
-  if (patch.showAvatarOnHome != null) {
-    await setSetting('show_avatar_on_home', patch.showAvatarOnHome ? '1' : '0');
-  }
-  if (patch.avatar != null) {
-    await setAvatarConfig(patch.avatar);
   }
   if (patch.sex !== undefined) {
     if (patch.sex == null) await setSetting('sex', '');

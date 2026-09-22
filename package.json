@@ -22,6 +22,7 @@
     "serve:web": "node scripts/serve-web.mjs"
   },
   "dependencies": {
+    "@react-native-community/datetimepicker": "^9.2.1",
     "@react-native-ml-kit/text-recognition": "^2.0.0",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.44.7",

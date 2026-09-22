@@ -11,25 +11,22 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { AvatarCreator } from '@/components/AvatarCreator';
-import { PixelAvatar } from '@/components/PixelAvatar';
+import { DateField } from '@/components/DateField';
 import { useDb } from '@/db/DatabaseProvider';
 import { previewCalorieTarget, updateAppSettings } from '@/db/settings-queries';
 import { addWeightEntry } from '@/db/weight-queries';
 import {
-  DEFAULT_AVATAR,
   ageFromBirthday,
   suggestCalorieTarget,
   suggestProteinTarget,
   suggestWaterTargetMl,
   toMetric,
-  type AvatarConfig,
   type SexOption,
-} from '@/lib/avatar';
+} from '@/lib/body';
 import { explainFloor } from '@/lib/calorie-floor';
 import { colors, spacing } from '@/lib/theme';
 
-const STEPS = ['Basics', 'Avatar', 'Goals', 'Done'] as const;
+const STEPS = ['Basics', 'Goals', 'Done'] as const;
 type Step = (typeof STEPS)[number];
 
 const SEX_OPTIONS: { id: SexOption; label: string }[] = [
@@ -52,7 +49,6 @@ export default function OnboardingScreen() {
   const [birthday, setBirthday] = useState(''); // YYYY-MM-DD
   const [heightCm, setHeightCm] = useState('');
   const [weight, setWeight] = useState('');
-  const [avatar, setAvatar] = useState<AvatarConfig>({ ...DEFAULT_AVATAR });
   const [calorieTarget, setCalorieTarget] = useState('2200');
   const [proteinTarget, setProteinTarget] = useState('150');
   const [waterTarget, setWaterTarget] = useState('2500');
@@ -92,7 +88,8 @@ export default function OnboardingScreen() {
   };
 
   const goNext = () => {
-    if (step === 'Avatar') seedGoalsIfNeeded();
+    // Goals are suggested from the basics, so seed them on the way in.
+    if (step === 'Basics') seedGoalsIfNeeded();
     if (stepIdx < STEPS.length - 1) setStepIdx((i) => i + 1);
   };
 
@@ -117,11 +114,9 @@ export default function OnboardingScreen() {
         sex,
         birthday: birthday.trim() || null,
         heightCm: Number.isFinite(heightNum) && heightNum > 0 ? heightNum : null,
-        avatar,
         calorieTarget: Number(calorieTarget) || 2200,
         proteinTarget: Number(proteinTarget) || 150,
         waterTargetMl: Number(waterTarget) || 2500,
-        showAvatarOnHome: true,
         onboardingComplete: true,
       });
       // Weight is logged above, so the floor now sees a full profile. Say so
@@ -210,15 +205,8 @@ export default function OnboardingScreen() {
               ))}
             </View>
 
-            <Text style={styles.label}>Birthday (YYYY-MM-DD, optional)</Text>
-            <TextInput
-              style={styles.input}
-              value={birthday}
-              onChangeText={setBirthday}
-              placeholder="1995-06-15"
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-            />
+            <Text style={styles.label}>Birthday (optional)</Text>
+            <DateField value={birthday || null} onChange={(iso) => setBirthday(iso ?? '')} />
 
             <Text style={styles.label}>Height (cm, optional)</Text>
             <TextInput
@@ -244,10 +232,6 @@ export default function OnboardingScreen() {
               step.
             </Text>
           </View>
-        )}
-
-        {step === 'Avatar' && (
-          <AvatarCreator value={avatar} onChange={setAvatar} pose="idle" />
         )}
 
         {step === 'Goals' && (
@@ -291,14 +275,13 @@ export default function OnboardingScreen() {
 
         {step === 'Done' && (
           <View style={styles.doneCard}>
-            <PixelAvatar config={avatar} pose="idle" size={110} />
             <Text style={styles.doneTitle}>You&apos;re set, {displayName.trim() || 'Athlete'}!</Text>
             <Text style={styles.hint}>
               {calorieTarget} kcal · {proteinTarget} g protein · {waterTarget} ml water
             </Text>
             <Text style={styles.hint}>
-              Your pixel character lives on Home (toggle in Settings). Edit anytime under Settings
-              → Character.
+              Nothing is filled in yet — that is deliberate. Log a session and the muscle map
+              starts colouring in.
             </Text>
           </View>
         )}
