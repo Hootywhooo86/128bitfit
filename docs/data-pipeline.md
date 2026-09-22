@@ -218,6 +218,43 @@ The release build is signed with the debug keystore (the React Native template
 default), which is fine for sideloading but must be replaced with a real upload
 key before any Play submission.
 
+**Size: cut the emulator architectures.** A default `assembleRelease` is a
+universal APK carrying native libraries for all four ABIs, and those libraries
+are most of the download:
+
+| | compressed |
+| --- | --- |
+| `lib/x86` | 29.5 MB |
+| `lib/x86_64` | 28.8 MB |
+| `lib/arm64-v8a` | 27.4 MB |
+| `lib/armeabi-v7a` | 18.6 MB |
+| JS bundle | 6.1 MB |
+| dex | ~20 MB |
+| **universal APK** | **135 MB** |
+
+`x86` and `x86_64` exist for emulators; no phone uses them. Dropping them takes
+the APK to about 77 MB while still installing on both 32- and 64-bit devices:
+
+```bash
+./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+```
+
+Pass the ABI list on the command line rather than editing
+`android/gradle.properties`, which `prebuild` regenerates.
+
+R8 (`enableProguardInReleaseBuilds`) would take another ~12 MB off the dex, and
+is deliberately **not** enabled: shrinking can strip classes that Expo modules
+reach by reflection, and the failure mode is a crash on launch that no test in
+this repo would catch. Turn it on when there is a device to test the result on.
+
+### Getting the APK onto a phone
+
+`.github/workflows/apk.yml` builds it and attaches it to a GitHub Release.
+Run it from the Actions tab with a tag (`v0.1.0-alpha.1`); the release page
+gives a plain download link that works in a phone browser with no login and no
+zip to unpack. The workflow runs `verify:import` first, so a build that lost its
+bundled exercise or food database fails instead of shipping hollow.
+
 ### Running the app
 
 The real target is **Android with a dev build** — Expo Go cannot load the native
