@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { AI_PROVIDERS, getProviderMeta, isAiProviderId, type AiProviderId } from './ai-coach';
+import {
+  AI_PROVIDERS,
+  VISION_PROVIDERS,
+  getProviderMeta,
+  isAiProviderId,
+  providerSupportsVision,
+  type AiProviderId,
+} from './ai-coach';
 
 describe('AI providers', () => {
   it('offers Hugging Face', () => {
@@ -44,5 +51,27 @@ describe('AI providers', () => {
 
   it('falls back to a real provider for an unknown id', () => {
     expect(getProviderMeta('nope' as AiProviderId).id).toBe(AI_PROVIDERS[0].id);
+  });
+});
+
+describe('vision support', () => {
+  it('knows which providers can look at a photo', () => {
+    expect(providerSupportsVision('anthropic')).toBe(true);
+    expect(providerSupportsVision('openai')).toBe(true);
+    expect(providerSupportsVision('gemini')).toBe(true);
+  });
+
+  it('does not claim vision for providers that route to arbitrary models', () => {
+    // A photo sent to one of these is silently dropped by the provider, and the
+    // model is then asked to describe something it never received. The UI has
+    // to be able to say "this provider cannot read photos" instead.
+    expect(providerSupportsVision('openrouter')).toBe(false);
+    expect(providerSupportsVision('huggingface')).toBe(false);
+    expect(providerSupportsVision('custom')).toBe(false);
+  });
+
+  it('names only real providers as vision-capable', () => {
+    const ids = new Set(AI_PROVIDERS.map((p) => p.id));
+    for (const id of VISION_PROVIDERS) expect(ids.has(id)).toBe(true);
   });
 });

@@ -433,6 +433,58 @@ is entirely uncoloured, which is the honest first-run state.
   generated here. It is third-party work and its licence has not been
   established — that needs settling before any Play submission.
 
+### Logging a meal with AI
+
+Fuel's first action is **AI**, with two ways in:
+
+- **Describe** — type what you ate ("3 eggs, 2 toast, 50 g cottage cheese") and
+  the model returns items with macros.
+- **Photo** — photograph the plate and the model estimates from that.
+
+Both use the user's own key via `lib/ai-food-client.ts`; the request goes
+straight to their provider, as every other AI call does.
+
+**Everything it produces is an estimate, and the app says so.** A model guessing
+a portion size from a photo, or from "some cottage cheese", is not measuring
+anything. Per CLAUDE.md nothing is saved until the user has seen the numbers on
+an editable list, the screen is headed `ESTIMATE — CHECK IT`, and every row
+carries an `estimated` flag so nothing downstream can forget.
+
+`lib/ai-food.ts` is pure — prompt in, parsed items out — because a model will
+eventually return something malformed and the answer has to be "I couldn't read
+that", never a plate of zeroes. What it guarantees, each tested and
+mutation-checked:
+
+- A row with no name or no calories is **dropped**, not logged as 0.
+- A macro the model could not estimate stays `null`. Negative, non-numeric and
+  absurd values (a single item over 20,000 kcal) are rejected the same way.
+- Totals skip a macro nothing supplied rather than reporting `0 g`.
+- Unparseable output is reported as unreadable, with the raw reply kept, and the
+  user is pointed at the manual form.
+- A markdown fence or a leading sentence is stripped, because models add both
+  despite being told not to.
+
+The meal is chosen from the time of day, so a morning entry lands in Breakfast.
+
+**Vision.** `ChatMessage` takes an optional image, sent as content blocks
+(Anthropic), `image_url` parts (OpenAI-compatible) or `inline_data` (Gemini).
+`VISION_PROVIDERS` names the three that can actually see one; picking Photo on
+OpenRouter, Hugging Face or a custom endpoint says so rather than sending a
+photo that gets silently dropped and asking the model to describe it.
+
+**One compromise, recorded.** `food_logs` stores macros `NOT NULL DEFAULT 0`, so
+a macro nobody estimated has to land as `0`, which would read as "this meal had
+no fat". The row's note therefore names them: `AI estimate · not estimated: fat`.
+
+### The app icon
+
+The logo is the wordmark: `128BIT` over `FIT` in Silkscreen, white on black.
+`scripts/` does not generate it — it was produced once from the bundled font at
+the largest whole-pixel size that fits each icon's safe area, so the letters
+stay crisp rather than anti-aliasing to mush. The adaptive foreground uses a
+tighter safe area (52% vs 72%) because Android masks the outer third away and a
+clipped wordmark is unreadable.
+
 ### Privacy & Health Connect compliance
 
 - Policy: `docs/privacy-policy.md`. In-app screen: `app/settings/privacy.tsx`,
