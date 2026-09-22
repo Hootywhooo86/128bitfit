@@ -99,6 +99,10 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
   `session_exercises`, `sets`
 - Queries: `db/workout-queries.ts`; starter seed: `db/seed-routines.ts` (once, if empty)
 - Rest timer: `lib/rest-timer.tsx` + `lib/rest-timer-notifications.ts`
+- Screen wake lock: `lib/session-awake.ts` (the rule) + `lib/use-session-awake.ts`
+  (the effect). Held only while a session is `in_progress`, released on unmount.
+  `expo-keep-awake` needs no permission and no config plugin — it sets
+  `FLAG_KEEP_SCREEN_ON`. Setting `keep_awake`, on by default.
 - Screens: `app/(tabs)/train.tsx`, `app/train/active.tsx`,
   `app/train/add-exercise.tsx`, `app/train/summary.tsx`
 
