@@ -159,6 +159,12 @@ export default function TrainScreen() {
 
       <Label>REVIEW</Label>
       <MenuRow
+        icon="◷"
+        name="Workout history"
+        sub="Every session — open or delete one"
+        onPress={() => router.push('/train/history')}
+      />
+      <MenuRow
         icon="◍"
         name="Muscle map"
         sub="What you've hit, and what you haven't"

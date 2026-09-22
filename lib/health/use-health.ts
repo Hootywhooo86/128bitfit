@@ -29,8 +29,12 @@ export function useTodaySteps() {
     if (availability === 'unavailable') return setState({ status: 'unavailable' });
     if (availability === 'update_required') return setState({ status: 'update' });
 
-    const permission = await health.getPermissionState();
-    if (permission !== 'granted') return setState({ status: 'denied' });
+    // Ask whether *steps* was granted, not whether everything was. The app
+    // requests 27 permissions and Health Connect lets the user tick some and
+    // not others, so requiring the full set reported "denied" to anyone who
+    // had connected and granted steps — which is most people.
+    const grants = await health.getGrants();
+    if (!grants.read.includes('steps')) return setState({ status: 'denied' });
 
     const day = today();
     const [reading] = await health.readDays(day, day);
@@ -39,8 +43,10 @@ export function useTodaySteps() {
 
   /** Prompts, so only call from a button press. */
   const connect = useCallback(async () => {
+    // Partial counts: the prompt succeeded if the user granted anything, and
+    // refresh() decides whether steps specifically came through.
     const permission = await health.requestPermissions();
-    if (permission === 'granted') {
+    if (permission === 'granted' || permission === 'partial') {
       await refresh();
       return true;
     }
