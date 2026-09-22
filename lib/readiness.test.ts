@@ -153,3 +153,49 @@ describe('readiness', () => {
     expect(DEFAULT_SLEEP_TARGET_MIN).toBe(420);
   });
 });
+
+/**
+ * Reported from a real phone: the rest card read "💩 Rest — 0h 0m of 7h" on a
+ * night nothing had recorded. Zero minutes is not a bad night, it is an absent
+ * reading, and grading it is the app inventing a measurement and then judging
+ * the user for it.
+ */
+describe('a night with no reading', () => {
+  it('does not grade zero minutes as the worst possible rest', () => {
+    const r = restQuality(0);
+    expect(r.status).toBe('not-enough-data');
+    if (r.status === 'not-enough-data') expect(r.missing).toContain('sleep');
+  });
+
+  it('treats a negative reading the same way', () => {
+    expect(restQuality(-30).status).toBe('not-enough-data');
+  });
+
+  it('still grades a genuinely short night', () => {
+    // The fix must not swallow a real three-hour night, which is a bad one.
+    const r = restQuality(180);
+    expect(r.status).toBe('scored');
+    if (r.status === 'scored') expect(r.grade).toBe('bad');
+  });
+
+  it('gives no readiness score from zero sleep', () => {
+    const r = readiness({
+      sleepMinutes: 0,
+      restingHr: 58,
+      baselineRestingHr: 56,
+      recentSets: 10,
+    });
+    expect(r.status).toBe('not-enough-data');
+    if (r.status === 'not-enough-data') expect(r.missing).toContain('sleep');
+  });
+
+  it('still scores a real night that was short', () => {
+    const r = readiness({
+      sleepMinutes: 200,
+      restingHr: 58,
+      baselineRestingHr: 56,
+      recentSets: 10,
+    });
+    expect(r.status).toBe('scored');
+  });
+});

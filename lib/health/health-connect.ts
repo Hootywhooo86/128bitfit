@@ -201,6 +201,9 @@ export const healthConnectProvider: HealthProvider = {
 
     // A successful query means every day in range has a real reading, so days
     // with no records are genuinely zero. A failed or ungranted one stays null.
+    //
+    // This holds for counters — nobody walked, nobody drank, nobody burned
+    // anything above basal. It does NOT hold for sleep: see below.
     const zeroAll = (field: keyof HealthDay) => {
       for (const d of byDate.values()) (d[field] as number | null) = 0;
     };
@@ -230,7 +233,14 @@ export const healthConnectProvider: HealthProvider = {
       for (const r of water) addTo('hydrationMl', dayOf(r), num(r.volume?.inMilliliters));
     }
     if (sleep) {
-      zeroAll('sleepMinutes');
+      // Deliberately NOT zeroed, unlike every counter above.
+      //
+      // Nobody sleeps zero minutes. No SleepSession for a night means nothing
+      // recorded it — the watch was off the wrist, the phone was charging — not
+      // that the night happened and lasted no time. Zeroing it made the rest
+      // card read "0h 0m of 7h" with the worst possible grade against it, which
+      // is the app inventing a measurement and then judging the user for it.
+      // A night with no reading stays null and the card says so.
       for (const r of sleep) {
         const mins = (new Date(r.endTime).getTime() - new Date(r.startTime).getTime()) / 60000;
         addTo('sleepMinutes', dayOf(r), mins > 0 ? Math.round(mins) : null);

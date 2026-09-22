@@ -78,7 +78,12 @@ export function restQuality(
   sleepMinutes: number | null,
   targetMinutes = DEFAULT_SLEEP_TARGET_MIN
 ): RestQuality {
-  if (sleepMinutes == null) {
+  // Zero is not a night, it is a night nobody recorded. Nobody sleeps zero
+  // minutes, so a 0 arriving here means the watch was off — and grading that
+  // as the worst possible rest is the app inventing a measurement and then
+  // judging the user for it. The provider is fixed not to produce one, and this
+  // refuses to score it whatever the source.
+  if (sleepMinutes == null || sleepMinutes <= 0) {
     return { status: 'not-enough-data', missing: ['sleep'] };
   }
   const target = targetMinutes > 0 ? targetMinutes : DEFAULT_SLEEP_TARGET_MIN;
@@ -127,9 +132,11 @@ export type ReadinessInput = {
  */
 export function readiness(input: ReadinessInput): Readiness {
   const missing: string[] = [];
-  if (input.sleepMinutes == null) missing.push('sleep');
+  // Zero minutes is an absent reading, not a sleepless night. See restQuality.
+  const slept = input.sleepMinutes != null && input.sleepMinutes > 0 ? input.sleepMinutes : null;
+  if (slept == null) missing.push('sleep');
   if (input.restingHr == null) missing.push('resting heart rate');
-  if (input.sleepMinutes == null) {
+  if (slept == null) {
     return { status: 'not-enough-data', missing };
   }
 
@@ -139,10 +146,10 @@ export function readiness(input: ReadinessInput): Readiness {
   // Sleep: 0-70 points, flat once the target is met, and curved so a short
   // night actually costs something. Scored linearly, four hours came out as
   // "OK", which it is not.
-  const sleepRatio = Math.min(1.2, input.sleepMinutes / target);
+  const sleepRatio = Math.min(1.2, slept / target);
   const capped = Math.min(1, sleepRatio);
   const sleepPoints = Math.round(capped * capped * 70);
-  const hours = (input.sleepMinutes / 60).toFixed(1);
+  const hours = (slept / 60).toFixed(1);
   reasons.push(
     sleepRatio >= 0.95
       ? `${hours}h sleep, on target`
