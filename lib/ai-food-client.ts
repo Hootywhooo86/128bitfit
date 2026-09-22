@@ -10,8 +10,9 @@
  * in one sentence and pointed at the manual form.
  */
 import { getAiRuntimeConfig } from '@/db/ai-settings';
-import { AiCoachError, coachChat, getProviderMeta, visionSupport } from './ai-coach';
-import { callVision } from './ai-vision-call';
+import { AiCoachError, getProviderMeta, visionSupport } from './ai-coach';
+import { callWithRotation } from './ai-rotate';
+import { describeNetworkFailure } from './net-errors';
 import {
   PHOTO_PROMPT,
   describePrompt,
@@ -79,29 +80,22 @@ export async function estimateFood(
   ];
 
   try {
-    // A photo request rotates through the Hugging Face vision chain when a
-    // model runs out; everything else is one call, as before.
-    if (needsVision) {
-      const attempt = await callVision(messages, signal);
-      return parseAiFood(attempt.content);
-    }
-    const result = await coachChat({
-      provider: cfg.provider,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
-      baseUrl: cfg.baseUrl,
-      signal,
-      messages,
-    });
-    return parseAiFood(result.content);
+    // Every request, not only the photo ones. callWithRotation is a single
+    // call on a provider that does not rotate, so this is the old behaviour
+    // everywhere except Hugging Face — where describing a meal now falls over
+    // to the next model exactly as photographing one does.
+    const attempt = await callWithRotation(messages, signal);
+    return parseAiFood(attempt.content);
   } catch (e) {
     if (e instanceof AiCoachError) {
-      return { status: 'failed', message: e.message };
+      // The provider's own words when it answered; a translated sentence when
+      // the request never left the phone.
+      return {
+        status: 'failed',
+        message: e.status != null ? e.message : describeNetworkFailure(e, 'your food estimate'),
+      };
     }
-    return {
-      status: 'failed',
-      message: e instanceof Error ? e.message : 'The estimate failed. Try again, or add the food by hand.',
-    };
+    return { status: 'failed', message: describeNetworkFailure(e, 'your food estimate') };
   }
 }
 

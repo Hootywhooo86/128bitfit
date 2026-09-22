@@ -5,6 +5,7 @@ import {
   type AiProviderId,
 } from '@/lib/ai-coach';
 import { getAiApiKey, setAiApiKey, clearAiApiKey, hasAiApiKey } from '@/lib/ai-secure';
+import { sanitizeBaseUrl } from '@/lib/api-key';
 import { getSetting, setSetting } from './settings-queries';
 
 export type AiSettings = {
@@ -44,8 +45,9 @@ export async function getAiSettings(): Promise<AiSettings> {
     providerRaw && isAiProviderId(providerRaw) ? providerRaw : 'anthropic';
   const meta = getProviderMeta(provider);
   const model = (modelRaw && modelRaw.trim()) || meta.defaultModel;
-  const baseUrl =
-    (baseUrlRaw && baseUrlRaw.trim()) || (meta.defaultBaseUrl ?? '') || '';
+  // Sanitised on read too, so an address saved broken by an earlier build is
+  // repaired rather than failing every request until someone retypes it.
+  const baseUrl = sanitizeBaseUrl(baseUrlRaw) || (meta.defaultBaseUrl ?? '') || '';
 
   // '' means "typed by hand, nothing known" and is not the same as '0'.
   const modelVision = visionRaw === '1' ? true : visionRaw === '0' ? false : null;
@@ -80,7 +82,9 @@ export async function updateAiSettings(patch: {
     await setSetting(KEY_MODEL_VISION, patch.modelVision == null ? '' : patch.modelVision ? '1' : '0');
   }
   if (patch.baseUrl != null) {
-    await setSetting(KEY_BASE_URL, patch.baseUrl.trim());
+    // Not trim(): a pasted address carries the same paste damage a pasted key
+    // does, and a newline in it fails the request exactly as one in the key did.
+    await setSetting(KEY_BASE_URL, sanitizeBaseUrl(patch.baseUrl));
   }
   if (patch.apiKey !== undefined) {
     if (patch.apiKey.trim()) {

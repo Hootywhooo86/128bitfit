@@ -1,10 +1,16 @@
 /**
- * One photo request, tried across the Hugging Face vision chain.
+ * One request, tried across the Hugging Face chain until a model answers.
  *
  * A free Hugging Face token runs out partway through a month and different
  * models draw on it at very different rates, so a single model is a single
- * point of failure for every photo feature in the app. The token is the same
- * for all of them — moving to the next costs one retry and nothing else.
+ * point of failure for every AI feature in the app. The token is the same for
+ * all of them — moving to the next costs one retry and nothing else.
+ *
+ * The chain is built from vision models, as asked, but it is used for text
+ * requests too: every model that reads a photo also reads a sentence, so
+ * describing a meal gets the same protection for free. Leaving text on a
+ * single model would have meant the Describe tab failing with nowhere to go
+ * while the photo tabs beside it rotated happily.
  *
  * Only Hugging Face rotates. Anthropic, OpenAI and Gemini each serve one
  * vision family on the user's own account, so there is nowhere to move to and
@@ -56,7 +62,7 @@ export async function hfVisionChain(
  * On a provider that does not rotate, this is a single call and behaves
  * exactly as it did before.
  */
-export async function callVision(
+export async function callWithRotation(
   messages: ChatMessage[],
   signal?: AbortSignal
 ): Promise<VisionAttempt> {
