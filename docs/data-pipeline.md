@@ -132,6 +132,20 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
   from `app/train/add-exercise.tsx` with a `sessionId`, which adds the finished
   exercise straight into the running session.
 
+### Imported exercises with no muscles
+
+- openGym references its built-in exercises by number and its backup carries
+  neither names nor muscles, so they import as `openGym 0577` with `[]` muscles
+  and colour nothing on the map. On a real backup: 101 exercises, 3,956 sets,
+  93% of the history.
+- `listUntaggedExercises()` finds them (sets logged, no muscles), ordered by set
+  count. `mergeExerciseInto(from, to)` re-points `session_exercises` and
+  `routine_exercises` then deletes the placeholder, so the history keeps its
+  weights and dates and the map fills in retroactively.
+- Screen: `app/train/match-imported.tsx`, linked from the muscle card on Home
+  whenever untagged exercises exist — a grey map with a full history has to say
+  why.
+
 ### Fuel / nutrition logging
 
 - Schema: `food_logs`, `water_logs`, `settings` (calorie/protein/water targets)

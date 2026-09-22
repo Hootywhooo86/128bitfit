@@ -14,6 +14,7 @@ import { getLatestWeightEntry, weightInKg } from '@/db/weight-queries';
 import type { WeightEntry } from '@/db/schema';
 import {
   countCompletedSessions,
+  listUntaggedExercises,
   getInProgressSession,
   getLastCompletedWorkoutSummary,
   type WorkoutSummary,
@@ -49,12 +50,13 @@ export default function HomeScreen() {
   const [tally, setTally] = useState<MuscleTally>(emptyTally());
   const [roles, setRoles] = useState<MuscleRoles>(emptyRoles());
   const [recentSets, setRecentSets] = useState<number | null>(null);
+  const [untagged, setUntagged] = useState<{ count: number; sets: number }>({ count: 0, sets: 0 });
 
   const refresh = useCallback(async () => {
     if (!ready) return;
     try {
       const since = periodFor(7).since;
-      const [appSettings, fuel, workout, active, weight, count, t, r, rs] = await Promise.all([
+      const [appSettings, fuel, workout, active, weight, count, t, r, rs, un] = await Promise.all([
         getAppSettings(),
         getDayFuelSummary(new Date()),
         getLastCompletedWorkoutSummary(),
@@ -64,6 +66,7 @@ export default function HomeScreen() {
         getMuscleTally(since),
         getMuscleRoles(since),
         countRecentSets(2),
+        listUntaggedExercises(),
       ]);
       setUnits(appSettings.units);
       setCalories(fuel.logs.length > 0 ? fuel.totals.calories : null);
@@ -76,6 +79,7 @@ export default function HomeScreen() {
       setTally(t);
       setRoles(r);
       setRecentSets(rs);
+      setUntagged({ count: un.length, sets: un.reduce((n, e) => n + e.setCount, 0) });
     } finally {
       setLoading(false);
     }
@@ -181,7 +185,7 @@ export default function HomeScreen() {
       />
 
       <View style={{ height: 10 }} />
-      <MuscleLoadCard tally={tally} roles={roles} />
+      <MuscleLoadCard tally={tally} roles={roles} untagged={untagged} />
 
       {lastWorkout ? (
         <MenuRow
