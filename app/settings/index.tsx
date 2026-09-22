@@ -26,6 +26,8 @@ import {
 } from '@/db/settings-queries';
 import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
 import { explainFloor } from '@/lib/calorie-floor';
+import { HF_VISION_FAMILIES } from '@/lib/ai-fallback';
+import { AiKeyStoreError } from '@/lib/ai-secure';
 import { colors, spacing } from '@/lib/theme';
 import { HfModelPicker } from '@/components/HfModelPicker';
 import { Screen } from '@/components/ui';
@@ -132,8 +134,24 @@ export default function SettingsScreen() {
       if (aiKeyDraft.trim()) {
         aiPatch.apiKey = aiKeyDraft;
       }
-      const nextAi = await updateAiSettings(aiPatch);
-      applyAi(nextAi);
+      let keyWarning: string | null = null;
+      try {
+        const nextAi = await updateAiSettings(aiPatch);
+        applyAi(nextAi);
+      } catch (e) {
+        if (e instanceof AiKeyStoreError) {
+          // Everything but the key is saved by this point. Say what did not
+          // stick rather than clearing the field and looking like it worked.
+          keyWarning = e.message;
+          applyAi(await getAiSettings());
+        } else {
+          throw e;
+        }
+      }
+      if (keyWarning) {
+        Alert.alert('Key not saved', `${keyWarning}\n\nPaste it again, or use it for this session only.`);
+        return;
+      }
 
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1500);
@@ -300,9 +318,17 @@ export default function SettingsScreen() {
           autoCorrect={false}
         />
         {aiProvider === 'huggingface' ? (
-          <Pressable style={styles.browseBtn} onPress={() => setPickerOpen(true)}>
-            <Text style={styles.browseText}>Browse models →</Text>
-          </Pressable>
+          <>
+            <Pressable style={styles.browseBtn} onPress={() => setPickerOpen(true)}>
+              <Text style={styles.browseText}>Browse models →</Text>
+            </Pressable>
+            <Text style={styles.muted}>
+              Photos rotate automatically when a model runs out of credit or its provider is
+              busy: {HF_VISION_FAMILIES.map((f) => f.label).join(' → ')}. Your token works for
+              all of them, so nothing else is needed. A key that is rejected stops there rather
+              than retrying five times.
+            </Text>
+          </>
         ) : null}
         <HfModelPicker
           visible={pickerOpen}

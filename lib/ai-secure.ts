@@ -31,19 +31,66 @@ export async function getAiApiKey(): Promise<string | null> {
   }
 }
 
+/**
+ * Thrown when the key could not be written to the keystore.
+ *
+ * Never carries the key or any part of it — only that the write failed and
+ * roughly why.
+ */
+export class AiKeyStoreError extends Error {}
+
+/**
+ * Saves the key, and proves it saved.
+ *
+ * This used to swallow a failed write: the key stayed in `memoryKey`, the app
+ * looked fine until it was killed, and the key was gone next launch with
+ * nothing ever having said so. That is the silent no-op the house style
+ * forbids, and it is exactly what a user hitting Save and finding no key later
+ * would experience.
+ *
+ * So the write is read back. SecureStore's setItemAsync can resolve without
+ * having persisted anything on some devices — a keystore that is locked, full,
+ * or has had its entries invalidated by a credential change — and only a read
+ * distinguishes that from success.
+ */
 export async function setAiApiKey(key: string): Promise<void> {
   const trimmed = key.trim();
   memoryKey = trimmed || null;
+
+  if (!(await secureAvailable())) {
+    // Web and anywhere without a keystore: in-memory only, and the caller has
+    // to be able to tell the user it will not survive a restart.
+    throw new AiKeyStoreError(
+      'This device has no secure keystore, so the key is held only until the app closes.'
+    );
+  }
+
   try {
-    if (await secureAvailable()) {
-      if (trimmed) {
-        await SecureStore.setItemAsync(STORE_KEY, trimmed);
-      } else {
-        await SecureStore.deleteItemAsync(STORE_KEY);
-      }
+    if (!trimmed) {
+      await SecureStore.deleteItemAsync(STORE_KEY);
+      return;
     }
-  } catch {
-    // Keep memoryKey; surface nothing about the key itself.
+    await SecureStore.setItemAsync(STORE_KEY, trimmed);
+  } catch (e) {
+    throw new AiKeyStoreError(
+      `The device keystore refused the key: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+
+  // The part that was missing. A write that reports success and stores nothing
+  // is indistinguishable from a working save until the next launch.
+  let readBack: string | null = null;
+  try {
+    readBack = await SecureStore.getItemAsync(STORE_KEY);
+  } catch (e) {
+    throw new AiKeyStoreError(
+      `Saved, but the key could not be read back: ${e instanceof Error ? e.message : String(e)}`
+    );
+  }
+  if (readBack?.trim() !== trimmed) {
+    throw new AiKeyStoreError(
+      'The key did not survive being written to the device keystore.'
+    );
   }
 }
 

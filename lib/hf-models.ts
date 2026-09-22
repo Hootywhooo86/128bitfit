@@ -24,6 +24,14 @@ export type HfModel = {
    * rest does not, so "can Hugging Face see photos" has no single answer.
    */
   vision: boolean;
+  /**
+   * How many providers are serving it right now.
+   *
+   * Used to pick within a family when rotating: a model five providers serve is
+   * far less likely to be the one that is busy. Zero means the router listed it
+   * with nothing live behind it.
+   */
+  providerCount: number;
 };
 
 export type HfModelsResult =
@@ -80,10 +88,21 @@ export function parseHfModels(body: unknown): HfModel[] {
     // offers and do not invent one when it offers none.
     let provider: string | null = null;
     const providers = r.providers;
+    let providerCount = 0;
     if (Array.isArray(providers) && providers.length > 0) {
       const p = providers[0] as Record<string, unknown>;
       if (typeof p?.provider === 'string') provider = p.provider;
       else if (typeof providers[0] === 'string') provider = providers[0] as string;
+      // Everything except a provider that explicitly says it is not live. A
+      // provider reporting "error" cannot answer, so counting it would rank a
+      // dead model above a working one — but a missing status is unknown, not
+      // dead, and dropping those would count every provider as zero on a
+      // response shape that does not report status at all.
+      providerCount = providers.filter((x) => {
+        if (typeof x === 'string') return true;
+        const status = (x as Record<string, unknown>)?.status;
+        return status == null || status === 'live';
+      }).length;
     }
 
     // A model that does not say it takes images is treated as not taking them.
@@ -93,7 +112,7 @@ export function parseHfModels(body: unknown): HfModel[] {
       ?.input_modalities;
     const vision = Array.isArray(modalities) && modalities.includes('image');
 
-    out.push({ id, provider, vision });
+    out.push({ id, provider, vision, providerCount });
   }
   return out.sort((a, b) => a.id.localeCompare(b.id));
 }

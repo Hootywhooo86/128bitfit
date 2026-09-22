@@ -175,6 +175,16 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
   into `HfModel.vision`. The flag is saved as `ai_model_vision` when a model is
   picked, so the check is offline; a hand-typed model is 'unknown' and the call
   is attempted rather than refused.
+- Hugging Face photo rotation: `lib/ai-fallback.ts` holds the family order
+  (DeepSeek → Kimi → Qwen → Gemma → Apertus) and the rule for which failures are
+  worth retrying; `lib/ai-vision-call.ts` runs a photo request down the chain.
+  Families resolve against the live router listing (vision models only, most
+  live providers first) with a snapshot fallback. A 401/403 never rotates — the
+  key is the same everywhere. Only Hugging Face rotates; the other providers
+  serve one vision family each.
+- API keys: `lib/ai-secure.ts` reads the key back after writing it and throws
+  `AiKeyStoreError` if it did not stick. It used to swallow the failure, so the
+  key lived in memory until the app closed and then vanished silently.
 - Label scan: `app/fuel/label.tsx`, two shots — front of pack then nutrition panel.
   The pack shot becomes the food's photo and gives a name guess
   (`lib/package-label.ts`); the panel shot is OCR'd for numbers

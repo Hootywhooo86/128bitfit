@@ -12,14 +12,19 @@ describe('parsing the router model list', () => {
     // Sorted case-insensitively, which is what a person scanning a list wants;
     // a plain codepoint sort would put every capitalised id in its own block.
     expect(models).toEqual([
-      { id: 'meta-llama/Llama-3.3-70B-Instruct', provider: 'together', vision: false },
-      { id: 'Qwen/Qwen2.5-72B-Instruct', provider: 'nebius', vision: false },
+      {
+        id: 'meta-llama/Llama-3.3-70B-Instruct',
+        provider: 'together',
+        vision: false,
+        providerCount: 1,
+      },
+      { id: 'Qwen/Qwen2.5-72B-Instruct', provider: 'nebius', vision: false, providerCount: 1 },
     ]);
   });
 
   it('leaves the provider null rather than inventing one', () => {
     expect(parseHfModels({ data: [{ id: 'a/b' }] })).toEqual([
-      { id: 'a/b', provider: null, vision: false },
+      { id: 'a/b', provider: null, vision: false, providerCount: 0 },
     ]);
     expect(parseHfModels({ data: [{ id: 'a/b', providers: [] }] })[0].provider).toBeNull();
   });
@@ -34,7 +39,25 @@ describe('parsing the router model list', () => {
     const models = parseHfModels({
       data: [{ id: 'a/b' }, { id: '  ' }, {}, null, 'nope', { id: 'a/b' }],
     });
-    expect(models).toEqual([{ id: 'a/b', provider: null, vision: false }]);
+    expect(models).toEqual([{ id: 'a/b', provider: null, vision: false, providerCount: 0 }]);
+  });
+
+  it('counts only the providers actually serving it', () => {
+    // Used to pick within a family when rotating. Counting a provider that is
+    // not live would rank a dead model above a working one.
+    const [m] = parseHfModels({
+      data: [
+        {
+          id: 'a/b',
+          providers: [
+            { provider: 'novita', status: 'live' },
+            { provider: 'sambanova', status: 'error' },
+            { provider: 'together', status: 'live' },
+          ],
+        },
+      ],
+    });
+    expect(m.providerCount).toBe(2);
   });
 
   it('reads image support from the modalities the router reports', () => {
@@ -69,9 +92,9 @@ describe('parsing the router model list', () => {
 
 describe('searching the list', () => {
   const models: HfModel[] = [
-    { id: 'meta-llama/Llama-3.3-70B-Instruct', provider: 'together', vision: false },
-    { id: 'Qwen/Qwen2.5-72B-Instruct', provider: 'nebius', vision: true },
-    { id: 'mistralai/Mistral-Small-24B', provider: null, vision: false },
+    { id: 'meta-llama/Llama-3.3-70B-Instruct', provider: 'together', vision: false, providerCount: 1 },
+    { id: 'Qwen/Qwen2.5-72B-Instruct', provider: 'nebius', vision: true, providerCount: 1 },
+    { id: 'mistralai/Mistral-Small-24B', provider: null, vision: false, providerCount: 0 },
   ];
 
   it('matches case-insensitively on the id', () => {
