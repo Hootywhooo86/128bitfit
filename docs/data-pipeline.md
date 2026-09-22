@@ -412,6 +412,15 @@ is entirely uncoloured, which is the honest first-run state.
   on the view it is visible from — glutes on the back, pecs on the front.
   Drawing a muscle on the wrong view colours the wrong part of the body, which
   is worse than not colouring it.
+- **A region is the whole muscle.** The grown region used to be clipped back to
+  its seed polygon, which left a quad half filled: the polygon is a rough guess
+  at where the muscle is, the basin is where the artwork says it ends. The clip
+  is gone, and coverage went from about half the body to 83% front / 77% back —
+  the rest being the head, hands and feet, which are not muscle groups.
+- **Background is what lies well away from a muscle**, by distance transform,
+  not "anything unclaimed". Treating every unclaimed cell as background left
+  the outer thigh and the forearm grey, because the seed polygons are narrower
+  than the muscles they name.
 - **Regions come from the artwork, not from a polygon.** Hand-drawn polygons
   never line up: they spill over a drawn edge or stop short of one, and the
   first version visibly did both. The masks are now built by watershed — seeded
