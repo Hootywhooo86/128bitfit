@@ -10,7 +10,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { TopBar } from '@/components/TopBar';
-import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { CONTENT_MAX_WIDTH, colors, fonts, radius, spacing } from '@/lib/theme';
 
 /**
  * The shell's building blocks, ported from prototype/app-shell.html.
@@ -288,7 +288,15 @@ export function Note({ children }: { children: React.ReactNode }) {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
-  main: { padding: spacing.md, paddingBottom: 104 },
+  main: {
+    padding: spacing.md,
+    paddingBottom: 104,
+    // Landscape and unfolded screens: keep the column readable and centred
+    // rather than stretching every row to the full width.
+    width: '100%',
+    maxWidth: CONTENT_MAX_WIDTH,
+    alignSelf: 'center',
+  },
   fill: { flex: 1 },
   noTabGap: { paddingBottom: spacing.md },
   lblWrap: { marginTop: spacing.lg, marginBottom: 10 },

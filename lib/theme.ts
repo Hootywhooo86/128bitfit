@@ -81,3 +81,13 @@ export const radius = {
   lg: 12,
   pill: 20,
 };
+
+/**
+ * The widest the content column ever gets.
+ *
+ * Portrait on a phone is narrower than this, so it changes nothing there. In
+ * landscape, and on a Fold opened out, it stops a line of text running the
+ * full width of the screen — which is unreadable, and makes a phone app look
+ * like a stretched phone app.
+ */
+export const CONTENT_MAX_WIDTH = 640;
