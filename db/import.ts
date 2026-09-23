@@ -1,4 +1,5 @@
 import { count, eq, notInArray, sql } from 'drizzle-orm';
+import { PRESERVED_EXERCISE_CATEGORIES } from '@/lib/exercise-sources';
 import { PRESERVED_FOOD_SOURCES } from '@/lib/food-sources';
 import { DATA_MANIFEST } from './data-manifest';
 import { db, sqlite } from './client';
@@ -65,7 +66,15 @@ async function setMeta(key: string, value: string): Promise<void> {
 }
 
 export async function getCounts(): Promise<{ exercises: number; foods: number }> {
-  const [ex] = await db.select({ n: count() }).from(exercises);
+  // Bundled rows only, on both tables. Counting the user's own exercises here
+  // made the count differ from the manifest the moment they added one, so
+  // needsImport said yes on every launch and the re-import below deleted it.
+  const [ex] = await db
+    .select({ n: count() })
+    .from(exercises)
+    .where(
+      notInArray(sql`coalesce(${exercises.category}, '')`, [...PRESERVED_EXERCISE_CATEGORIES])
+    );
   // Exclude runtime OFF cache + custom foods so re-import checksums stay stable.
   const [fo] = await db
     .select({ n: count() })
@@ -139,8 +148,14 @@ export async function importBundledData(
   });
 
   try {
-    // Clear previous rows outside the heavy insert loop
-    await db.delete(exercises);
+    // Clear previous rows outside the heavy insert loop, but only the bundled
+    // ones: an exercise the user made, or that importing their backup created,
+    // exists nowhere else and a routine may already point at it.
+    await db
+      .delete(exercises)
+      .where(
+        notInArray(sql`coalesce(${exercises.category}, '')`, [...PRESERVED_EXERCISE_CATEGORIES])
+      );
     // Keep Open Food Facts cache rows + user custom foods across USDA re-import.
     await db
       .delete(foods)

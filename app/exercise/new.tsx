@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { addExerciseToSession, createCustomExercise } from '@/db/workout-queries';
+import { stageNewExercise } from '@/lib/exercise-handoff';
 import { identifyEquipment } from '@/lib/ai-exercise-client';
 import { MUSCLE_GROUPS, MUSCLE_LABELS, type MuscleGroup } from '@/lib/muscle-load';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
@@ -33,8 +34,14 @@ export default function NewExerciseScreen() {
   const router = useRouter();
   // Set when this was opened from a live workout, so the finished exercise can
   // go straight into that session instead of only into the library.
-  const { sessionId } = useLocalSearchParams<{ sessionId?: string }>();
+  const { sessionId, returnTo, name: presetName } = useLocalSearchParams<{
+    sessionId?: string;
+    returnTo?: string;
+    name?: string;
+  }>();
   const sid = sessionId ? decodeURIComponent(sessionId) : '';
+  // Set when a routine is half-built behind us and waiting for this exercise.
+  const toRoutine = returnTo === 'routine';
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
 
@@ -42,10 +49,13 @@ export default function NewExerciseScreen() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [unmapped, setUnmapped] = useState<string[]>([]);
-  const [identified, setIdentified] = useState(false);
+  const [identified, setIdentified] = useState(Boolean(presetName));
   const [camOpen, setCamOpen] = useState(false);
 
-  const [name, setName] = useState('');
+  // Prefilled when the user searched for something the library does not have
+  // and chose to make it — retyping what they just typed is the kind of small
+  // insult that stops people using a feature.
+  const [name, setName] = useState(presetName ? decodeURIComponent(presetName) : '');
   const [equipment, setEquipment] = useState('');
   const [instructions, setInstructions] = useState('');
   const [primary, setPrimary] = useState<MuscleGroup[]>([]);
@@ -113,6 +123,17 @@ export default function NewExerciseScreen() {
           .map((l) => l.trim())
           .filter(Boolean),
       });
+
+      // Reached from a routine being built: hand the exercise back and return
+      // to the draft, which is still mounted behind this screen. Routing
+      // forward to the builder instead would mount a second, empty copy and
+      // the half-built routine would be gone.
+      if (toRoutine) {
+        stageNewExercise(id);
+        if (router.canGoBack()) router.back();
+        else router.replace('/train/build-routine');
+        return;
+      }
 
       // Reached from a live workout: the point was to add this machine to the
       // session, so do that and go back to it. Dropping the user in the

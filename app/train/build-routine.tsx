@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
-import { distinctPrimaryMuscles, listExercises } from '@/db/queries';
+import { distinctPrimaryMuscles, getExerciseById, listExercises } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
 import {
   createRoutine,
@@ -23,6 +23,7 @@ import {
   updateRoutine,
   type RoutineDraftExercise,
 } from '@/db/workout-queries';
+import { clearNewExercise, takeNewExercise } from '@/lib/exercise-handoff';
 import { colors, fonts, spacing } from '@/lib/theme';
 
 const DEFAULT_SETS = 3;
@@ -96,6 +97,31 @@ export default function BuildRoutineScreen() {
       },
     ]);
   };
+
+  /**
+   * Picks up an exercise made on the custom-exercise screen while this draft
+   * was open, and puts it straight into the routine.
+   *
+   * Taking it clears it, so coming back to this screen for any other reason
+   * does not add the same exercise a second time.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      if (!ready) return;
+      const madeId = takeNewExercise();
+      if (!madeId) return;
+      let alive = true;
+      void (async () => {
+        const made = await getExerciseById(madeId);
+        if (alive && made) add(made);
+      })();
+      return () => {
+        alive = false;
+      };
+      // add is stable enough: it only calls setRows, which never changes.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [ready])
+  );
 
   const patch = (i: number, p: Partial<Row>) =>
     setRows((prev) => prev.map((r, n) => (n === i ? { ...r, ...p } : r)));
@@ -224,7 +250,22 @@ export default function BuildRoutineScreen() {
         </Text>
       </Pressable>
 
-      <PickExercise visible={picking} onPick={add} onClose={() => setPicking(false)} />
+      <PickExercise
+        visible={picking}
+        onPick={add}
+        onClose={() => setPicking(false)}
+        onMakeOwn={(withName) => {
+          setPicking(false);
+          // Nothing staged should survive into a new trip out, or a stale id
+          // from an abandoned one would land in this routine.
+          clearNewExercise();
+          router.push(
+            withName.trim()
+              ? `/exercise/new?returnTo=routine&name=${encodeURIComponent(withName.trim())}`
+              : '/exercise/new?returnTo=routine'
+          );
+        }}
+      />
     </Screen>
   );
 }
@@ -257,15 +298,23 @@ function NumField({
   );
 }
 
-/** The same search as Add exercise: by name, muscle, equipment or category. */
+/**
+ * The same search as Add exercise: by name, muscle, equipment or category.
+ *
+ * Also the way out to making one. The library is 876 exercises and does not
+ * have your gym's machines in it, so a search that finds nothing has to lead
+ * somewhere — otherwise the routine cannot contain the lift you actually do.
+ */
 function PickExercise({
   visible,
   onPick,
   onClose,
+  onMakeOwn,
 }: {
   visible: boolean;
   onPick: (e: Exercise) => void;
   onClose: () => void;
+  onMakeOwn: (withName: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [muscle, setMuscle] = useState<string | null>(null);
@@ -323,6 +372,16 @@ function PickExercise({
           ))}
         </ScrollView>
 
+        <Pressable style={s.makeOwn} onPress={() => onMakeOwn(query)}>
+          <Text style={s.makeOwnT}>
+            + Make your own{query.trim() ? ` — “${query.trim()}”` : ''}
+          </Text>
+          <Text style={s.makeOwnSub}>
+            Photograph the machine or fill it in by hand. It comes straight back into this
+            routine.
+          </Text>
+        </Pressable>
+
         <FlatList
           data={items}
           keyExtractor={(e) => e.id}
@@ -331,11 +390,19 @@ function PickExercise({
             <Pressable style={s.pickRow} onPress={() => onPick(item)}>
               <Text style={s.pickName}>{item.name}</Text>
               <Text style={s.pickMeta}>
-                {[item.equipment, item.level].filter(Boolean).join(' · ')}
+                {[item.equipment, item.category === 'custom' ? 'yours' : null, item.level]
+                  .filter(Boolean)
+                  .join(' · ')}
               </Text>
             </Pressable>
           )}
-          ListEmptyComponent={<Text style={s.pickEmpty}>Nothing matches that.</Text>}
+          ListEmptyComponent={
+            <Text style={s.pickEmpty}>
+              {query.trim() || muscle
+                ? 'Nothing in the library matches that. Make it yourself above and it goes into this routine.'
+                : 'No exercises yet.'}
+            </Text>
+          }
         />
       </View>
     </Modal>
@@ -431,6 +498,23 @@ const s = StyleSheet.create({
   chipOn: { borderColor: colors.accent, backgroundColor: colors.track },
   chipT: { color: colors.textMuted, fontSize: 12 },
   chipTOn: { color: colors.text, fontWeight: '700' },
+  makeOwn: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.borderBright,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    marginBottom: spacing.sm,
+  },
+  makeOwnT: { color: colors.text, fontSize: 14, fontFamily: fonts.bodySemi },
+  makeOwnSub: {
+    color: colors.textDim,
+    fontSize: 11.5,
+    lineHeight: 16,
+    marginTop: 4,
+    fontFamily: fonts.body,
+  },
   pickRow: { paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: colors.border },
   pickName: { color: colors.text, fontSize: 14.5, fontFamily: fonts.body },
   pickMeta: { color: colors.textDim, fontSize: 11.5, marginTop: 3, fontFamily: fonts.body },
