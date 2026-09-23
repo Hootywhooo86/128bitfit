@@ -28,6 +28,7 @@ import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
 import { describeLastPerformance } from '@/lib/set-prefill';
 import { colors, spacing } from '@/lib/theme';
+import { formatElapsed, sessionStats } from '@/lib/session-stats';
 
 export default function ActiveWorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -35,7 +36,7 @@ export default function ActiveWorkoutScreen() {
   const timer = useRestTimer();
   const [workout, setWorkout] = useState<ActiveWorkout | null>(null);
   const [loading, setLoading] = useState(true);
-  const [elapsed, setElapsed] = useState('0:00');
+  const [elapsedMs, setElapsedMs] = useState(0);
   const [keepAwake, setKeepAwake] = useState(false);
 
   const sessionId = id ? decodeURIComponent(id) : '';
@@ -75,16 +76,23 @@ export default function ActiveWorkoutScreen() {
   useEffect(() => {
     if (!workout?.session.startedAt) return;
     const started = new Date(workout.session.startedAt).getTime();
-    const tick = () => {
-      const sec = Math.max(0, Math.floor((Date.now() - started) / 1000));
-      const m = Math.floor(sec / 60);
-      const s = sec % 60;
-      setElapsed(`${m}:${s.toString().padStart(2, '0')}`);
-    };
+    const tick = () => setElapsedMs(Date.now() - started);
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [workout?.session.startedAt]);
+
+  // Flattened across every exercise: the header counts the session, not a block.
+  const stats = sessionStats(
+    (workout?.exercises ?? []).flatMap((se) =>
+      se.sets.map((st) => ({
+        completed: st.completed,
+        reps: st.reps,
+        weight: st.weight,
+        isWarmup: st.isWarmup,
+      }))
+    )
+  );
 
   const onAddSet = async (se: SessionExerciseWithMeta) => {
     await addSet(se.id);
@@ -165,7 +173,7 @@ export default function ActiveWorkoutScreen() {
     <>
       <Stack.Screen
         options={{
-          title: `Workout · ${elapsed}`,
+          title: 'Workout',
           headerRight: () => (
             <Pressable onPress={onFinish} hitSlop={8}>
               <Text style={{ color: colors.accent, fontWeight: '800' }}>Finish</Text>
@@ -174,6 +182,30 @@ export default function ActiveWorkoutScreen() {
         }}
       />
       <View style={styles.container}>
+        {/*
+          The three numbers you glance at between sets. Elapsed used to be a
+          few small characters in the navigation title, which is the one of
+          the three you actually look at mid-session.
+        */}
+        <View style={styles.stats}>
+          <View style={styles.stat}>
+            <Text style={styles.statV}>
+              {stats.setsDone}/{stats.setsTotal}
+            </Text>
+            <Text style={styles.statL}>SETS</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statV}>
+              {stats.volume.toLocaleString()}
+              {stats.volumePartial ? '+' : ''}
+            </Text>
+            <Text style={styles.statL}>LB VOLUME</Text>
+          </View>
+          <View style={styles.stat}>
+            <Text style={styles.statV}>{formatElapsed(elapsedMs)}</Text>
+            <Text style={styles.statL}>ELAPSED</Text>
+          </View>
+        </View>
         <RestTimerBar />
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
           {workout.exercises.length === 0 ? (
@@ -340,6 +372,25 @@ function SetRow({
 }
 
 const styles = StyleSheet.create({
+  stats: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: 2,
+  },
+  stat: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 11,
+    alignItems: 'center',
+    gap: 3,
+  },
+  statV: { color: colors.text, fontSize: 21, fontWeight: '700' },
+  statL: { color: colors.textDim, fontSize: 9.5, letterSpacing: 0.7, fontWeight: '700' },
   container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 12 },
   muted: { color: colors.textMuted },
