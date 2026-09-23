@@ -651,6 +651,89 @@ export async function deleteSession(sessionId: string): Promise<void> {
   mirrorWorkoutRemoved(sessionId);
 }
 
+export type RoutineDraftExercise = {
+  exerciseId: string;
+  targetSets: number | null;
+  targetReps: number | null;
+  restSeconds: number | null;
+  notes?: string | null;
+};
+
+/**
+ * Creates a routine from scratch.
+ *
+ * There was no way to make one: routines could only arrive from an import or
+ * the seeded starters, so "build a workout" meant starting a freestyle session
+ * and picking as you went, every time, with nothing kept at the end of it.
+ *
+ * Position comes from the order given, not from a field on each item, so the
+ * caller reorders by reordering the array and cannot produce two exercises
+ * claiming the same slot.
+ */
+export async function createRoutine(input: {
+  name: string;
+  notes?: string | null;
+  exercises: RoutineDraftExercise[];
+}): Promise<string> {
+  const routineId = newId('rt');
+  await db.insert(routines).values({
+    id: routineId,
+    name: input.name.trim(),
+    notes: input.notes?.trim() || null,
+    createdAt: new Date(),
+  });
+
+  let position = 0;
+  for (const ex of input.exercises) {
+    await db.insert(routineExercises).values({
+      id: newId('re'),
+      routineId,
+      exerciseId: ex.exerciseId,
+      position: position++,
+      targetSets: ex.targetSets,
+      targetReps: ex.targetReps,
+      restSeconds: ex.restSeconds,
+      notes: ex.notes ?? null,
+    });
+  }
+  return routineId;
+}
+
+/**
+ * Replaces a routine's exercise list, keeping the routine itself.
+ *
+ * Editing rather than delete-and-recreate, so sessions that reference the
+ * routine keep pointing at something real.
+ */
+export async function updateRoutine(
+  routineId: string,
+  input: { name?: string; notes?: string | null; exercises?: RoutineDraftExercise[] }
+): Promise<void> {
+  const patch: Record<string, string | null> = {};
+  if (input.name != null) patch.name = input.name.trim();
+  if (input.notes !== undefined) patch.notes = input.notes?.trim() || null;
+  if (Object.keys(patch).length > 0) {
+    await db.update(routines).set(patch).where(eq(routines.id, routineId));
+  }
+
+  if (input.exercises) {
+    await db.delete(routineExercises).where(eq(routineExercises.routineId, routineId));
+    let position = 0;
+    for (const ex of input.exercises) {
+      await db.insert(routineExercises).values({
+        id: newId('re'),
+        routineId,
+        exerciseId: ex.exerciseId,
+        position: position++,
+        targetSets: ex.targetSets,
+        targetReps: ex.targetReps,
+        restSeconds: ex.restSeconds,
+        notes: ex.notes ?? null,
+      });
+    }
+  }
+}
+
 /** Deletes a routine and its exercise list. Logged sessions are untouched. */
 export async function deleteRoutine(routineId: string): Promise<void> {
   await db.delete(routineExercises).where(eq(routineExercises.routineId, routineId));

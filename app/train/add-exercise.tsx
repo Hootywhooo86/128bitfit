@@ -139,7 +139,31 @@ export default function AddExerciseScreen() {
               </Pressable>
             )}
             ListEmptyComponent={
-              !loading ? <Text style={styles.empty}>No matches.</Text> : null
+              loading ? null : (
+                <View style={styles.emptyWrap}>
+                  <Text style={styles.empty}>
+                    {muscle
+                      ? `Nothing in the library for ${muscle}${search ? ` matching “${search}”` : ''}.`
+                      : `Nothing matches “${search}”.`}
+                  </Text>
+                  {/*
+                    A dead end with no way out is the worst version of this
+                    screen: the whole reason to search a muscle is that you are
+                    standing in front of something and want to log it.
+                  */}
+                  <Pressable
+                    style={styles.emptyBtn}
+                    onPress={() =>
+                      router.push(`/exercise/new?sessionId=${encodeURIComponent(sid)}`)
+                    }
+                  >
+                    <Text style={styles.emptyBtnText}>Make your own →</Text>
+                  </Pressable>
+                  <Text style={styles.emptyHint}>
+                    Photograph the machine and the AI fills it in, or type it yourself.
+                  </Text>
+                </View>
+              )
             }
           />
         )}
@@ -212,5 +236,14 @@ const styles = StyleSheet.create({
   rowTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
   rowMeta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   plus: { color: colors.accent, fontSize: 22, fontWeight: '800', marginLeft: 8 },
-  empty: { color: colors.textMuted, textAlign: 'center', marginTop: 40 },
+  emptyWrap: { marginTop: 36, alignItems: 'center', gap: 10, paddingHorizontal: spacing.md },
+  empty: { color: colors.textMuted, textAlign: 'center' },
+  emptyBtn: {
+    backgroundColor: colors.accent,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+  },
+  emptyBtnText: { color: colors.onAccent, fontWeight: '800', fontSize: 13 },
+  emptyHint: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 17 },
 });

@@ -37,7 +37,8 @@ export default function HomeScreen() {
   const { ready } = useDb();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const { state: healthState } = useTodaySteps();
+  const { state: healthState, refresh: refreshHealth } = useTodaySteps();
+  const [refreshing, setRefreshing] = useState(false);
 
   const [calories, setCalories] = useState<number | null>(null);
   const [waterMl, setWaterMl] = useState(0);
@@ -91,6 +92,19 @@ export default function HomeScreen() {
     }, [refresh])
   );
 
+  /**
+   * Pull to re-read everything, including the phone's health data.
+   *
+   * Focusing the screen already re-reads the database, but steps and sleep
+   * come from Health Connect and change while the app is open — walking with
+   * Home on screen used to leave the step count stale with no way to nudge it
+   * short of leaving the tab and coming back.
+   */
+  const pullToRefresh = useCallback(() => {
+    setRefreshing(true);
+    void Promise.allSettled([refresh(), refreshHealth()]).finally(() => setRefreshing(false));
+  }, [refresh, refreshHealth]);
+
   const water = async (ml: number) => {
     const next = Math.max(0, waterMl + ml);
     setWaterMl(next);
@@ -111,7 +125,7 @@ export default function HomeScreen() {
   const waterPct = waterTarget > 0 ? (waterMl / waterTarget) * 100 : 0;
 
   return (
-    <Screen section="Home">
+    <Screen section="Home" onRefresh={pullToRefresh} refreshing={refreshing}>
       <SessionCard
         title={inProgress ? 'SESSION IN PROGRESS' : 'START TRAINING'}
         sub={

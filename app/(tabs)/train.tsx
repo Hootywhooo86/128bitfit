@@ -144,6 +144,12 @@ export default function TrainScreen() {
         />
       ))}
       <MenuRow
+        icon="+"
+        name="Build a routine"
+        sub="Plan one now, run it later"
+        onPress={() => router.push('/train/build-routine')}
+      />
+      <MenuRow
         icon="✎"
         name="Freestyle session"
         sub="Start empty and pick as you go"
