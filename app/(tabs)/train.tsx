@@ -144,6 +144,12 @@ export default function TrainScreen() {
         />
       ))}
       <MenuRow
+        icon="◈"
+        name="What have I skipped?"
+        sub="Builds a session from muscles with no sets in 30 days"
+        onPress={() => router.push('/train/suggested')}
+      />
+      <MenuRow
         icon="+"
         name="Build a routine"
         sub="Plan one now, run it later"

@@ -35,7 +35,7 @@ export function periodFor(days: number): MusclePeriod {
  * Completed sets in the window, grouped by exercise, with that exercise's
  * muscles. Grouping in SQL keeps this one query rather than one per exercise.
  */
-async function workEntries(since: Date): Promise<MuscleWorkEntry[]> {
+export async function workEntries(since: Date): Promise<MuscleWorkEntry[]> {
   const rows = await db
     .select({
       completedSets: sql<number>`count(${sets.id})`,
