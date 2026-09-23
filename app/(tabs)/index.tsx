@@ -8,7 +8,7 @@ import { WeightCard } from '@/components/WeightCard';
 import { Bar, Card, CardHead, Label, MenuRow, Screen, SessionCard, Stat3 } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { addWater, getDayFuelSummary } from '@/db/food-queries';
-import { countRecentSets, getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';
+import { countRecentSets, getMuscleTally, periodFor } from '@/db/muscle-queries';
 import { getAppSettings } from '@/db/settings-queries';
 import { getLatestWeightEntry, weightInKg } from '@/db/weight-queries';
 import type { WeightEntry } from '@/db/schema';
@@ -22,7 +22,7 @@ import {
 import { useTodaySteps } from '@/lib/health/use-health';
 import { useLatestWeight } from '@/lib/health/use-weight';
 import { formatKg } from '@/lib/weight-source';
-import { emptyRoles, emptyTally, type MuscleRoles, type MuscleTally } from '@/lib/muscle-load';
+import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
 import type { WeightUnit } from '@/db/settings-queries';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
@@ -49,7 +49,6 @@ export default function HomeScreen() {
   const [latestWeight, setLatestWeight] = useState<WeightEntry | null>(null);
   const [units, setUnits] = useState<WeightUnit>('lb');
   const [tally, setTally] = useState<MuscleTally>(emptyTally());
-  const [roles, setRoles] = useState<MuscleRoles>(emptyRoles());
   const [recentSets, setRecentSets] = useState<number | null>(null);
   const [untagged, setUntagged] = useState<{ count: number; sets: number }>({ count: 0, sets: 0 });
 
@@ -57,7 +56,7 @@ export default function HomeScreen() {
     if (!ready) return;
     try {
       const since = periodFor(7).since;
-      const [appSettings, fuel, workout, active, weight, count, t, r, rs, un] = await Promise.all([
+      const [appSettings, fuel, workout, active, weight, count, t, rs, un] = await Promise.all([
         getAppSettings(),
         getDayFuelSummary(new Date()),
         getLastCompletedWorkoutSummary(),
@@ -65,7 +64,6 @@ export default function HomeScreen() {
         getLatestWeightEntry(),
         countCompletedSessions(),
         getMuscleTally(since),
-        getMuscleRoles(since),
         countRecentSets(2),
         listUntaggedExercises(),
       ]);
@@ -78,7 +76,6 @@ export default function HomeScreen() {
       setLatestWeight(weight);
       setSessionCount(count);
       setTally(t);
-      setRoles(r);
       setRecentSets(rs);
       setUntagged({ count: un.length, sets: un.reduce((n, e) => n + e.setCount, 0) });
     } finally {
@@ -199,7 +196,7 @@ export default function HomeScreen() {
       />
 
       <View style={{ height: 10 }} />
-      <MuscleLoadCard tally={tally} roles={roles} untagged={untagged} />
+      <MuscleLoadCard tally={tally} untagged={untagged} />
 
       {lastWorkout ? (
         <MenuRow

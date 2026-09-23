@@ -1,33 +1,36 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { MuscleMap } from '@/components/MuscleMap';
 import {
   MUSCLE_LABELS,
-  neglectedMuscles,
-  rankMuscles,
-  type MuscleRoles,
+  topTrained,
+  type LoadLevel,
   type MuscleTally,
 } from '@/lib/muscle-load';
-import { colors, spacing } from '@/lib/theme';
+import { colors, muscleHeat, spacing } from '@/lib/theme';
 
 /**
- * Muscle load on Home — the app's signature view, so it sits up front rather
- * than buried behind a tab.
+ * The muscles you have trained most, on Home.
+ *
+ * This replaced the body silhouette. The map is honest but it is mostly grey
+ * until every exercise is tagged, and grey tells you nothing about the week
+ * you just had. A short ranked strip changes with your training and reads at
+ * a glance.
+ *
+ * All seventeen muscle groups remain — this shows the top few of them, it
+ * does not merge them into broader buckets. The map itself is still there
+ * behind Progress for anyone who wants the whole picture.
  */
 export function MuscleLoadCard({
   tally,
-  roles,
   untagged,
 }: {
   tally: MuscleTally;
-  roles: MuscleRoles;
   /** Exercises with sets logged but no muscles recorded, and how many sets. */
   untagged?: { count: number; sets: number };
 }) {
   const router = useRouter();
-  const ranked = rankMuscles(tally).filter((r) => r.sets > 0);
-  const neglected = neglectedMuscles(tally);
+  const top = topTrained(tally, 6);
 
   return (
     <Pressable style={styles.card} onPress={() => router.push('/progress')}>
@@ -36,17 +39,19 @@ export function MuscleLoadCard({
         <Text style={styles.link}>Last 7 days →</Text>
       </View>
 
-      <MuscleMap roles={roles} width={104} showLegend={false} />
-
-      {ranked.length > 0 ? (
-        <Text style={styles.hint} numberOfLines={2}>
-          Most worked: {ranked.slice(0, 3).map((r) => MUSCLE_LABELS[r.muscle]).join(', ')}
-          {neglected.length > 0
-            ? ` · Least: ${neglected.map((m) => MUSCLE_LABELS[m]).join(', ')}`
-            : ''}
-        </Text>
+      {top.length > 0 ? (
+        <View style={styles.strip}>
+          {top.map((t) => (
+            <View key={t.muscle} style={[styles.chip, levelStyle[t.level]]}>
+              <Text style={[styles.chipName, levelText[t.level]]} numberOfLines={1}>
+                {MUSCLE_LABELS[t.muscle].toUpperCase()}
+              </Text>
+              <Text style={[styles.chipSets, levelText[t.level]]}>{round(t.sets)}</Text>
+            </View>
+          ))}
+        </View>
       ) : (
-        // Grey everywhere is the honest first-run state, and it wants filling in.
+        // Nothing trained is its own state, not six muscles reading zero.
         <Text style={styles.hint}>No completed workouts this week yet.</Text>
       )}
 
@@ -73,7 +78,45 @@ export function MuscleLoadCard({
   );
 }
 
+/** Sets can be half, from an assisting muscle. One decimal, never three. */
+function round(n: number): string {
+  return String(Math.round(n * 10) / 10);
+}
+
+/**
+ * The one colour rule in the brief: yellow 1-3, orange 4-7, red 8+, grey for
+ * untrained. muscleHeat is that scale, shared with the map so the two can
+ * never drift into meaning different things.
+ */
+const levelStyle: Record<LoadLevel, { borderColor: string }> = {
+  none: { borderColor: colors.border },
+  light: { borderColor: muscleHeat.light },
+  medium: { borderColor: muscleHeat.medium },
+  heavy: { borderColor: muscleHeat.heavy },
+};
+
+const levelText: Record<LoadLevel, { color: string }> = {
+  none: { color: colors.textMuted },
+  light: { color: muscleHeat.light },
+  medium: { color: muscleHeat.medium },
+  heavy: { color: muscleHeat.heavy },
+};
+
 const styles = StyleSheet.create({
+  strip: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  chip: {
+    backgroundColor: colors.surfaceAlt,
+    flexGrow: 1,
+    flexBasis: '30%',
+    borderWidth: 1,
+    borderRadius: 9,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    gap: 3,
+  },
+  chipName: { fontSize: 9.5, letterSpacing: 0.6, fontWeight: '700' },
+  chipSets: { fontSize: 17, fontWeight: '700' },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 12,

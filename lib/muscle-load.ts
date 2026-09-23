@@ -170,3 +170,26 @@ export function neglectedMuscles(tally: MuscleTally, limit = 3): MuscleGroup[] {
     .slice(0, limit)
     .map((r) => r.muscle);
 }
+
+/**
+ * The muscles you have actually trained, hardest first.
+ *
+ * What Home shows instead of the body map: a short ranked strip that changes
+ * with your training, rather than a silhouette that is mostly grey until the
+ * whole library is tagged. All seventeen groups stay — this picks the top few
+ * of them, it does not merge them into broader ones.
+ *
+ * Only muscles with work on them. A muscle sitting at zero is not one of the
+ * ones you trained most, and padding the strip out to a fixed length with
+ * zeroes would put untrained muscles in a list headed "most trained".
+ */
+export function topTrained(
+  tally: MuscleTally,
+  limit = 6
+): { muscle: MuscleGroup; sets: number; level: LoadLevel }[] {
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+  return rankMuscles(tally)
+    .filter((r) => r.sets > 0)
+    .slice(0, limit)
+    .map((r) => ({ ...r, level: loadLevel(r.sets) }));
+}
