@@ -30,6 +30,12 @@ import {
   coachChat,
   defaultUserPromptForMode,
 } from '@/lib/ai-coach';
+import {
+  buildCoachMessages,
+  isOpeningTurn,
+  threadTitle,
+  type CoachTurn,
+} from '@/lib/coach-thread';
 import { colors, spacing } from '@/lib/theme';
 
 function isCoachMode(v: string): v is CoachMode {
@@ -49,11 +55,16 @@ export default function CoachSessionScreen() {
   const [providerLabel, setProviderLabel] = useState('');
 
   const [question, setQuestion] = useState('');
-  const [reply, setReply] = useState<string | null>(null);
+  // A conversation, not a single reply. The old `reply` slot was overwritten
+  // on every ask, which is why three questions felt like three separate
+  // screens rather than one thread.
+  const [turns, setTurns] = useState<CoachTurn[]>([]);
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** What was asked first, so the opening can be rebuilt for later turns. */
+  const openingQuestion = useRef('');
 
   useEffect(() => {
     if (!ready) return;
@@ -82,36 +93,49 @@ export default function CoachSessionScreen() {
 
   const onAsk = useCallback(async () => {
     if (!ctx || asking) return;
+    const typed = question.trim();
+    const opening = isOpeningTurn(turns);
+    // After the opening there is nothing to send but the question itself.
+    if (!opening && !typed) return;
+
     setAskError(null);
     setAsking(true);
-    setReply(null);
-
     const controller = new AbortController();
     abortRef.current = controller;
+
+    // Shown straight away, so the question does not vanish for the length of
+    // the round trip. Removed again if the send fails.
+    const asked: CoachTurn = { role: 'user', content: typed || coachModeLabel(mode) };
+    setTurns((prev) => [...prev, asked]);
+    setQuestion('');
 
     try {
       const runtime = await getAiRuntimeConfig();
       if (!runtime.apiKey) {
         setHasKey(false);
-        setAskError('No API key configured. Add one in Settings.');
-        return;
+        throw new AiCoachError('No API key configured. Add one in Settings.');
       }
       setHasKey(true);
       setProviderLabel(`${runtime.provider} · ${runtime.model}`);
 
-      const userContent = defaultUserPromptForMode(mode, ctx.promptBlock, question);
-      const messages = [
-        { role: 'system' as const, content: buildSystemPrompt() },
-        { role: 'user' as const, content: userContent },
-      ];
+      if (opening) openingQuestion.current = typed;
+
+      // The opening carries the mode's instructions and the local summary, and
+      // is the only message that does. Follow-ups are just what was asked —
+      // the model already has the rest of the thread.
+      const messages = buildCoachMessages({
+        system: buildSystemPrompt(),
+        opening: defaultUserPromptForMode(mode, ctx.promptBlock, openingQuestion.current),
+        turns: opening ? [] : [...turns, asked],
+      });
 
       let tid = threadId;
       if (!tid) {
-        const thread = await createCoachThread(mode, question.trim() || undefined);
+        const thread = await createCoachThread(mode, threadTitle(typed, coachModeLabel(mode)));
         tid = thread.id;
         setThreadId(tid);
       }
-      await appendCoachMessage(tid, 'user', question.trim() || userContent.slice(0, 200));
+      await appendCoachMessage(tid, 'user', asked.content);
 
       const result = await coachChat({
         provider: runtime.provider,
@@ -122,22 +146,42 @@ export default function CoachSessionScreen() {
         signal: controller.signal,
       });
 
-      setReply(result.content);
+      setTurns((prev) => [...prev, { role: 'assistant', content: result.content }]);
       await appendCoachMessage(tid, 'assistant', result.content);
     } catch (e) {
       if (controller.signal.aborted) return;
-      const msg =
-        e instanceof AiCoachError
-          ? e.message
-          : e instanceof Error
-            ? e.message
-            : String(e);
-      setAskError(msg);
+      setAskError(e instanceof Error ? e.message : String(e));
+      // Take the question back out and put the text back in the box, so a
+      // failed send costs nothing but the wait.
+      setTurns((prev) => prev.filter((t) => t !== asked));
+      setQuestion(typed);
     } finally {
       setAsking(false);
       abortRef.current = null;
     }
-  }, [ctx, asking, mode, question, threadId]);
+  }, [ctx, asking, mode, question, threadId, turns]);
+
+  /**
+   * Starts over: new thread, fresh context.
+   *
+   * The summary is assembled when the screen loads, so a conversation started
+   * this morning is answering with this morning's numbers. Reset rebuilds it,
+   * which is the only way to pick up a session logged since.
+   */
+  const onReset = useCallback(async () => {
+    abortRef.current?.abort();
+    setTurns([]);
+    setThreadId(null);
+    setQuestion('');
+    setAskError(null);
+    setAsking(false);
+    openingQuestion.current = '';
+    try {
+      setCtx(await buildCoachContext(mode));
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : String(e));
+    }
+  }, [mode]);
 
   if (!ready || (!ctx && !loadError)) {
     return (
@@ -183,19 +227,32 @@ export default function CoachSessionScreen() {
           <Text style={styles.providerLine}>Using {providerLabel} (BYO key)</Text>
         )}
 
-        <Text style={styles.label}>
-          {mode === 'ask' ? 'Your question' : 'Optional note'}
-        </Text>
+        <View style={styles.labelRow}>
+          <Text style={styles.label}>
+            {turns.length > 0
+              ? 'Follow up'
+              : mode === 'ask'
+                ? 'Your question'
+                : 'Optional note'}
+          </Text>
+          {turns.length > 0 ? (
+            <Pressable onPress={() => void onReset()} hitSlop={10} disabled={asking}>
+              <Text style={[styles.reset, asking && { opacity: 0.4 }]}>Reset</Text>
+            </Pressable>
+          ) : null}
+        </View>
         <TextInput
           style={[styles.input, styles.inputMultiline]}
           value={question}
           onChangeText={setQuestion}
           placeholder={
-            mode === 'ask'
-              ? 'e.g. How should I adjust protein on rest days?'
-              : mode === 'debrief'
-                ? 'Anything notable about the session?'
-                : 'Focus for next week?'
+            turns.length > 0
+              ? 'Ask a follow-up — it remembers what was said'
+              : mode === 'ask'
+                ? 'e.g. How should I adjust protein on rest days?'
+                : mode === 'debrief'
+                  ? 'Anything notable about the session?'
+                  : 'Focus for next week?'
           }
           placeholderTextColor={colors.textMuted}
           multiline
@@ -217,7 +274,7 @@ export default function CoachSessionScreen() {
             <ActivityIndicator color={colors.chipActiveText} />
           ) : (
             <Text style={styles.askBtnText}>
-              {hasKey ? askLabel : 'Configure API key in Settings'}
+              {!hasKey ? 'Configure API key in Settings' : turns.length > 0 ? 'Send' : askLabel}
             </Text>
           )}
         </Pressable>
@@ -236,17 +293,33 @@ export default function CoachSessionScreen() {
           </View>
         ) : null}
 
-        {reply ? (
-          <View style={styles.replyCard}>
-            <Text style={styles.section}>Coach reply</Text>
-            <Text style={styles.reply}>{reply}</Text>
+        {turns.length > 0 ? (
+          <View style={styles.thread}>
+            {turns.map((t, i) => (
+              <View
+                key={`${i}-${t.role}`}
+                style={t.role === 'user' ? styles.userBubble : styles.replyCard}
+              >
+                <Text style={styles.section}>{t.role === 'user' ? 'You' : 'Coach'}</Text>
+                <Text style={styles.reply}>{t.content}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
 
-        <Text style={styles.section}>Assembled context (SQLite)</Text>
-        <View style={styles.contextCard}>
-          <Text style={styles.mono}>{ctx.promptBlock}</Text>
-        </View>
+        {turns.length === 0 ? (
+          <>
+            <Text style={styles.section}>Assembled context (SQLite)</Text>
+            <View style={styles.contextCard}>
+              <Text style={styles.mono}>{ctx.promptBlock}</Text>
+            </View>
+          </>
+        ) : (
+          <Text style={styles.footer}>
+            Context was assembled when this thread started. Reset to pick up anything logged
+            since.
+          </Text>
+        )}
 
         <Text style={styles.footer}>
           Assembled {new Date(ctx.assembledAt).toLocaleString()}
@@ -259,6 +332,16 @@ export default function CoachSessionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
+  thread: { gap: spacing.sm, marginTop: spacing.sm },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reset: { color: colors.textMuted, fontSize: 13, textDecorationLine: 'underline' },
+  userBubble: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    padding: spacing.md,
+  },
   center: {
     flex: 1,
     backgroundColor: colors.bg,
