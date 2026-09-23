@@ -3,33 +3,40 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { Label, MenuRow, Screen, SessionCard } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
+import { countLibraryExercises } from '@/db/queries';
 import { ensureStarterRoutines } from '@/db/seed-routines';
 import {
   discardSession,
   getInProgressSession,
   listRoutines,
-  startFreestyleWorkout,
-  startRoutineWorkout,
 } from '@/db/workout-queries';
 import type { Routine, WorkoutSession } from '@/db/schema';
 import { colors } from '@/lib/theme';
 
 export default function TrainScreen() {
   const router = useRouter();
-  const { ready, exerciseCount } = useDb();
+  const { ready } = useDb();
+  // Queried on focus rather than read from the import result, which is set
+  // once at launch and never moves — so an exercise you just made was not
+  // counted until you restarted the app.
+  const [exerciseCount, setExerciseCount] = useState(0);
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [inProgress, setInProgress] = useState<WorkoutSession | null>(null);
   const [loading, setLoading] = useState(true);
-  const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!ready) return;
     setLoading(true);
     try {
       await ensureStarterRoutines();
-      const [r, session] = await Promise.all([listRoutines(), getInProgressSession()]);
+      const [r, session, exCount] = await Promise.all([
+        listRoutines(),
+        getInProgressSession(),
+        countLibraryExercises(),
+      ]);
       setRoutines(r);
       setInProgress(session);
+      setExerciseCount(exCount);
     } finally {
       setLoading(false);
     }
@@ -40,42 +47,6 @@ export default function TrainScreen() {
       void refresh();
     }, [refresh])
   );
-
-  const startFreestyle = async () => {
-    if (busy) return;
-    if (inProgress) {
-      Alert.alert(
-        'Workout in progress',
-        'Resume the current workout or discard it before starting a new one.'
-      );
-      return;
-    }
-    setBusy(true);
-    try {
-      const id = await startFreestyleWorkout();
-      router.push(`/train/active?id=${encodeURIComponent(id)}`);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const startRoutine = async (routineId: string) => {
-    if (busy) return;
-    if (inProgress) {
-      Alert.alert(
-        'Workout in progress',
-        'Resume the current workout or discard it before starting a new one.'
-      );
-      return;
-    }
-    setBusy(true);
-    try {
-      const id = await startRoutineWorkout(routineId);
-      router.push(`/train/active?id=${encodeURIComponent(id)}`);
-    } finally {
-      setBusy(false);
-    }
-  };
 
   const onDiscard = () => {
     if (!inProgress) return;
@@ -102,7 +73,6 @@ export default function TrainScreen() {
     );
   }
 
-  const todays = routines[0];
 
   return (
     <Screen section="Train">
@@ -122,10 +92,14 @@ export default function TrainScreen() {
         />
       ) : (
         <SessionCard
-          title={todays ? todays.name.toUpperCase() : 'FREESTYLE'}
-          sub={todays ? 'Scheduled today · or pick something else' : 'Pick exercises as you go'}
-          action="START WORKOUT"
-          onPress={() => (todays ? void startRoutine(todays.id) : void startFreestyle())}
+          title="START WORKOUT"
+          sub={
+            routines.length > 0
+              ? 'Pick a routine, or go freestyle'
+              : 'Go freestyle, or build a routine first'
+          }
+          action="CHOOSE"
+          onPress={() => router.push('/train/start')}
         />
       )}
 
@@ -134,48 +108,33 @@ export default function TrainScreen() {
       ) : null}
 
       <Label>BUILD</Label>
-      {routines.map((r) => (
-        <MenuRow
-          key={r.id}
-          icon="▤"
-          name={r.name}
-          sub={r.notes ?? 'Ready to run'}
-          onPress={() => void startRoutine(r.id)}
-        />
-      ))}
       <MenuRow
-        icon="◈"
-        name="What have I skipped?"
-        sub="Builds a session from muscles with no sets in 30 days"
-        onPress={() => router.push('/train/suggested')}
-      />
-      <MenuRow
-        icon="+"
-        name="Build a routine"
-        sub="Plan one now, run it later"
-        onPress={() => router.push('/train/build-routine')}
+        icon="▤"
+        name="Saved routines"
+        sub="Your workouts, ready to run"
+        value={String(routines.length)}
+        onPress={() => router.push('/train/routines')}
       />
       <MenuRow
         icon="✎"
-        name="Freestyle session"
-        sub="Start empty and pick as you go"
-        onPress={() => void startFreestyle()}
+        name="Workout builder"
+        sub="Plan a session now, run it later"
+        onPress={() => router.push('/train/build-routine')}
       />
-      {routines.length > 0 ? (
-        <MenuRow
-          icon="✕"
-          name="Manage routines"
-          sub="Delete ones you don't use"
-          value={String(routines.length)}
-          onPress={() => router.push('/train/routines')}
-        />
-      ) : null}
       <MenuRow
         icon="▦"
         name="Exercise library"
         sub="Browse, or create your own"
         value={String(exerciseCount)}
         onPress={() => router.push('/exercise')}
+      />
+
+      <Label>PLAN</Label>
+      <MenuRow
+        icon="◈"
+        name="What have I skipped?"
+        sub="Builds a session from muscles with no sets in 30 days"
+        onPress={() => router.push('/train/suggested')}
       />
 
       <Label>REVIEW</Label>

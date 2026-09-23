@@ -96,3 +96,17 @@ export async function countExercises(): Promise<number> {
 }
 
 export { sql };
+
+/**
+ * How many exercises the library actually holds, for display.
+ *
+ * Deliberately NOT getCounts().exercises. That one excludes the categories the
+ * user owns, because it is compared against the bundled manifest to decide
+ * whether a re-import is needed — counting a custom exercise there would make
+ * the app re-import on every launch and delete it. This one is the opposite
+ * question: everything you can browse, including what you made.
+ */
+export async function countLibraryExercises(): Promise<number> {
+  const [row] = await db.select({ n: sql<number>`count(*)` }).from(exercises);
+  return Number(row?.n ?? 0);
+}
