@@ -91,13 +91,22 @@ export default function RoutinesScreen() {
         <>
           <Label>{routines.length} ROUTINES</Label>
           <Note>
-            Deleting a routine removes the plan only. Sessions you logged from it stay in your
-            history and on the muscle map — they happened.
+            Tap one to see what is in it and start it. Deleting removes the plan only — sessions
+            you logged from it stay in your history and on the muscle map, because they happened.
           </Note>
           {routines.map((r) => (
             <Card key={r.id}>
               <View style={s.row}>
-                <View style={{ flex: 1 }}>
+                {/*
+                  The row itself runs the routine. This screen was reachable
+                  from "Saved routines" while offering only Edit and Delete,
+                  so the obvious thing to do with a routine — run it — was the
+                  one thing you could not do from here.
+                */}
+                <Pressable
+                  style={{ flex: 1 }}
+                  onPress={() => router.push(`/train/preview?id=${encodeURIComponent(r.id)}`)}
+                >
                   <Text style={s.name}>{r.name}</Text>
                   <Text style={s.meta}>
                     {r.exerciseCount} exercise{r.exerciseCount === 1 ? '' : 's'}
@@ -109,7 +118,7 @@ export default function RoutinesScreen() {
                       {r.exerciseCount > r.names.length ? ' …' : ''}
                     </Text>
                   ) : null}
-                </View>
+                </Pressable>
                 <Pressable
                   style={s.edit}
                   onPress={() => router.push(`/train/build-routine?id=${encodeURIComponent(r.id)}`)}
