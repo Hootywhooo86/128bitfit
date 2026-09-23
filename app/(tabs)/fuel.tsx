@@ -2,7 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CalorieRing } from '@/components/CalorieRing';
-import { Card, MacroBar, QuickActions, Screen } from '@/components/ui';
+import { Card, MacroBar, MenuRow, QuickActions, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { getDayFuelSummary, type DayFuelSummary } from '@/db/food-queries';
 import { MEAL_TYPES, type MealType } from '@/db/schema';
@@ -127,6 +127,17 @@ export default function FuelScreen() {
           </View>
         );
       })}
+
+      {/*
+        The whole day, not just the three big numbers. Sits at the bottom
+        because it is the thing you look at after logging, not before.
+      */}
+      <MenuRow
+        icon="▥"
+        name="Detailed nutrition"
+        sub="Every vitamin and mineral today, and the 7- and 30-day averages"
+        onPress={() => router.push('/fuel/detail')}
+      />
     </Screen>
   );
 }
