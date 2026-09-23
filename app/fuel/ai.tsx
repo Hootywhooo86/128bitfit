@@ -14,18 +14,13 @@ import { Card, Label, Note, Screen } from '@/components/ui';
 import { insertFoodLog, logFoodFromCatalog } from '@/db/food-queries';
 import { insertCustomFood } from '@/db/barcode-queries';
 import { describeIngredients, fallbackRecipeName, recipeTotals } from '@/lib/recipe';
-import { MEAL_TYPES, type MealType } from '@/db/schema';
+import type { MealType } from '@/db/schema';
 import { MAX_RECIPE_PHOTOS, estimateFood, type AiPhoto } from '@/lib/ai-food-client';
 import { totalsOf, type AiFoodItem } from '@/lib/ai-food';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
+import { MealSlot } from '@/components/MealSlot';
+import { mealTimestamp, type MealDay } from '@/lib/meal-time';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
-
-const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'BREAKFAST',
-  lunch: 'LUNCH',
-  dinner: 'DINNER',
-  snack: 'SNACK',
-};
 
 /**
  * Log a meal by describing it, or by photographing it.
@@ -53,6 +48,7 @@ export default function AiFoodScreen() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [items, setItems] = useState<AiFoodItem[] | null>(null);
+  const [mealDay, setMealDay] = useState<MealDay>('today');
   const [mealType, setMealType] = useState<MealType>(
     defaultMealTypeForHour(new Date().getHours())
   );
@@ -177,6 +173,7 @@ export default function AiFoodScreen() {
       await logFoodFromCatalog(food, {
         servings: ateNum(),
         mealType,
+        loggedAt: mealTimestamp(mealType, mealDay),
         notes: 'AI estimate',
       });
       router.replace('/(tabs)/fuel');
@@ -199,6 +196,7 @@ export default function AiFoodScreen() {
           foodId: null,
           customName: `${it.name} (${it.portion})`,
           mealType,
+          loggedAt: mealTimestamp(mealType, mealDay),
           servings: 1,
           calories: it.calories,
           protein: it.protein,
@@ -485,15 +483,12 @@ export default function AiFoodScreen() {
 
           <Label>MEAL</Label>
           <View style={s.meals}>
-            {MEAL_TYPES.map((m) => (
-              <Pressable
-                key={m}
-                style={[s.mealChip, mealType === m && s.mealOn]}
-                onPress={() => setMealType(m)}
-              >
-                <Text style={[s.mealT, mealType === m && s.mealTOn]}>{MEAL_LABELS[m]}</Text>
-              </Pressable>
-            ))}
+            <MealSlot
+              mealType={mealType}
+              onChangeMeal={setMealType}
+              day={mealDay}
+              onChangeDay={setMealDay}
+            />
           </View>
 
           <Pressable

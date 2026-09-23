@@ -6,6 +6,7 @@ import { listUserFoods } from '@/db/barcode-queries';
 import { useDb } from '@/db/DatabaseProvider';
 import { logFoodFromCatalog } from '@/db/food-queries';
 import type { Food } from '@/db/schema';
+import { mealTimestamp } from '@/lib/meal-time';
 import {
   defaultMealTypeForHour,
   formatOptionalGrams,
@@ -55,9 +56,13 @@ export default function CustomHubScreen() {
     if (logging) return;
     setLogging(food.id);
     try {
+      // One tap still means "now", but the slot decides the time the same way
+      // every other screen does, so a late-night tap does not land tomorrow.
+      const meal = defaultMealTypeForHour(new Date().getHours());
       await logFoodFromCatalog(food, {
         servings: 1,
-        mealType: defaultMealTypeForHour(new Date().getHours()),
+        mealType: meal,
+        loggedAt: mealTimestamp(meal, 'today'),
       });
       router.replace('/(tabs)/fuel');
     } catch (e) {
