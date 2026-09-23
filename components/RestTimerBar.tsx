@@ -14,6 +14,14 @@ export function RestTimerBar() {
         <Text style={styles.clock}>{formatRestClock(timer.remainingSeconds)}</Text>
       </View>
       <View style={styles.actions}>
+        {/*
+          Both directions. A rest you want to cut short is as common as one you
+          want to stretch — starting the next set early was previously only
+          possible by skipping the whole thing.
+        */}
+        <Pressable style={styles.btn} onPress={() => timer.addSeconds(-15)}>
+          <Text style={styles.btnText}>−15</Text>
+        </Pressable>
         <Pressable style={styles.btn} onPress={() => timer.addSeconds(15)}>
           <Text style={styles.btnText}>+15</Text>
         </Pressable>
@@ -44,7 +52,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 8 },
   btn: {
     backgroundColor: colors.surface,
-    paddingHorizontal: 14,
+    paddingHorizontal: 11,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,

@@ -10,6 +10,7 @@ import React, {
 import { Alert, AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
+import { adjustRest } from './rest-adjust';
 import {
   cancelRestNotification,
   ensureRestNotificationSetup,
@@ -86,8 +87,11 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
   const sessionIdRef = useRef<string | null>(null);
   const sessionExerciseIdRef = useRef<string | null>(null);
   const permissionsReadyRef = useRef(false);
+  // Read inside setEndsAt's updater, where a closure over state would be stale.
+  const totalSecondsRef = useRef(DEFAULT_REST);
 
   endsAtRef.current = endsAt;
+  totalSecondsRef.current = totalSeconds;
   sessionIdRef.current = sessionId;
   sessionExerciseIdRef.current = sessionExerciseId;
 
@@ -211,16 +215,29 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
       setEndsAt((prev) => {
         const seId = sessionExerciseIdRef.current;
         const sid = sessionIdRef.current;
-        if (prev == null) {
-          const secs = Math.max(1, delta);
-          const next = Date.now() + secs * 1000;
-          setTotalSeconds(secs);
+        const now = Date.now();
+        // adjustRest owns the edge cases — see lib/rest-adjust.ts. The one
+        // that used to bite: a negative tap with no rest running clamped the
+        // length to a minimum and started a one-second rest.
+        const action = adjustRest(
+          {
+            remainingMs: prev == null ? null : prev - now,
+            totalSeconds: totalSecondsRef.current,
+          },
+          delta
+        );
+
+        if (action.kind === 'none') return prev;
+
+        if (action.kind === 'start') {
+          const next = now + action.seconds * 1000;
+          setTotalSeconds(action.seconds);
           arm(next, seId, sid);
           return next;
         }
-        const next = prev + delta * 1000;
-        const remaining = Math.max(1, Math.ceil((next - Date.now()) / 1000));
-        setTotalSeconds((t) => Math.max(t, remaining));
+
+        const next = now + action.remainingMs;
+        setTotalSeconds(action.totalSeconds);
         arm(next, seId, sid);
         return next;
       });
