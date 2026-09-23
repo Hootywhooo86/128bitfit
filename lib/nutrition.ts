@@ -109,3 +109,36 @@ export function isCaloriesMissing(food: Pick<Food, 'nutrients'>): boolean {
   return n.calories == null || !Number.isFinite(n.calories);
 }
 
+
+/** Per-serving figures where a nutrient that was never recorded stays null. */
+export type OptionalNutrients = {
+  calories: number | null;
+  protein: number | null;
+  fat: number | null;
+  carb: number | null;
+};
+
+/**
+ * The same scaling as nutrientsPerServing, without the coercion to zero.
+ *
+ * nutrientsPerServing turns a missing nutrient into 0 so it can be added to a
+ * day's running total. That is the wrong shape for anything that displays a
+ * single food: 0 g of protein is a reading, and a food whose protein was never
+ * entered has no reading. Use this where a number is shown rather than summed.
+ */
+export function optionalNutrientsPerServing(
+  food: Pick<Food, 'servingSize' | 'nutritionBasis' | 'nutrients'>
+): OptionalNutrients {
+  const n = parseNutrients(food.nutrients);
+  const basis = food.nutritionBasis ?? 'per_100g';
+  const size = food.servingSize && food.servingSize > 0 ? food.servingSize : 100;
+  const factor = basis === 'per_serving' ? 1 : size / 100;
+  const scale = (v: number | null | undefined): number | null =>
+    typeof v === 'number' && Number.isFinite(v) ? v * factor : null;
+  return {
+    calories: scale(n.calories),
+    protein: scale(n.protein),
+    fat: scale(n.fat),
+    carb: scale(n.carb),
+  };
+}

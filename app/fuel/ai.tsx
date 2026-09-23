@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -11,7 +11,9 @@ import {
   View,
 } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
-import { insertFoodLog } from '@/db/food-queries';
+import { insertFoodLog, logFoodFromCatalog } from '@/db/food-queries';
+import { insertCustomFood } from '@/db/barcode-queries';
+import { describeIngredients, fallbackRecipeName, recipeTotals } from '@/lib/recipe';
 import { MEAL_TYPES, type MealType } from '@/db/schema';
 import { MAX_RECIPE_PHOTOS, estimateFood, type AiPhoto } from '@/lib/ai-food-client';
 import { totalsOf, type AiFoodItem } from '@/lib/ai-food';
@@ -36,10 +38,16 @@ const MEAL_LABELS: Record<MealType, string> = {
  */
 export default function AiFoodScreen() {
   const router = useRouter();
-  const [mode, setMode] = useState<'describe' | 'photo' | 'recipe'>('describe');
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const [mode, setMode] = useState<'describe' | 'photo' | 'recipe'>(
+    params.mode === 'recipe' ? 'recipe' : 'describe'
+  );
   const [shots, setShots] = useState<AiPhoto[]>([]);
   const [link, setLink] = useState('');
   const [servings, setServings] = useState('4');
+  const [recipeName, setRecipeName] = useState('');
+  /** How many of those servings you actually ate. */
+  const [ate, setAte] = useState('1');
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +118,11 @@ export default function AiFoodScreen() {
     return Number.isFinite(n) && n > 0 ? Math.round(n) : 1;
   };
 
+  const ateNum = () => {
+    const n = Number(ate);
+    return Number.isFinite(n) && n > 0 ? n : 1;
+  };
+
   const runRecipePhotos = async () => {
     if (busy || shots.length === 0) return;
     setBusy(true);
@@ -136,8 +149,47 @@ export default function AiFoodScreen() {
     setItems((prev) => prev && prev.map((it, n) => (n === i ? { ...it, ...patch } : it)));
   };
 
+  /**
+   * A recipe becomes one food you can log again, not a pile of ingredients in
+   * today.
+   *
+   * Saved to the catalogue with its per-serving panel, then logged for however
+   * many servings you actually ate. Next week it is in Custom → My recipes and
+   * needs no camera at all.
+   */
+  const saveRecipe = async () => {
+    if (!items || items.length === 0 || busy) return;
+    setBusy(true);
+    try {
+      const totals = recipeTotals(items);
+      const food = await insertCustomFood({
+        name: recipeName.trim() || fallbackRecipeName(items),
+        source: 'recipe',
+        description: describeIngredients(items, servingsNum()),
+        servingSize: 1,
+        servingUnit: 'serving',
+        nutritionBasis: 'per_serving',
+        calories: totals.calories,
+        protein: totals.protein,
+        fat: totals.fat,
+        carb: totals.carb,
+      });
+      await logFoodFromCatalog(food, {
+        servings: ateNum(),
+        mealType,
+        notes: 'AI estimate',
+      });
+      router.replace('/(tabs)/fuel');
+    } catch (e) {
+      Alert.alert('Save failed', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async () => {
     if (!items || items.length === 0 || busy) return;
+    if (mode === 'recipe') return saveRecipe();
     setBusy(true);
     try {
       for (const it of items) {
@@ -163,7 +215,13 @@ export default function AiFoodScreen() {
     }
   };
 
-  const totals = items ? totalsOf(items) : null;
+  // In recipe mode the panel must be the numbers that get saved, rounded the
+  // same way, or the card you keep disagrees with the card you were shown.
+  const recipe = items && mode === 'recipe' ? recipeTotals(items) : null;
+  const totals = recipe ?? (items ? totalsOf(items) : null);
+  const missing = recipe
+    ? (['protein', 'carb', 'fat'] as const).filter((k) => recipe.partial[k])
+    : [];
 
   return (
     <Screen section="AI log" back>
@@ -378,10 +436,51 @@ export default function AiFoodScreen() {
           ))}
 
           {totals ? (
-            <Text style={s.totals}>
-              Total {totals.calories} kcal · P {totals.protein ?? '–'} · C {totals.carb ?? '–'} · F{' '}
-              {totals.fat ?? '–'}
-            </Text>
+            <>
+              <Text style={s.totals}>
+                {mode === 'recipe' ? 'Per serving' : 'Total'} {totals.calories} kcal · P{' '}
+                {totals.protein ?? '–'} · C {totals.carb ?? '–'} · F {totals.fat ?? '–'}
+              </Text>
+              {missing.length > 0 ? (
+                <Text style={s.help}>
+                  {missing.join(', ')} {missing.length === 1 ? 'is' : 'are'} at least this much —
+                  an ingredient had no figure for it. Edit any row above to fill it in.
+                </Text>
+              ) : null}
+            </>
+          ) : null}
+
+          {/*
+            A recipe is saved as one food and logged by the serving, so it needs
+            a name to find it under and a count of how many you actually ate.
+            Without this the ingredients went into today as separate lines and
+            nothing was kept.
+          */}
+          {mode === 'recipe' ? (
+            <>
+              <Label>SAVE IT AS</Label>
+              <TextInput
+                style={s.input}
+                value={recipeName}
+                onChangeText={setRecipeName}
+                placeholder={fallbackRecipeName(items ?? [])}
+                placeholderTextColor={colors.textMuted}
+              />
+              <Text style={s.help}>
+                Kept in Custom → My recipes with the panel above, per serving. Logging it again
+                needs no camera.
+              </Text>
+
+              <Label>HOW MANY SERVINGS DID YOU EAT?</Label>
+              <TextInput
+                style={s.input}
+                value={ate}
+                onChangeText={setAte}
+                keyboardType="decimal-pad"
+                placeholder="1"
+                placeholderTextColor={colors.textMuted}
+              />
+            </>
           ) : null}
 
           <Label>MEAL</Label>

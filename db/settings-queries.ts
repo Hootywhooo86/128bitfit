@@ -1,8 +1,14 @@
 import { desc, eq } from 'drizzle-orm';
 import {
+  ACTIVITY_LEVELS,
+  DEFAULT_ACTIVITY,
+  DEFAULT_GOAL,
+  GOALS,
   ageFromBirthday,
   toMetric,
+  type ActivityLevel,
   type CalorieProfile,
+  type Goal,
   type SexOption,
 } from '@/lib/body';
 import { clampCalorieTarget, type ClampedTarget } from '@/lib/calorie-floor';
@@ -26,6 +32,10 @@ export type AppSettings = DailyGoals & {
   heightCm: number | null;
   /** Hold the screen awake while a workout is running. */
   keepAwake: boolean;
+  /** How much you move outside training — the TDEE multiplier. */
+  activity: ActivityLevel;
+  /** Cut, maintain or bulk. Adjusts the suggested target, never the floor. */
+  goal: Goal;
 };
 
 /**
@@ -42,6 +52,11 @@ const DEFAULT_DISPLAY_NAME = 'Athlete';
 const DEFAULT_UNITS: WeightUnit = 'lb';
 
 const SEX_VALUES: SexOption[] = ['female', 'male', 'other', 'prefer_not'];
+
+const parseActivity = (raw: string | null): ActivityLevel =>
+  ACTIVITY_LEVELS.some((l) => l.id === raw) ? (raw as ActivityLevel) : DEFAULT_ACTIVITY;
+const parseGoal = (raw: string | null): Goal =>
+  GOALS.some((g) => g.id === raw) ? (raw as Goal) : DEFAULT_GOAL;
 
 export async function getSetting(key: string): Promise<string | null> {
   const rows = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
@@ -90,6 +105,8 @@ export async function getAppSettings(): Promise<AppSettings> {
     birthdayRaw,
     heightRaw,
     keepAwakeRaw,
+    activityRaw,
+    goalRaw,
   ] = await Promise.all([
     getSetting('display_name'),
     getSetting('units'),
@@ -98,6 +115,8 @@ export async function getAppSettings(): Promise<AppSettings> {
     getSetting('birthday'),
     getSetting('height_cm'),
     getSetting('keep_awake'),
+    getSetting('activity_level'),
+    getSetting('goal'),
   ]);
   const units: WeightUnit = unitsRaw === 'kg' ? 'kg' : DEFAULT_UNITS;
   const heightN = heightRaw != null ? Number(heightRaw) : NaN;
@@ -110,6 +129,8 @@ export async function getAppSettings(): Promise<AppSettings> {
     birthday: birthdayRaw && /^\d{4}-\d{2}-\d{2}$/.test(birthdayRaw) ? birthdayRaw : null,
     heightCm: Number.isFinite(heightN) && heightN > 0 ? heightN : null,
     keepAwake: parseBool(keepAwakeRaw, DEFAULT_KEEP_AWAKE),
+    activity: parseActivity(activityRaw),
+    goal: parseGoal(goalRaw),
   };
 }
 
@@ -123,11 +144,12 @@ export async function getAppSettings(): Promise<AppSettings> {
  * cycle.
  */
 export async function getCalorieProfile(): Promise<CalorieProfile> {
-  const [sexRaw, birthdayRaw, heightRaw, unitsRaw] = await Promise.all([
+  const [sexRaw, birthdayRaw, heightRaw, unitsRaw, activityRaw] = await Promise.all([
     getSetting('sex'),
     getSetting('birthday'),
     getSetting('height_cm'),
     getSetting('units'),
+    getSetting('activity_level'),
   ]);
 
   const latest = await db
@@ -151,6 +173,9 @@ export async function getCalorieProfile(): Promise<CalorieProfile> {
     age: ageFromBirthday(birthdayRaw),
     weightKg: kg,
     heightCm: cm,
+    // Carried here too, or the floor and the suggestion disagree about what
+    // maintenance is for this person.
+    activity: parseActivity(activityRaw),
   };
 }
 
@@ -174,6 +199,8 @@ export async function updateAppSettings(patch: {
   birthday?: string | null;
   heightCm?: number | null;
   keepAwake?: boolean;
+  activity?: ActivityLevel;
+  goal?: Goal;
 }): Promise<AppSettings> {
   if (patch.calorieTarget != null) {
     // Non-negotiable #6: the floor is applied here, at the only path into the
@@ -210,6 +237,8 @@ export async function updateAppSettings(patch: {
   if (patch.keepAwake != null) {
     await setSetting('keep_awake', patch.keepAwake ? '1' : '0');
   }
+  if (patch.activity != null) await setSetting('activity_level', patch.activity);
+  if (patch.goal != null) await setSetting('goal', patch.goal);
   return getAppSettings();
 }
 

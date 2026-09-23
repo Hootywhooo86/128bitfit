@@ -132,6 +132,23 @@ pipelines stay in `scripts/` + `assets/data/`. Run with `npx expo start` (or
   from `app/train/add-exercise.tsx` with a `sessionId`, which adds the finished
   exercise straight into the running session.
 
+### Calorie targets
+
+- `lib/body.ts` holds Mifflin-St Jeor (9.99 coefficient, as Gym Geek's
+  calculator states it), the five Harris-Benedict activity factors
+  (1.2 / 1.375 / 1.55 / 1.725 / 1.9) and the goal fractions (±10%, ±20%).
+- Activity and goal are settings (`activity_level`, `goal`); they were a single
+  hardcoded 1.375 before. `getCalorieProfile()` carries the activity level so
+  the floor and the suggestion agree on maintenance.
+- The floor in `lib/calorie-floor.ts` still has the last word on every target —
+  non-negotiable #6 — so no goal can produce a target below BMR.
+
+### Building a routine
+
+- `createRoutine` / `updateRoutine` in `db/workout-queries.ts`;
+  `app/train/build-routine.tsx` is both builder and editor (pass `id` to edit).
+  Position comes from array order, so two exercises cannot claim one slot.
+
 ### Personal records
 
 - Rule: `lib/personal-records.ts`. Two kinds kept apart — **heaviest** (a

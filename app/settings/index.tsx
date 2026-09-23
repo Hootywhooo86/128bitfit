@@ -19,6 +19,7 @@ import {
 import { useDb } from '@/db/DatabaseProvider';
 import {
   getAppSettings,
+  getCalorieProfile,
   previewCalorieTarget,
   updateAppSettings,
   type AppSettings,
@@ -28,6 +29,18 @@ import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
 import { explainFloor } from '@/lib/calorie-floor';
 import { HF_VISION_FAMILIES } from '@/lib/ai-fallback';
 import { AiKeyStoreError } from '@/lib/ai-secure';
+import {
+  ACTIVITY_LEVELS,
+  DEFAULT_ACTIVITY,
+  DEFAULT_GOAL,
+  GOALS,
+  basalMetabolicRate,
+  suggestCalorieTarget,
+  totalDailyEnergy,
+  type ActivityLevel,
+  type CalorieProfile,
+  type Goal,
+} from '@/lib/body';
 import { colors, spacing } from '@/lib/theme';
 import { HfModelPicker } from '@/components/HfModelPicker';
 import { Screen } from '@/components/ui';
@@ -44,6 +57,9 @@ export default function SettingsScreen() {
   const [waterTarget, setWaterTarget] = useState('2500');
   const [units, setUnits] = useState<WeightUnit>('lb');
   const [keepAwake, setKeepAwake] = useState(true);
+  const [activity, setActivity] = useState<ActivityLevel>(DEFAULT_ACTIVITY);
+  const [goal, setGoal] = useState<Goal>(DEFAULT_GOAL);
+  const [profile, setProfile] = useState<CalorieProfile | null>(null);
 
   const [aiProvider, setAiProvider] = useState<AiProviderId>('anthropic');
   const [aiModel, setAiModel] = useState('');
@@ -62,6 +78,8 @@ export default function SettingsScreen() {
     setWaterTarget(String(s.waterTargetMl));
     setUnits(s.units);
     setKeepAwake(s.keepAwake);
+    setActivity(s.activity);
+    setGoal(s.goal);
   };
 
   const applyAi = (s: AiSettings) => {
@@ -78,7 +96,12 @@ export default function SettingsScreen() {
     if (!ready) return;
     setLoading(true);
     try {
-      const [app, ai] = await Promise.all([getAppSettings(), getAiSettings()]);
+      const [app, ai, prof] = await Promise.all([
+        getAppSettings(),
+        getAiSettings(),
+        getCalorieProfile(),
+      ]);
+      setProfile(prof);
       applyApp(app);
       applyAi(ai);
     } finally {
@@ -118,6 +141,8 @@ export default function SettingsScreen() {
         waterTargetMl: Number(waterTarget) || 2500,
         units,
         keepAwake,
+        activity,
+        goal,
       });
       applyApp(nextApp);
       if (floorCheck.clamped) {
@@ -261,6 +286,42 @@ export default function SettingsScreen() {
           </Pressable>
         ))}
       </View>
+
+      <Text style={styles.label}>How active are you?</Text>
+      <Text style={styles.muted}>
+        Outside training. This is the multiplier on your maintenance calories, and it was
+        fixed at &quot;Light&quot; before — worth about 1,200 kcal a day between the ends of
+        the scale.
+      </Text>
+      {ACTIVITY_LEVELS.map((l) => (
+        <Pressable
+          key={l.id}
+          style={[styles.optRow, activity === l.id && styles.optRowOn]}
+          onPress={() => setActivity(l.id)}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.optName}>{l.label}</Text>
+            <Text style={styles.optDetail}>{l.detail}</Text>
+          </View>
+          <Text style={styles.optFactor}>×{l.factor}</Text>
+        </Pressable>
+      ))}
+
+      <Text style={styles.label}>What are you aiming for?</Text>
+      {GOALS.map((g) => (
+        <Pressable
+          key={g.id}
+          style={[styles.optRow, goal === g.id && styles.optRowOn]}
+          onPress={() => setGoal(g.id)}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.optName}>{g.label}</Text>
+            <Text style={styles.optDetail}>{g.detail}</Text>
+          </View>
+        </Pressable>
+      ))}
+
+      <MaintenanceNote profile={profile} activity={activity} goal={goal} />
 
       <Text style={styles.label}>During a workout</Text>
       <Pressable
@@ -408,6 +469,56 @@ export default function SettingsScreen() {
   );
 }
 
+/**
+ * What these two choices actually do to the numbers.
+ *
+ * Shown live, because "×1.55" means nothing on its own and the point of the
+ * setting is the calorie figure at the end of it. Renders nothing when the
+ * profile is too incomplete to compute one — a maintenance figure invented
+ * from a missing height and age would be exactly the made-up measurement the
+ * app exists to avoid.
+ */
+function MaintenanceNote({
+  profile,
+  activity,
+  goal,
+}: {
+  profile: CalorieProfile | null;
+  activity: ActivityLevel;
+  goal: Goal;
+}) {
+  if (!profile) return null;
+  const withActivity = { ...profile, activity };
+  const bmr = basalMetabolicRate(withActivity);
+  const tdee = totalDailyEnergy(withActivity);
+  if (bmr == null || tdee == null) {
+    return (
+      <Text style={styles.muted}>
+        Add your height, birthday and a weigh-in and this will show what you burn in a day.
+      </Text>
+    );
+  }
+  const target = suggestCalorieTarget(withActivity, goal);
+  return (
+    <View style={styles.calcCard}>
+      <Text style={styles.calcRow}>
+        Resting burn <Text style={styles.calcNum}>{Math.round(bmr).toLocaleString()}</Text> kcal
+      </Text>
+      <Text style={styles.calcRow}>
+        Maintenance <Text style={styles.calcNum}>{Math.round(tdee).toLocaleString()}</Text> kcal
+      </Text>
+      <Text style={styles.calcRow}>
+        Suggested target <Text style={styles.calcNum}>{target.toLocaleString()}</Text> kcal
+      </Text>
+      <Text style={styles.optDetail}>
+        An estimate from height, weight, age and how active you say you are — not a
+        measurement. Set the target field above to this if you want it. Whatever you enter,
+        it is never allowed below your resting burn.
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   browseBtn: { paddingVertical: 10 },
   browseText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
@@ -448,6 +559,33 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   unitChipOn: { borderColor: colors.accent, backgroundColor: colors.track },
+  optRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    marginBottom: 6,
+  },
+  optRowOn: { borderColor: colors.accent, backgroundColor: colors.track },
+  optName: { color: colors.text, fontWeight: '700', fontSize: 14 },
+  optDetail: { color: colors.textMuted, fontSize: 11.5, lineHeight: 16, marginTop: 2 },
+  optFactor: { color: colors.textMuted, fontSize: 12.5, fontWeight: '700' },
+  calcCard: {
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    gap: 4,
+  },
+  calcRow: { color: colors.textMuted, fontSize: 13 },
+  calcNum: { color: colors.text, fontWeight: '800', fontSize: 15 },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',

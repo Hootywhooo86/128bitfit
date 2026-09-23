@@ -1,6 +1,14 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ViewStyle,
+} from 'react-native';
 import { TopBar } from '@/components/TopBar';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
@@ -23,12 +31,17 @@ export function Screen({
   back,
   right,
   scroll = true,
+  onRefresh,
+  refreshing = false,
 }: {
   section: string;
   children: React.ReactNode;
   back?: boolean;
   right?: 'gear' | 'none';
   scroll?: boolean;
+  /** Pull down to re-read. Omit on screens with nothing to re-read. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const router = useRouter();
   const bar = (
@@ -56,7 +69,24 @@ export function Screen({
   return (
     <View style={s.screen}>
       {bar}
-      <ScrollView style={s.screen} contentContainerStyle={s.main} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={s.screen}
+        contentContainerStyle={s.main}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          onRefresh ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              // The spinner has to be visible on a black background; the
+              // platform default is a dark grey that vanishes into it.
+              tintColor={colors.textMuted}
+              colors={[colors.accent]}
+              progressBackgroundColor={colors.surface}
+            />
+          ) : undefined
+        }
+      >
         {children}
       </ScrollView>
     </View>

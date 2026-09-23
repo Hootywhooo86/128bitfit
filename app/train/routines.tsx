@@ -83,8 +83,8 @@ export default function RoutinesScreen() {
         <>
           <Label>NO ROUTINES</Label>
           <Note>
-            Nothing to run and nothing to delete. Import a backup from Settings, or start a
-            freestyle session and pick as you go.
+            Nothing to run and nothing to delete. Build one from Train, import a backup from
+            Settings, or start a freestyle session and pick as you go.
           </Note>
         </>
       ) : (
@@ -110,6 +110,13 @@ export default function RoutinesScreen() {
                     </Text>
                   ) : null}
                 </View>
+                <Pressable
+                  style={s.edit}
+                  onPress={() => router.push(`/train/build-routine?id=${encodeURIComponent(r.id)}`)}
+                  hitSlop={8}
+                >
+                  <Text style={s.editT}>Edit</Text>
+                </Pressable>
                 <Pressable style={s.del} onPress={() => remove(r)} hitSlop={8}>
                   <Text style={s.delT}>Delete</Text>
                 </Pressable>
@@ -132,6 +139,8 @@ const s = StyleSheet.create({
   name: { color: colors.text, fontSize: 15, fontFamily: fonts.bodySemi },
   meta: { color: colors.textMuted, fontSize: 12.5, marginTop: 4, fontFamily: fonts.body },
   names: { color: colors.textDim, fontSize: 12, marginTop: 3, fontFamily: fonts.body },
+  edit: { paddingVertical: 4, paddingHorizontal: 6 },
+  editT: { color: colors.accent, fontSize: 12.5, fontFamily: fonts.bodySemi },
   del: { paddingVertical: 4, paddingHorizontal: 6 },
   delT: { color: colors.danger, fontSize: 12.5, fontFamily: fonts.bodySemi },
   back: { marginTop: spacing.lg, alignItems: 'center' },
