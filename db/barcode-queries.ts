@@ -1,4 +1,9 @@
-import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, notInArray, or, sql } from 'drizzle-orm';
+import {
+  PRESERVED_FOOD_SOURCES,
+  USER_FOOD_SOURCES,
+  type UserFoodSource,
+} from '@/lib/food-sources';
 import {
   fetchOpenFoodFactsProduct,
   normalizeBarcode,
@@ -255,6 +260,10 @@ export type CustomFoodInput = {
   servingSize?: number | null;
   servingUnit?: string | null;
   nutritionBasis?: 'per_100g' | 'per_serving';
+  /** 'recipe' for something assembled from ingredients; 'custom' otherwise. */
+  source?: UserFoodSource;
+  /** For a recipe: what went into it, one ingredient per line. */
+  description?: string | null;
   calories?: number | null;
   protein?: number | null;
   fat?: number | null;
@@ -269,6 +278,9 @@ export type CustomFoodInput = {
   /** Already copied into the document directory by saveFoodPhoto. */
   photoUri?: string | null;
 };
+
+/** Re-exported so food callers do not need to know where the list lives. */
+export { USER_FOOD_SOURCES, type UserFoodSource };
 
 /** Insert a user-defined food (e.g. barcode miss). */
 /** Id for a custom food, so a photo can be filed under it before the insert. */
@@ -298,8 +310,11 @@ export async function insertCustomFood(
     id,
     sourceId: null,
     name: input.name.trim(),
-    description: input.brand?.trim() || null,
-    source: 'custom',
+    // The brand already has its own column; description carries the recipe's
+    // ingredient list when there is one, and falls back to the brand so a
+    // custom food reads the same as it always did.
+    description: input.description ?? input.brand?.trim() ?? null,
+    source: input.source ?? 'custom',
     barcode,
     gtin: barcode,
     brand: input.brand?.trim() || null,
@@ -313,11 +328,27 @@ export async function insertCustomFood(
   return rows[0]!;
 }
 
+/**
+ * Foods the user created, newest first.
+ *
+ * `source` separates the two kinds: a recipe is something assembled from
+ * ingredients and logged by the serving, a custom food is a single item the
+ * catalogue did not have.
+ */
+export async function listUserFoods(source: UserFoodSource): Promise<Food[]> {
+  return db
+    .select()
+    .from(foods)
+    .where(eq(foods.source, source))
+    .orderBy(desc(foods.id))
+    .limit(200);
+}
+
 /** Count only bundled USDA foods (for import checksum). */
 export async function countBundledFoods(): Promise<number> {
   const [row] = await db
     .select({ n: sql<number>`count(*)` })
     .from(foods)
-    .where(sql`coalesce(${foods.source}, '') not in ('open_food_facts', 'custom')`);
+    .where(notInArray(sql`coalesce(${foods.source}, '')`, [...PRESERVED_FOOD_SOURCES]));
   return Number(row?.n ?? 0);
 }

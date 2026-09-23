@@ -1,4 +1,5 @@
-import { count, eq, sql } from 'drizzle-orm';
+import { count, eq, notInArray, sql } from 'drizzle-orm';
+import { PRESERVED_FOOD_SOURCES } from '@/lib/food-sources';
 import { DATA_MANIFEST } from './data-manifest';
 import { db, sqlite } from './client';
 import { exercises, foods, meta } from './schema';
@@ -69,7 +70,7 @@ export async function getCounts(): Promise<{ exercises: number; foods: number }>
   const [fo] = await db
     .select({ n: count() })
     .from(foods)
-    .where(sql`coalesce(${foods.source}, '') not in ('open_food_facts', 'custom')`);
+    .where(notInArray(sql`coalesce(${foods.source}, '')`, [...PRESERVED_FOOD_SOURCES]));
   return { exercises: ex?.n ?? 0, foods: fo?.n ?? 0 };
 }
 
@@ -141,9 +142,9 @@ export async function importBundledData(
     // Clear previous rows outside the heavy insert loop
     await db.delete(exercises);
     // Keep Open Food Facts cache rows + user custom foods across USDA re-import.
-    await db.delete(foods).where(
-      sql`coalesce(${foods.source}, '') not in ('open_food_facts', 'custom')`
-    );
+    await db
+      .delete(foods)
+      .where(notInArray(sql`coalesce(${foods.source}, '')`, [...PRESERVED_FOOD_SOURCES]));
 
     const exBatches = chunk(exerciseData, 50);
     let exDone = 0;

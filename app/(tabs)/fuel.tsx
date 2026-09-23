@@ -81,7 +81,7 @@ export default function FuelScreen() {
           { icon: '▣', label: 'SCAN', onPress: () => router.push('/fuel/scan') },
           { icon: '⌕', label: 'SEARCH', onPress: () => router.push('/fuel/add') },
           { icon: '◉', label: 'LABEL', onPress: () => router.push('/fuel/label') },
-          { icon: '✎', label: 'CUSTOM', onPress: () => router.push('/fuel/custom') },
+          { icon: '✎', label: 'CUSTOM', onPress: () => router.push('/fuel/custom-hub') },
         ]}
       />
 
