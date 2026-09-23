@@ -14,20 +14,15 @@ import {
 import { PhotoCapture } from '@/components/PhotoCapture';
 import { insertCustomFood, newCustomFoodId } from '@/db/barcode-queries';
 import { logFoodFromCatalog } from '@/db/food-queries';
-import { MEAL_TYPES, type MealType } from '@/db/schema';
+import type { MealType } from '@/db/schema';
 import { buildFoodSubmission } from '@/lib/community-food';
 import { saveFoodPhoto } from '@/lib/food-photo-store';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
+import { MealSlot } from '@/components/MealSlot';
+import { mealTimestamp, type MealDay } from '@/lib/meal-time';
 import type { LabelReading } from '@/lib/nutrition-label';
 import { colors, spacing } from '@/lib/theme';
 import { Screen } from '@/components/ui';
-
-const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Breakfast',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  snack: 'Snack',
-};
 
 function parseOptionalNumber(raw: string): number | null {
   const t = raw.trim();
@@ -91,6 +86,7 @@ export default function CustomFoodScreen() {
   const [mealType, setMealType] = useState<MealType>(
     defaultMealTypeForHour(new Date().getHours())
   );
+  const [mealDay, setMealDay] = useState<MealDay>('today');
   const [saving, setSaving] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
 
@@ -158,7 +154,11 @@ export default function CustomFoodScreen() {
         cholesterol: reading?.fields.cholesterol ?? null,
         addedSugars: reading?.fields.addedSugars ?? null,
       }, id);
-      await logFoodFromCatalog(food, { servings: servingsNum, mealType });
+      await logFoodFromCatalog(food, {
+        servings: servingsNum,
+        mealType,
+        loggedAt: mealTimestamp(mealType, mealDay),
+      });
 
       // Offering it to the shared database is opt-in, per food, and nothing
       // leaves the phone until the user submits the issue GitHub opens.
@@ -283,17 +283,12 @@ export default function CustomFoodScreen() {
         keyboardType="decimal-pad"
       />
       <View style={styles.mealRow}>
-        {MEAL_TYPES.map((m) => (
-          <Pressable
-            key={m}
-            style={[styles.mealChip, mealType === m && styles.mealChipOn]}
-            onPress={() => setMealType(m)}
-          >
-            <Text style={[styles.mealText, mealType === m && styles.mealTextOn]}>
-              {MEAL_LABELS[m]}
-            </Text>
-          </Pressable>
-        ))}
+        <MealSlot
+          mealType={mealType}
+          onChangeMeal={setMealType}
+          day={mealDay}
+          onChangeDay={setMealDay}
+        />
       </View>
 
       <PhotoCapture

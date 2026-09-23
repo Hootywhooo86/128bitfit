@@ -17,6 +17,8 @@ import {
   searchFoods,
 } from '@/db/food-queries';
 import { MEAL_TYPES, type Food, type MealType } from '@/db/schema';
+import { MealSlot } from '@/components/MealSlot';
+import { mealTimestamp, type MealDay } from '@/lib/meal-time';
 import {
   defaultMealTypeForHour,
   formatGrams,
@@ -31,13 +33,6 @@ import {
 import { OFF_LICENSE_NOTE } from '@/lib/open-food-facts';
 import { colors, spacing } from '@/lib/theme';
 import { Screen } from '@/components/ui';
-
-const MEAL_LABELS: Record<MealType, string> = {
-  breakfast: 'Breakfast',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  snack: 'Snack',
-};
 
 type RecentItem = {
   key: string;
@@ -62,6 +57,8 @@ export default function AddFoodScreen() {
   const [selected, setSelected] = useState<Food | null>(null);
   const [servings, setServings] = useState('1');
   const [mealType, setMealType] = useState<MealType>(initialMeal);
+  // Which day the meal belongs to, for entering yesterday's food after midnight.
+  const [mealDay, setMealDay] = useState<MealDay>('today');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -126,7 +123,11 @@ export default function AddFoodScreen() {
     if (isCaloriesMissing(selected)) return;
     setSaving(true);
     try {
-      await logFoodFromCatalog(selected, { servings: servingsNum, mealType });
+      await logFoodFromCatalog(selected, {
+        servings: servingsNum,
+        mealType,
+        loggedAt: mealTimestamp(mealType, mealDay),
+      });
       router.back();
     } finally {
       setSaving(false);
@@ -185,19 +186,12 @@ export default function AddFoodScreen() {
         </View>
 
         <Text style={styles.section}>Meal</Text>
-        <View style={styles.mealRow}>
-          {MEAL_TYPES.map((m) => (
-            <Pressable
-              key={m}
-              style={[styles.mealChip, mealType === m && styles.mealChipActive]}
-              onPress={() => setMealType(m)}
-            >
-              <Text style={[styles.mealChipText, mealType === m && styles.mealChipTextActive]}>
-                {MEAL_LABELS[m]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        <MealSlot
+          mealType={mealType}
+          onChangeMeal={setMealType}
+          day={mealDay}
+          onChangeDay={setMealDay}
+        />
 
         {preview ? (
           <View style={styles.previewCard}>
