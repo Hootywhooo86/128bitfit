@@ -32,15 +32,19 @@ describe('logging the whole day at bedtime', () => {
 describe('logging after midnight', () => {
   const justAfterMidnight = at(2026, 9, 24, 0, 30);
 
-  it('files dinner as yesterday, not nineteen hours from now', () => {
+  it('keeps the meal on today, because today is what was picked', () => {
+    // This used to file as yesterday, inferred from the slot hour. That
+    // inference is what sent a lunch logged at 12:10 a day back, so it is
+    // gone: the day is the user's choice, never a guess from the clock.
     const t = mealTimestamp('dinner', 'today', justAfterMidnight);
-    expect(t.getDate()).toBe(23);
-    expect(t.getHours()).toBe(19);
+    expect(t.getDate()).toBe(24);
   });
 
-  it('files breakfast as yesterday too, because 8am has not come round', () => {
-    const t = mealTimestamp('breakfast', 'today', justAfterMidnight);
+  it('still reaches yesterday when the user actually says so', () => {
+    // "A day earlier" in the slot picker, or picking the day in Fuel.
+    const t = mealTimestamp('dinner', 'yesterday', justAfterMidnight);
     expect(t.getDate()).toBe(23);
+    expect(t.getHours()).toBe(19);
   });
 
   it('never produces a time in the future', () => {
@@ -76,7 +80,8 @@ describe('saying yesterday explicitly', () => {
 
 describe('crossing a month boundary', () => {
   it('rolls into the previous month rather than day zero', () => {
-    const t = mealTimestamp('dinner', 'today', at(2026, 10, 1, 0, 15));
+    // Only when the user asked for yesterday — the automatic step-back is gone.
+    const t = mealTimestamp('dinner', 'yesterday', at(2026, 10, 1, 0, 15));
     expect(t.getMonth()).toBe(8); // September
     expect(t.getDate()).toBe(30);
   });
@@ -157,5 +162,101 @@ describe('logging onto a day you navigated back to', () => {
     const t = mealTimestamp('lunch', aug31, now);
     expect(t.getMonth()).toBe(7);
     expect(t.getDate()).toBe(31);
+  });
+});
+
+describe('logging a meal slightly before its nominal hour', () => {
+  // The reported bug, from a screenshot: the phone said 12:10 p.m. and the
+  // form said "Logging as yesterday 12:30 p.m.". The bar was saved to
+  // yesterday, Fuel was showing today, and the app looked like it had dropped
+  // the food entirely.
+  const lunchtime = at(2026, 9, 24, 12, 10);
+
+  it('keeps lunch on today when it is twenty minutes early', () => {
+    const t = mealTimestamp('lunch', 'today', lunchtime);
+    expect(t.getDate()).toBe(24);
+    expect(t.getHours()).toBe(12);
+    expect(t.getMinutes()).toBe(10);
+  });
+
+  it('describes it as today, so the screen cannot say otherwise', () => {
+    const t = mealTimestamp('lunch', 'today', lunchtime);
+    expect(describeMealTime(t, lunchtime)).toMatch(/^today /);
+  });
+
+  it('keeps an early breakfast on today', () => {
+    const early = at(2026, 9, 24, 7, 15);
+    const t = mealTimestamp('breakfast', 'today', early);
+    expect(t.getDate()).toBe(24);
+    expect(t.getHours()).toBe(7);
+  });
+
+  it('keeps an early dinner on today', () => {
+    const early = at(2026, 9, 24, 16, 30);
+    const t = mealTimestamp('dinner', 'today', early);
+    expect(t.getDate()).toBe(24);
+    expect(t.getHours()).toBe(16);
+  });
+
+  it('keeps a slot hours ahead on today too, at the current time', () => {
+    // At 10am, "dinner" is nine hours off. It used to file as last night's.
+    // Scanning something today puts it on today, whatever slot is picked.
+    const morning = at(2026, 9, 24, 10, 0);
+    const t = mealTimestamp('dinner', 'today', morning);
+    expect(t.getDate()).toBe(24);
+    expect(t.getHours()).toBe(10);
+  });
+
+  it('never moves a meal off the day that was picked, at any hour', () => {
+    // The whole class of bug in one assertion.
+    for (let hour = 0; hour < 24; hour += 1) {
+      const now = at(2026, 9, 24, hour, 0);
+      for (const meal of ['breakfast', 'lunch', 'dinner', 'snack'] as const) {
+        expect(
+          mealTimestamp(meal, 'today', now).getDate(),
+          `${meal} at ${hour}:00`
+        ).toBe(24);
+      }
+    }
+  });
+
+  it('lands an explicitly chosen past day on that day, at any hour', () => {
+    const chosen = new Date(2026, 8, 18, 0, 0, 0, 0);
+    for (let hour = 0; hour < 24; hour += 1) {
+      const now = at(2026, 9, 24, hour, 0);
+      for (const meal of ['breakfast', 'lunch', 'dinner', 'snack'] as const) {
+        expect(
+          mealTimestamp(meal, chosen, now).getDate(),
+          `${meal} at ${hour}:00`
+        ).toBe(18);
+      }
+    }
+  });
+
+  it('never returns a future timestamp whatever the hour', () => {
+    for (let hour = 0; hour < 24; hour += 1) {
+      const now = at(2026, 9, 24, hour, 0);
+      for (const meal of ['breakfast', 'lunch', 'dinner', 'snack'] as const) {
+        expect(
+          mealTimestamp(meal, 'today', now).getTime(),
+          `${meal} at ${hour}:00`
+        ).toBeLessThanOrEqual(now.getTime());
+      }
+    }
+  });
+
+  it('never dates a meal before the day it was logged on', () => {
+    // The reported bug was a meal landing 24 hours back. Nothing may now land
+    // before midnight of the chosen day at all.
+    for (let hour = 0; hour < 24; hour += 1) {
+      const now = at(2026, 9, 24, hour, 0);
+      const midnight = at(2026, 9, 24, 0, 0);
+      for (const meal of ['breakfast', 'lunch', 'dinner', 'snack'] as const) {
+        expect(
+          mealTimestamp(meal, 'today', now).getTime(),
+          `${meal} at ${hour}:00`
+        ).toBeGreaterThanOrEqual(midnight.getTime());
+      }
+    }
   });
 });
