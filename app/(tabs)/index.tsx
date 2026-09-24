@@ -21,6 +21,7 @@ import {
 } from '@/db/workout-queries';
 import { useTodaySteps } from '@/lib/health/use-health';
 import { broadcastHealthRefresh } from '@/lib/health/use-health-refresh';
+import { withMinimumDuration } from '@/lib/min-duration';
 import { formatKg } from '@/lib/weight-source';
 import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
 import type { WeightUnit } from '@/db/settings-queries';
@@ -104,7 +105,13 @@ export default function HomeScreen() {
   const pullToRefresh = useCallback(() => {
     setRefreshing(true);
     broadcastHealthRefresh();
-    void Promise.allSettled([refresh(), refreshHealth()]).finally(() => setRefreshing(false));
+    // Held visible for a moment. Both reads are local — SQLite and the phone's
+    // health store — and routinely finish inside a frame, which dismissed the
+    // spinner before it ever rendered. A pull that worked then looked exactly
+    // like a pull the gesture never registered.
+    void withMinimumDuration(Promise.allSettled([refresh(), refreshHealth()])).finally(() =>
+      setRefreshing(false)
+    );
   }, [refresh, refreshHealth]);
 
   const water = async (ml: number) => {
@@ -141,7 +148,17 @@ export default function HomeScreen() {
         onPress={() => router.push('/(tabs)/train')}
       />
 
-      <Label>TODAY</Label>
+      <View style={s.todayRow}>
+        <Label>TODAY</Label>
+        {/*
+          Pull-to-refresh is the main path, but it is a gesture, and a gesture
+          that does not register leaves no way to ask for fresh numbers. This
+          always works.
+        */}
+        <Pressable onPress={pullToRefresh} hitSlop={10}>
+          <Text style={s.refresh}>{refreshing ? 'REFRESHING' : 'REFRESH'}</Text>
+        </Pressable>
+      </View>
       <Stat3
         items={[
           // A real reading from Health Connect. 0 steps is a reading and shows
@@ -229,6 +246,17 @@ export default function HomeScreen() {
 
 const s = StyleSheet.create({
   center: { paddingVertical: 80, alignItems: 'center' },
+  todayRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  refresh: {
+    fontFamily: fonts.pixel,
+    fontSize: 9,
+    letterSpacing: 1,
+    color: colors.textDim,
+    // Same vertical box as Label's wrapper, so the two sit on one line rather
+    // than the pixel type drifting below the section heading.
+    marginTop: spacing.lg,
+    marginBottom: 10,
+  },
   wadd: { flexDirection: 'row', gap: 6, marginTop: 12 },
   waddBtn: {
     flex: 1,
