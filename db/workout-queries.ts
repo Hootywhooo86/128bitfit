@@ -182,11 +182,27 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
 /**
  * The most recent completed performance of an exercise, for pre-filling.
  *
+ * Keyed by exercise, deliberately — not by routine, and not by routine plus
+ * exercise. Your bench is your bench whether today's is in Push Day A, a
+ * freestyle session, or a routine built last night and never run; scoping it
+ * per routine would hand you an empty box on exactly the session where you are
+ * least sure what to load, and fragment one lift's history across every
+ * routine that contains it. Where routines legitimately differ is the rep
+ * target, and resolveSetSeed already takes reps from the routine's plan while
+ * taking weight from what was actually lifted.
+ *
  * Only completed sets of completed sessions count: an abandoned workout is full
  * of pre-filled values nobody lifted, and seeding from those would compound a
  * guess into a record.
  *
  * `excludeSessionId` keeps the session being built now out of its own history.
+ *
+ * NOTE for whoever wires up warm-up sets in the live session: `sets.isWarmup`
+ * exists in the schema and nothing writes it yet, so this query cannot see the
+ * difference today. The moment the live session starts setting it, a warm-up
+ * will be in this list and set 1 will pre-fill with the empty bar. Decide then
+ * whether warm-ups seed warm-ups or are excluded outright — do not let it be
+ * settled by omission.
  */
 export async function getLastPerformance(
   exerciseId: string,
