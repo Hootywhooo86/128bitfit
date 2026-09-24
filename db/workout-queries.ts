@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, gte, lt, ne, sql, inArray } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
+import { isUserExercise } from '@/lib/exercise-sources';
 import { resolveSetSeed, type LastPerformance } from '@/lib/set-prefill';
 import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import {
@@ -1001,6 +1002,52 @@ export type CustomExerciseInput = {
  * Muscles are stored as the app's own group names, already mapped — the muscle
  * map's coverage is closed and a free-text muscle would simply never light up.
  */
+/**
+ * Thrown when an edit is refused. Carries a sentence the UI can show as-is.
+ */
+export class ExerciseNotEditableError extends Error {}
+
+/**
+ * Corrects an exercise you own.
+ *
+ * Only the ones you own: a bundled exercise can be edited in the UI all day
+ * and the next catalogue re-import silently reverts it, because the import
+ * deletes and rewrites every bundled row. Offering an edit that quietly
+ * un-does itself is worse than not offering one, so this refuses with a
+ * sentence rather than pretending.
+ *
+ * 'custom' (made here) and 'imported' (created by importing a backup) are the
+ * two the re-import preserves — the same list isUserExercise guards.
+ */
+export async function updateCustomExercise(
+  id: string,
+  input: CustomExerciseInput
+): Promise<void> {
+  const [row] = await db
+    .select({ category: exercises.category })
+    .from(exercises)
+    .where(eq(exercises.id, id))
+    .limit(1);
+
+  if (!row) throw new ExerciseNotEditableError('That exercise no longer exists.');
+  if (!isUserExercise(row.category)) {
+    throw new ExerciseNotEditableError(
+      'This one ships with the app, so an edit would be undone the next time the exercise database refreshes. Make your own copy instead.'
+    );
+  }
+
+  await db
+    .update(exercises)
+    .set({
+      name: input.name.trim(),
+      equipment: input.equipment?.trim() || null,
+      primaryMuscles: JSON.stringify(input.primaryMuscles),
+      secondaryMuscles: JSON.stringify(input.secondaryMuscles),
+      instructions: JSON.stringify(input.instructions),
+    })
+    .where(eq(exercises.id, id));
+}
+
 export async function createCustomExercise(input: CustomExerciseInput): Promise<string> {
   const id = newId('ex');
   await db.insert(exercises).values({
