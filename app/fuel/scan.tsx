@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,6 +14,9 @@ import { colors, spacing } from '@/lib/theme';
 
 export default function ScanBarcodeScreen() {
   const router = useRouter();
+  // Passed straight through rather than parsed: this screen never logs
+  // anything itself, it only hands the barcode to a screen that does.
+  const { day } = useLocalSearchParams<{ day?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [manual, setManual] = useState('');
   const [looking, setLooking] = useState(false);
@@ -36,13 +39,19 @@ export default function ScanBarcodeScreen() {
             params: {
               foodId: result.food.id,
               source: result.source,
+              // A scan started from a past day is still for that day.
+              ...(day ? { day } : {}),
             },
           });
           return;
         }
         router.replace({
           pathname: '/fuel/custom',
-          params: { barcode: result.barcode || code, message: result.message },
+          params: {
+            barcode: result.barcode || code,
+            message: result.message,
+            ...(day ? { day } : {}),
+          },
         });
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Lookup failed');
@@ -51,7 +60,7 @@ export default function ScanBarcodeScreen() {
         setLooking(false);
       }
     },
-    [looking, router]
+    [looking, router, day]
   );
 
   const onBarcodeScanned = (scan: BarcodeScanningResult) => {

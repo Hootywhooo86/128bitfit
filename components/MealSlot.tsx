@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MEAL_TYPES, type MealType } from '@/db/schema';
-import { describeMealTime, mealTimestamp, type MealDay } from '@/lib/meal-time';
+import { describeMealTime, mealDayDate, mealTimestamp, type MealDay } from '@/lib/meal-time';
 import { colors, fonts, spacing } from '@/lib/theme';
 
 const LABELS: Record<MealType, string> = {
@@ -34,6 +34,17 @@ export function MealSlot({
   now?: Date;
 }) {
   const at = mealTimestamp(mealType, day, now);
+
+  // Which day the control is on, taken from the selection rather than from the
+  // timestamp it produced — see mealDayDate.
+  const selected = mealDayDate(day, now);
+  const onToday = selected.getTime() === mealDayDate('today', now).getTime();
+  const stepBack = () => {
+    const earlier = new Date(selected);
+    earlier.setDate(earlier.getDate() - 1);
+    onChangeDay(earlier);
+  };
+
   return (
     <View>
       <View style={s.row}>
@@ -50,10 +61,10 @@ export function MealSlot({
       <View style={s.whenRow}>
         <Text style={s.when}>Logging as {describeMealTime(at, now)}</Text>
         <Pressable
-          onPress={() => onChangeDay(day === 'today' ? 'yesterday' : 'today')}
+          onPress={() => (onToday ? stepBack() : onChangeDay('today'))}
           hitSlop={10}
         >
-          <Text style={s.toggle}>{day === 'today' ? 'A day earlier' : 'Back to today'}</Text>
+          <Text style={s.toggle}>{onToday ? 'A day earlier' : 'Back to today'}</Text>
         </Pressable>
       </View>
     </View>

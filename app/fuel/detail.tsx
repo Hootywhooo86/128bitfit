@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
@@ -11,11 +12,20 @@ import {
   type DayNutrients,
   type NutrientLevel,
 } from '@/lib/micronutrients';
+import { describeFuelDay, parseDayKey } from '@/lib/fuel-day';
 import { colors, fonts, muscleHeat, spacing } from '@/lib/theme';
 
 type Window = 'day' | 'week' | 'month';
-const WINDOWS: { id: Window; label: string }[] = [
-  { id: 'day', label: 'TODAY' },
+/**
+ * The day button is labelled with the day it is actually showing. Reached from
+ * a past day in Fuel it would otherwise say TODAY over last Tuesday's iron.
+ *
+ * The averages are always the last 7 and 30 days ending now, whichever day is
+ * selected — an average that slid backwards with the day picker would be a
+ * different statistic wearing the same label.
+ */
+const windowsFor = (dayLabel: string): { id: Window; label: string }[] => [
+  { id: 'day', label: dayLabel.toUpperCase() },
   { id: 'week', label: '7-DAY AVG' },
   { id: 'month', label: '30-DAY AVG' },
 ];
@@ -29,6 +39,14 @@ const WINDOWS: { id: Window; label: string }[] = [
  */
 export default function DetailedNutritionScreen() {
   const { ready } = useDb();
+  const params = useLocalSearchParams<{ day?: string }>();
+  // A fresh Date per render would make `load` a new function every time and
+  // re-query in a loop, so the fallback is pinned for the life of the screen.
+  const day = useMemo(() => parseDayKey(params.day) ?? new Date(), [params.day]);
+  const dayLabel = describeFuelDay(day);
+  // "on yesterday" is not English; "on Mon 22 Sep" is.
+  const whenPhrase =
+    dayLabel === 'Today' ? 'today yet' : dayLabel === 'Yesterday' ? 'yesterday' : `on ${dayLabel}`;
   const [view, setView] = useState<Window>('day');
   const [data, setData] = useState<DayNutrients | null>(null);
   const [daysWithFood, setDaysWithFood] = useState<number | null>(null);
@@ -39,7 +57,7 @@ export default function DetailedNutritionScreen() {
     setLoading(true);
     try {
       if (view === 'day') {
-        setData(await getDayNutrition());
+        setData(await getDayNutrition(day));
         setDaysWithFood(null);
       } else {
         const avg = await getAverageNutrition(view === 'week' ? 7 : 30);
@@ -49,7 +67,7 @@ export default function DetailedNutritionScreen() {
     } finally {
       setLoading(false);
     }
-  }, [ready, view]);
+  }, [ready, view, day]);
 
   useEffect(() => {
     void load();
@@ -58,7 +76,7 @@ export default function DetailedNutritionScreen() {
   return (
     <Screen section="Detailed nutrition" back onRefresh={() => void load()}>
       <View style={s.seg}>
-        {WINDOWS.map((v) => (
+        {windowsFor(dayLabel).map((v) => (
           <Pressable
             key={v.id}
             style={[s.segBtn, view === v.id && s.segOn]}
@@ -76,7 +94,7 @@ export default function DetailedNutritionScreen() {
       ) : data.itemCount === 0 ? (
         <Note>
           {view === 'day'
-            ? 'Nothing logged today yet. Log a meal and the full breakdown appears here.'
+            ? `Nothing logged ${whenPhrase}. Log a meal and the full breakdown appears here.`
             : `Nothing logged in the last ${view === 'week' ? 7 : 30} days.`}
         </Note>
       ) : (

@@ -12,6 +12,7 @@ import {
   type WaterLog,
 } from './schema';
 import { dayBounds, nutrientsForServings, type Nutrients } from '@/lib/nutrition';
+import { dayKey } from '@/lib/fuel-day';
 import {
   mirrorMeal,
   mirrorMealRemoved,
@@ -158,6 +159,54 @@ export async function listFoodLogsForDay(day: Date = new Date()): Promise<FoodLo
     displayName: r.customName || r.foodName || 'Food',
     photoUri: r.photoUri ?? null,
   }));
+}
+
+/** One day in the history strip: what it cost and whether anything is there. */
+export type DayTotal = {
+  /** Local `YYYY-MM-DD`, matching lib/fuel-day's dayKey. */
+  key: string;
+  calories: number;
+  items: number;
+};
+
+/**
+ * Calories per day across a range, for the day strip.
+ *
+ * One query for the whole window rather than thirty — a strip that fires a
+ * round trip per chip would stutter on the first paint of Fuel.
+ *
+ * Bucketed in JS, not SQL. The rows hold an instant; which calendar day that
+ * instant falls in is a question about the phone's timezone, and SQLite would
+ * have to be told the offset for every day in the window to answer it — which
+ * it would then get wrong on the days either side of a DST change.
+ *
+ * A day with no logs is absent from the map, not present with 0. The strip has
+ * to be able to tell "ate nothing recorded" from "logged nothing".
+ */
+export async function listDayTotals(days: Date[]): Promise<Map<string, DayTotal>> {
+  const totals = new Map<string, DayTotal>();
+  if (days.length === 0) return totals;
+
+  const sorted = [...days].sort((a, b) => a.getTime() - b.getTime());
+  const { start } = dayBounds(sorted[0]);
+  const { end } = dayBounds(sorted[sorted.length - 1]);
+
+  const rows = await db
+    .select({ loggedAt: foodLogs.loggedAt, calories: foodLogs.calories })
+    .from(foodLogs)
+    .where(and(gte(foodLogs.loggedAt, start), lt(foodLogs.loggedAt, end)));
+
+  for (const row of rows) {
+    // dayKey, not a local copy of it: the strip looks these up by the key it
+    // computes itself, and two spellings of "which day is this" would show a
+    // day's food under the chip next to it.
+    const key = dayKey(row.loggedAt);
+    const existing = totals.get(key) ?? { key, calories: 0, items: 0 };
+    existing.calories += row.calories ?? 0;
+    existing.items += 1;
+    totals.set(key, existing);
+  }
+  return totals;
 }
 
 export async function getDayFuelSummary(day: Date = new Date()): Promise<DayFuelSummary> {

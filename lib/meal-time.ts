@@ -26,7 +26,25 @@ const SLOT_HOUR: Record<Exclude<MealType, 'snack'>, [number, number]> = {
   dinner: [19, 0],
 };
 
-export type MealDay = 'today' | 'yesterday';
+/**
+ * Which calendar day the meal belongs to.
+ *
+ * A `Date` is any day you have navigated to in Fuel — its time of day is
+ * ignored, only the calendar date is read.
+ */
+export type MealDay = 'today' | 'yesterday' | Date;
+
+/** The calendar day `day` names, as year/month/date on a copy of `now`. */
+function resolveDay(day: MealDay, now: Date): Date {
+  const at = new Date(now);
+  if (day === 'today') return at;
+  if (day === 'yesterday') {
+    at.setDate(at.getDate() - 1);
+    return at;
+  }
+  at.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
+  return at;
+}
 
 /**
  * The timestamp to log a meal with.
@@ -47,22 +65,32 @@ export function mealTimestamp(
   day: MealDay = 'today',
   now: Date = new Date()
 ): Date {
-  if (mealType === 'snack') {
-    // A snack is whenever. Only shift it if the user said yesterday.
-    if (day === 'today') return new Date(now);
-    const d = new Date(now);
-    d.setDate(d.getDate() - 1);
-    return d;
+  // A snack is whenever, so it keeps the clock time — on whichever day.
+  const at = resolveDay(day, now);
+  if (mealType !== 'snack') {
+    const [hour, minute] = SLOT_HOUR[mealType];
+    at.setHours(hour, minute, 0, 0);
+    // The slot has not come round yet today, so it means yesterday's.
+    if (at.getTime() > now.getTime()) at.setDate(at.getDate() - 1);
   }
 
-  const [hour, minute] = SLOT_HOUR[mealType];
-  const at = new Date(now);
-  at.setHours(hour, minute, 0, 0);
-  if (day === 'yesterday') at.setDate(at.getDate() - 1);
+  // Never in the future, whatever was asked for. A day picker can be handed
+  // tomorrow by a stale clamp or a clock that moved; food nobody has eaten
+  // must not get a timestamp that sorts ahead of food they have.
+  return at.getTime() > now.getTime() ? new Date(now) : at;
+}
 
-  // The slot has not come round yet today, so it means yesterday's.
-  if (at.getTime() > now.getTime()) at.setDate(at.getDate() - 1);
-  return at;
+/**
+ * The calendar day a `MealDay` names, at local midnight.
+ *
+ * The slot picker needs this to label its own control. Reading it off the
+ * resolved timestamp instead would misread the after-midnight case: at 00:30
+ * "today"'s breakfast resolves to yesterday 08:00, and a control that believed
+ * the timestamp would offer to go back to a day it was already on.
+ */
+export function mealDayDate(day: MealDay, now: Date = new Date()): Date {
+  const at = resolveDay(day, now);
+  return new Date(at.getFullYear(), at.getMonth(), at.getDate(), 0, 0, 0, 0);
 }
 
 /** What the screen says it is about to do, so the choice is never a surprise. */
@@ -78,5 +106,12 @@ export function describeMealTime(at: Date, now: Date = new Date()): string {
   const time = at.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
   if (sameDay(at, now)) return `today ${time}`;
   if (sameDay(at, yesterday)) return `yesterday ${time}`;
-  return `${at.toLocaleDateString()} ${time}`;
+  // Same shape as the Fuel day strip's label, so a day reads the same wherever
+  // it is named.
+  const date = at.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+  });
+  return `${date} ${time}`;
 }

@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { latestWeight, type LatestWeight, type WeightReading } from '../weight-source';
 import { dayKey } from './dates';
 import { health } from './index';
+import { useHealthRefresh } from './use-health-refresh';
 
 /** Far enough back to catch a scale used weekly, short enough to stay cheap. */
 const LOOKBACK_DAYS = 14;
@@ -72,6 +73,10 @@ export function useLatestWeight(local: WeightReading | null) {
       alive = false;
     };
   }, [local]);
+
+  // A scale pushes its reading while the app is backgrounded, and a pull to
+  // refresh has to reach this card too.
+  useHealthRefresh(() => void refresh());
 
   return { state, refresh };
 }

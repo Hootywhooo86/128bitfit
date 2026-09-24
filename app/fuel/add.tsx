@@ -19,6 +19,7 @@ import {
 import { MEAL_TYPES, type Food, type MealType } from '@/db/schema';
 import { MealSlot } from '@/components/MealSlot';
 import { mealTimestamp, type MealDay } from '@/lib/meal-time';
+import { parseDayKey } from '@/lib/fuel-day';
 import {
   defaultMealTypeForHour,
   formatGrams,
@@ -45,7 +46,7 @@ type RecentItem = {
 
 export default function AddFoodScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ meal?: string; foodId?: string }>();
+  const params = useLocalSearchParams<{ meal?: string; foodId?: string; day?: string }>();
   const initialMeal = (MEAL_TYPES as readonly string[]).includes(params.meal ?? '')
     ? (params.meal as MealType)
     : defaultMealTypeForHour(new Date().getHours());
@@ -57,8 +58,10 @@ export default function AddFoodScreen() {
   const [selected, setSelected] = useState<Food | null>(null);
   const [servings, setServings] = useState('1');
   const [mealType, setMealType] = useState<MealType>(initialMeal);
-  // Which day the meal belongs to, for entering yesterday's food after midnight.
-  const [mealDay, setMealDay] = useState<MealDay>('today');
+  // Which day the meal belongs to — the day Fuel was showing when this opened,
+  // so adding food while looking back at last Tuesday lands on last Tuesday.
+  // Absent or malformed means today.
+  const [mealDay, setMealDay] = useState<MealDay>(() => parseDayKey(params.day) ?? 'today');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
