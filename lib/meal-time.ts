@@ -27,6 +27,16 @@ const SLOT_HOUR: Record<Exclude<MealType, 'snack'>, [number, number]> = {
 };
 
 /**
+ * How far ahead of a slot's nominal hour still counts as that meal.
+ *
+ * Three hours covers eating early — lunch at 11, dinner at 16 — without
+ * reaching so far that logging dinner over breakfast is read as tonight's.
+ * Beyond it the meal is yesterday's, which is the after-midnight case the
+ * step-back rule was written for.
+ */
+const SLOT_GRACE_MS = 3 * 60 * 60 * 1000;
+
+/**
  * Which calendar day the meal belongs to.
  *
  * A `Date` is any day you have navigated to in Fuel — its time of day is
@@ -55,10 +65,17 @@ function resolveDay(day: MealDay, now: Date): Date {
  * and a future timestamp would sort ahead of real food and push the meal into
  * a day that has not happened.
  *
- * A slot whose hour has not arrived yet belongs to yesterday. At 00:30, "dinner"
- * means the dinner six hours ago, not the one nineteen hours away. Without this
- * the after-midnight log — the exact case someone entering their day late runs
- * into — silently files under tomorrow.
+ * A slot whose hour has not arrived yet usually belongs to yesterday. At 00:30,
+ * "dinner" means the dinner six hours ago, not the one nineteen hours away.
+ * Without this the after-midnight log — the exact case someone entering their
+ * day late runs into — silently files under tomorrow.
+ *
+ * But only when it is properly in the future. Eating lunch at 12:10 is twenty
+ * minutes ahead of the slot's nominal 12:30, and sending that meal back a full
+ * day is far worse than the problem the rule exists to solve: the food
+ * vanishes from today, and the app looks like it dropped it. Inside the grace
+ * window the meal is this one, logged a little early, so it keeps the current
+ * time.
  */
 export function mealTimestamp(
   mealType: MealType,
@@ -70,8 +87,16 @@ export function mealTimestamp(
   if (mealType !== 'snack') {
     const [hour, minute] = SLOT_HOUR[mealType];
     at.setHours(hour, minute, 0, 0);
-    // The slot has not come round yet today, so it means yesterday's.
-    if (at.getTime() > now.getTime()) at.setDate(at.getDate() - 1);
+    const ahead = at.getTime() - now.getTime();
+    if (ahead > SLOT_GRACE_MS) {
+      // Far enough ahead that it cannot be the meal being logged — it is
+      // yesterday's.
+      at.setDate(at.getDate() - 1);
+    } else if (ahead > 0) {
+      // This meal, a little early. Keeping the slot's own hour would be a
+      // future timestamp, so use the clock.
+      return new Date(now);
+    }
   }
 
   // Never in the future, whatever was asked for. A day picker can be handed

@@ -159,3 +159,80 @@ describe('logging onto a day you navigated back to', () => {
     expect(t.getDate()).toBe(31);
   });
 });
+
+describe('logging a meal slightly before its nominal hour', () => {
+  // The reported bug, from a screenshot: the phone said 12:10 p.m. and the
+  // form said "Logging as yesterday 12:30 p.m.". The bar was saved to
+  // yesterday, Fuel was showing today, and the app looked like it had dropped
+  // the food entirely.
+  const lunchtime = at(2026, 9, 24, 12, 10);
+
+  it('keeps lunch on today when it is twenty minutes early', () => {
+    const t = mealTimestamp('lunch', 'today', lunchtime);
+    expect(t.getDate()).toBe(24);
+    expect(t.getHours()).toBe(12);
+    expect(t.getMinutes()).toBe(10);
+  });
+
+  it('describes it as today, so the screen cannot say otherwise', () => {
+    const t = mealTimestamp('lunch', 'today', lunchtime);
+    expect(describeMealTime(t, lunchtime)).toMatch(/^today /);
+  });
+
+  it('keeps an early breakfast on today', () => {
+    const early = at(2026, 9, 24, 7, 15);
+    const t = mealTimestamp('breakfast', 'today', early);
+    expect(t.getDate()).toBe(24);
+    expect(t.getHours()).toBe(7);
+  });
+
+  it('keeps an early dinner on today', () => {
+    const early = at(2026, 9, 24, 16, 30);
+    const t = mealTimestamp('dinner', 'today', early);
+    expect(t.getDate()).toBe(24);
+    expect(t.getHours()).toBe(16);
+  });
+
+  it('still sends a slot properly in the future back a day', () => {
+    // At 10am, "dinner" is nine hours off. That is last night's, not a meal
+    // being eaten now.
+    const morning = at(2026, 9, 24, 10, 0);
+    const t = mealTimestamp('dinner', 'today', morning);
+    expect(t.getDate()).toBe(23);
+    expect(t.getHours()).toBe(19);
+  });
+
+  it('still handles the after-midnight case the rule was written for', () => {
+    const afterMidnight = at(2026, 9, 24, 0, 30);
+    for (const [meal, day] of [
+      ['breakfast', 23],
+      ['lunch', 23],
+      ['dinner', 23],
+    ] as const) {
+      expect(mealTimestamp(meal, 'today', afterMidnight).getDate(), meal).toBe(day);
+    }
+  });
+
+  it('never returns a future timestamp whatever the hour', () => {
+    for (let hour = 0; hour < 24; hour += 1) {
+      const now = at(2026, 9, 24, hour, 0);
+      for (const meal of ['breakfast', 'lunch', 'dinner', 'snack'] as const) {
+        expect(
+          mealTimestamp(meal, 'today', now).getTime(),
+          `${meal} at ${hour}:00`
+        ).toBeLessThanOrEqual(now.getTime());
+      }
+    }
+  });
+
+  it('never lands a meal more than a day back', () => {
+    // The bug sent a meal 24 hours away. Nothing should exceed that.
+    for (let hour = 0; hour < 24; hour += 1) {
+      const now = at(2026, 9, 24, hour, 0);
+      for (const meal of ['breakfast', 'lunch', 'dinner', 'snack'] as const) {
+        const ageHours = (now.getTime() - mealTimestamp(meal, 'today', now).getTime()) / 3_600_000;
+        expect(ageHours, `${meal} at ${hour}:00`).toBeLessThanOrEqual(24);
+      }
+    }
+  });
+});
