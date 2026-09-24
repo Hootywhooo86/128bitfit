@@ -1,13 +1,23 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { getExerciseById } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
 import { exerciseImageUrl, parseJsonArray } from '@/lib/exercise-images';
+import { isUserExercise } from '@/lib/exercise-sources';
 import { colors, spacing } from '@/lib/theme';
 
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const [exercise, setExercise] = useState<Exercise | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +55,24 @@ export default function ExerciseDetailScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: exercise.name }} />
+      <Stack.Screen
+        options={{
+          title: exercise.name,
+          // Only what you own. A bundled exercise would have the edit undone
+          // by the next catalogue refresh, so the button is not offered.
+          headerRight: () =>
+            isUserExercise(exercise.category) ? (
+              <Pressable
+                onPress={() =>
+                  router.push(`/exercise/new?id=${encodeURIComponent(exercise.id)}`)
+                }
+                hitSlop={8}
+              >
+                <Text style={{ color: colors.accent, fontWeight: '800' }}>Edit</Text>
+              </Pressable>
+            ) : null,
+        }}
+      />
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
         {imageUrl ? (
           <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />

@@ -1,6 +1,6 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,7 +11,13 @@ import {
   View,
 } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
-import { addExerciseToSession, createCustomExercise } from '@/db/workout-queries';
+import {
+  ExerciseNotEditableError,
+  addExerciseToSession,
+  createCustomExercise,
+  updateCustomExercise,
+} from '@/db/workout-queries';
+import { getExerciseById } from '@/db/queries';
 import { stageNewExercise } from '@/lib/exercise-handoff';
 import { identifyEquipment } from '@/lib/ai-exercise-client';
 import { MUSCLE_GROUPS, MUSCLE_LABELS, type MuscleGroup } from '@/lib/muscle-load';
@@ -34,11 +40,14 @@ export default function NewExerciseScreen() {
   const router = useRouter();
   // Set when this was opened from a live workout, so the finished exercise can
   // go straight into that session instead of only into the library.
-  const { sessionId, returnTo, name: presetName } = useLocalSearchParams<{
+  const { sessionId, returnTo, name: presetName, id: editId } = useLocalSearchParams<{
     sessionId?: string;
     returnTo?: string;
     name?: string;
+    /** Editing an exercise you already made, rather than making a new one. */
+    id?: string;
   }>();
+  const editingId = editId ? decodeURIComponent(editId) : null;
   const sid = sessionId ? decodeURIComponent(sessionId) : '';
   // Set when a routine is half-built behind us and waiting for this exercise.
   const toRoutine = returnTo === 'routine';
@@ -49,7 +58,7 @@ export default function NewExerciseScreen() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [unmapped, setUnmapped] = useState<string[]>([]);
-  const [identified, setIdentified] = useState(Boolean(presetName));
+  const [identified, setIdentified] = useState(Boolean(presetName) || Boolean(editId));
   const [camOpen, setCamOpen] = useState(false);
 
   // Prefilled when the user searched for something the library does not have
@@ -60,6 +69,38 @@ export default function NewExerciseScreen() {
   const [instructions, setInstructions] = useState('');
   const [primary, setPrimary] = useState<MuscleGroup[]>([]);
   const [secondary, setSecondary] = useState<MuscleGroup[]>([]);
+
+  // Fill the form from the exercise being corrected. Muscles are stored as the
+  // app's own group names, so they map straight back onto the chips.
+  useEffect(() => {
+    if (!editingId) return;
+    let alive = true;
+    void (async () => {
+      const row = await getExerciseById(editingId);
+      if (!alive || !row) return;
+      const parse = (raw: string | null): MuscleGroup[] => {
+        try {
+          const v = JSON.parse(raw ?? '[]');
+          return Array.isArray(v) ? v.filter((m): m is MuscleGroup => MUSCLE_GROUPS.includes(m)) : [];
+        } catch {
+          return [];
+        }
+      };
+      setName(row.name);
+      setEquipment(row.equipment ?? '');
+      setPrimary(parse(row.primaryMuscles));
+      setSecondary(parse(row.secondaryMuscles));
+      try {
+        const steps = JSON.parse(row.instructions ?? '[]');
+        setInstructions(Array.isArray(steps) ? steps.join('\n') : '');
+      } catch {
+        setInstructions('');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [editingId]);
 
   const identify = async () => {
     if (busy || !camera.current) return;
@@ -113,6 +154,25 @@ export default function NewExerciseScreen() {
     }
     setBusy(true);
     try {
+      // Editing corrects the exercise in place, so every session and routine
+      // already pointing at it picks up the fix. Creating a second one would
+      // leave the wrong muscles on all the history.
+      if (editingId) {
+        await updateCustomExercise(editingId, {
+          name,
+          equipment: equipment.trim() || null,
+          primaryMuscles: primary,
+          secondaryMuscles: secondary,
+          instructions: instructions
+            .split('\n')
+            .map((l) => l.trim())
+            .filter(Boolean),
+        });
+        if (router.canGoBack()) router.back();
+        else router.replace('/exercise');
+        return;
+      }
+
       const id = await createCustomExercise({
         name,
         equipment: equipment.trim() || null,
@@ -153,14 +213,18 @@ export default function NewExerciseScreen() {
       }
       router.replace('/exercise');
     } catch (e) {
-      Alert.alert('Save failed', e instanceof Error ? e.message : String(e));
+      // ExerciseNotEditableError already carries a sentence worth showing.
+      Alert.alert(
+        e instanceof ExerciseNotEditableError ? 'Cannot edit this one' : 'Save failed',
+        e instanceof Error ? e.message : String(e)
+      );
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Screen section="New exercise" back>
+    <Screen section={editingId ? 'Edit exercise' : 'New exercise'} back>
       {!identified ? (
         <>
           <Label>IDENTIFY FROM A PHOTO</Label>
