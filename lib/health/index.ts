@@ -13,6 +13,7 @@
  */
 import { Platform } from 'react-native';
 import { unavailableProvider } from './unavailable';
+import { describeError, type DiagnosticStep } from './diagnose';
 import type {
   HealthAvailability,
   HealthDay,
@@ -91,6 +92,31 @@ export const health: HealthProvider = {
     provider().openSettings();
   },
 };
+
+/**
+ * The unswallowed view, for the diagnostics screen.
+ *
+ * Loaded the same lazy, defensive way as the provider — a static import would
+ * take the app down at launch anywhere the native module is not registered.
+ */
+export async function diagnoseHealth(): Promise<DiagnosticStep[]> {
+  if (Platform.OS !== 'android') {
+    return [{ label: 'Platform', value: `${Platform.OS} — Health Connect is Android only`, ok: false }];
+  }
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const mod = require('./health-connect') as typeof import('./health-connect');
+    return await mod.diagnoseHealthConnect();
+  } catch (e) {
+    return [
+      {
+        label: 'Native module',
+        value: `not in this build — ${describeError(e)}`,
+        ok: false,
+      },
+    ];
+  }
+}
 
 export * from './types';
 export { dayKey, eachDay, today } from './dates';

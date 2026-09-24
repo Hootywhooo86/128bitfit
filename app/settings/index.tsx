@@ -223,6 +223,13 @@ export default function SettingsScreen() {
         </View>
       </Pressable>
 
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/health')}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Health Connect</Text>
+          <Text style={styles.muted}>Check what it is actually reporting →</Text>
+        </View>
+      </Pressable>
+
       <Pressable style={styles.charCard} onPress={() => router.push('/settings/import')}>
         <View style={{ flex: 1 }}>
           <Text style={styles.aiTitle}>Import exercises</Text>
