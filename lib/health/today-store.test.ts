@@ -207,3 +207,107 @@ describe('a read that fails after permission was granted', () => {
     expect(getTodayHealth()).toEqual({ status: 'ready', steps: 2200 });
   });
 });
+
+describe('keeping the number fresh while the screen is open', () => {
+  it('re-reads every minute without anyone touching it', async () => {
+    vi.useFakeTimers();
+    try {
+      subscribeTodayHealth(vi.fn());
+      connected(100);
+      await refreshTodayHealth();
+      expect(readDays).toHaveBeenCalledTimes(1);
+
+      connected(250);
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(readDays).toHaveBeenCalledTimes(2);
+      expect(getTodayHealth()).toEqual({ status: 'ready', steps: 250 });
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(readDays).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not read before the minute is up', async () => {
+    vi.useFakeTimers();
+    try {
+      subscribeTodayHealth(vi.fn());
+      connected(100);
+      await refreshTodayHealth();
+
+      await vi.advanceTimersByTimeAsync(59_000);
+      expect(readDays).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops while the app is backgrounded, so it is not polling out of sight', async () => {
+    vi.useFakeTimers();
+    try {
+      subscribeTodayHealth(vi.fn());
+      connected(100);
+      await refreshTodayHealth();
+      expect(readDays).toHaveBeenCalledTimes(1);
+
+      appStateListener?.('background');
+      await vi.advanceTimersByTimeAsync(300_000);
+      expect(readDays).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads once on the way back in, then resumes the minute cycle', async () => {
+    vi.useFakeTimers();
+    try {
+      subscribeTodayHealth(vi.fn());
+      connected(100);
+      await refreshTodayHealth();
+      appStateListener?.('background');
+      await vi.advanceTimersByTimeAsync(300_000);
+      expect(readDays).toHaveBeenCalledTimes(1);
+
+      appStateListener?.('active');
+      await vi.advanceTimersByTimeAsync(0);
+      expect(readDays).toHaveBeenCalledTimes(2); // the resume read
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(readDays).toHaveBeenCalledTimes(3); // polling again
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops once nothing is showing the reading', async () => {
+    vi.useFakeTimers();
+    try {
+      const off = subscribeTodayHealth(vi.fn());
+      connected(100);
+      await refreshTodayHealth();
+      off();
+
+      await vi.advanceTimersByTimeAsync(300_000);
+      expect(readDays).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps one timer when both mount points subscribe', async () => {
+    vi.useFakeTimers();
+    try {
+      // Home and StepsCard both subscribe. Two timers would double the reads.
+      subscribeTodayHealth(vi.fn());
+      subscribeTodayHealth(vi.fn());
+      connected(100);
+      await refreshTodayHealth();
+
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(readDays).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

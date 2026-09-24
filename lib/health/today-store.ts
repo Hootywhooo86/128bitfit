@@ -27,6 +27,19 @@ let state: TodayHealth = { status: 'checking' };
 const listeners = new Set<Listener>();
 let inFlight: Promise<void> | null = null;
 let appStateSub: NativeEventSubscription | null = null;
+let poll: ReturnType<typeof setInterval> | null = null;
+
+/**
+ * How often the reading refreshes itself while the app is open.
+ *
+ * Steps climb continuously and Health Connect has no change notification worth
+ * subscribing to here, so leaving Home open used to show the number from
+ * whenever the screen last read. A minute is frequent enough that the figure
+ * is never visibly wrong and slow enough that it is not doing work every time
+ * the user glances at it. The read is local IPC, not network, so this does not
+ * touch the offline rule.
+ */
+const POLL_MS = 60_000;
 
 function publish(next: TodayHealth): void {
   // useSyncExternalStore compares snapshots by identity, so an unchanged
@@ -89,8 +102,32 @@ export function refreshTodayHealth(): Promise<void> {
   return inFlight;
 }
 
+/**
+ * Only while something is showing the reading and the app is in front.
+ *
+ * Polling a backgrounded app would burn battery to update a number nobody can
+ * see, and the resume handler already re-reads on the way back in.
+ */
+function startPolling(): void {
+  if (poll || listeners.size === 0) return;
+  poll = setInterval(() => {
+    void refreshTodayHealth();
+  }, POLL_MS);
+}
+
+function stopPolling(): void {
+  if (!poll) return;
+  clearInterval(poll);
+  poll = null;
+}
+
 function onAppState(next: AppStateStatus): void {
-  if (next === 'active') void refreshTodayHealth();
+  if (next === 'active') {
+    void refreshTodayHealth();
+    startPolling();
+  } else {
+    stopPolling();
+  }
 }
 
 export function subscribeTodayHealth(listener: Listener): () => void {
@@ -98,11 +135,13 @@ export function subscribeTodayHealth(listener: Listener): () => void {
   if (listeners.size === 1 && !appStateSub) {
     appStateSub = AppState.addEventListener('change', onAppState);
   }
+  startPolling();
   return () => {
     listeners.delete(listener);
     if (listeners.size === 0) {
       appStateSub?.remove();
       appStateSub = null;
+      stopPolling();
     }
   };
 }
@@ -114,4 +153,5 @@ export function __resetTodayHealth(): void {
   inFlight = null;
   appStateSub?.remove();
   appStateSub = null;
+  stopPolling();
 }
