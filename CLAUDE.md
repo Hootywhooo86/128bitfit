@@ -143,9 +143,14 @@ behavioural spec. Port from it; don't ship it.
 
 Visual rules it establishes:
 - Monochrome UI. **Colour only ever means data.**
-- The only colour in the app is muscle load: yellow (1–3 sets) → orange (4–7) → red (8+),
-  plus red for over-target. An accent colour is user-selectable (paid) and must never
-  bleed into the muscle heat scale.
+- The only colour that carries meaning is muscle load: yellow (1–3 sets) → orange (4–7)
+  → red (8+), plus red for over-target. That scale is fixed and must never be
+  user-changeable — an accent that could be red would turn "you hammered this" into
+  "I like red".
+- The accent colour **is** user-selectable, and is **free, permanently**. It was once
+  listed here as paid; it shipped free, and per the non-negotiable above, nothing free
+  becomes paid later. It applies to buttons, highlights, active tabs, progress fills and
+  links — never to the heat scale or to over-target red.
 - Pixel font (Silkscreen) for section labels and headers only. Body text is Inter.
 - The character is a hand-authored 28×44 sprite grid rendered at 2×, not procedural shapes.
 
