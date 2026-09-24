@@ -20,6 +20,7 @@ import {
   type WorkoutSummary,
 } from '@/db/workout-queries';
 import { useTodaySteps } from '@/lib/health/use-health';
+import { broadcastHealthRefresh } from '@/lib/health/use-health-refresh';
 import { formatKg } from '@/lib/weight-source';
 import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
 import type { WeightUnit } from '@/db/settings-queries';
@@ -91,13 +92,18 @@ export default function HomeScreen() {
   /**
    * Pull to re-read everything, including the phone's health data.
    *
-   * Focusing the screen already re-reads the database, but steps and sleep
-   * come from Health Connect and change while the app is open — walking with
-   * Home on screen used to leave the step count stale with no way to nudge it
-   * short of leaving the tab and coming back.
+   * Focusing the screen already re-reads the database, but steps, sleep and a
+   * weigh-in from a scale come from Health Connect and change while the app is
+   * open — walking with Home on screen used to leave the step count stale with
+   * no way to nudge it short of leaving the tab and coming back.
+   *
+   * The broadcast is what reaches the readiness and weight cards. They hold
+   * their own state, so re-reading Home's own queries left them showing
+   * whatever they read when they mounted — a pull that visibly did nothing.
    */
   const pullToRefresh = useCallback(() => {
     setRefreshing(true);
+    broadcastHealthRefresh();
     void Promise.allSettled([refresh(), refreshHealth()]).finally(() => setRefreshing(false));
   }, [refresh, refreshHealth]);
 
