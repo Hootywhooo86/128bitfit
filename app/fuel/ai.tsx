@@ -20,6 +20,7 @@ import { totalsOf, type AiFoodItem } from '@/lib/ai-food';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
 import { MealSlot } from '@/components/MealSlot';
 import { mealTimestamp, type MealDay } from '@/lib/meal-time';
+import { parseDayKey } from '@/lib/fuel-day';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
 /**
@@ -33,7 +34,7 @@ import { colors, fonts, radius, spacing } from '@/lib/theme';
  */
 export default function AiFoodScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ mode?: string }>();
+  const params = useLocalSearchParams<{ mode?: string; day?: string }>();
   const [mode, setMode] = useState<'describe' | 'photo' | 'recipe'>(
     params.mode === 'recipe' ? 'recipe' : 'describe'
   );
@@ -48,7 +49,7 @@ export default function AiFoodScreen() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [items, setItems] = useState<AiFoodItem[] | null>(null);
-  const [mealDay, setMealDay] = useState<MealDay>('today');
+  const [mealDay, setMealDay] = useState<MealDay>(() => parseDayKey(params.day) ?? 'today');
   const [mealType, setMealType] = useState<MealType>(
     defaultMealTypeForHour(new Date().getHours())
   );

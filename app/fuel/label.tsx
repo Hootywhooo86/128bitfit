@@ -1,5 +1,5 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { describeReading, parseNutritionLabel, type LabelField } from '@/lib/nutrition-label';
@@ -37,6 +37,8 @@ type Step = 'package' | 'label';
 
 export default function ScanLabelScreen() {
   const router = useRouter();
+  // Passed through untouched — the custom-food form is what actually logs.
+  const { day } = useLocalSearchParams<{ day?: string }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -127,6 +129,8 @@ export default function ScanLabelScreen() {
         pathname: '/fuel/custom',
         params: {
           fromLabel: '1',
+          // A label photographed while looking at a past day is for that day.
+          ...(day ? { day } : {}),
           // The pack shot when there is one; the panel otherwise, so skipping
           // the first step leaves the food with a picture rather than none.
           photoUri: packageUri ?? uri,

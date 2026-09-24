@@ -2,10 +2,23 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CalorieRing } from '@/components/CalorieRing';
-import { Card, MacroBar, MenuRow, QuickActions, Screen } from '@/components/ui';
+import { DayStrip } from '@/components/DayStrip';
+import { Card, MacroBar, MenuRow, Note, QuickActions, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
-import { getDayFuelSummary, type DayFuelSummary } from '@/db/food-queries';
+import {
+  getDayFuelSummary,
+  listDayTotals,
+  type DayFuelSummary,
+  type DayTotal,
+} from '@/db/food-queries';
 import { MEAL_TYPES, type MealType } from '@/db/schema';
+import {
+  clampFuelDay,
+  dayKey,
+  describeFuelDay,
+  fuelWindow,
+  startOfDay,
+} from '@/lib/fuel-day';
 import { formatKcal } from '@/lib/nutrition';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
@@ -25,21 +38,47 @@ const MEAL_LABELS: Record<MealType, string> = {
  *
  * An unlogged day shows the target in an empty ring, never a filled zero — a
  * day nobody logged is not a day of eating nothing.
+ *
+ * The day strip at the top reaches back 30 days. Everything below it reads the
+ * selected day rather than `new Date()`, and every capture action is handed
+ * that day too — a screen showing last Tuesday with an Add button that logs to
+ * today would be worse than not letting you look back at all.
  */
 export default function FuelScreen() {
   const { ready } = useDb();
   const router = useRouter();
-  const [summary, setSummary] = useState<DayFuelSummary | null>(null);
+  const [day, setDay] = useState<Date>(() => startOfDay(new Date()));
+  // Tagged with the day it describes. Without the tag a day switch renders
+  // the previous day's numbers under the new day's header for a frame — brief,
+  // but a wrong number presented as that day's is still a wrong number.
+  const [summary, setSummary] = useState<{ key: string; data: DayFuelSummary } | null>(null);
+  const [totals, setTotals] = useState<Map<string, DayTotal>>(() => new Map());
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     if (!ready) return;
     try {
-      setSummary(await getDayFuelSummary(new Date()));
+      setError(null);
+      // Clamped on every read, not only when a day is picked: the selection
+      // can fall outside the window while the screen is open — a phone left on
+      // Fuel long enough for the day to age past 30, or a clock that moved
+      // backwards and put the selection in the future.
+      const showing = clampFuelDay(day);
+      if (dayKey(showing) !== dayKey(day)) setDay(showing);
+      const [next, windowTotals] = await Promise.all([
+        getDayFuelSummary(showing),
+        listDayTotals(fuelWindow()),
+      ]);
+      setSummary({ key: dayKey(showing), data: next });
+      setTotals(windowTotals);
+    } catch (e) {
+      // Spinning forever would be the app pretending it is still working.
+      setError(e instanceof Error ? e.message : String(e));
     } finally {
       setLoading(false);
     }
-  }, [ready]);
+  }, [ready, day]);
 
   useFocusEffect(
     useCallback(() => {
@@ -47,9 +86,17 @@ export default function FuelScreen() {
     }, [refresh])
   );
 
-  if (!ready || loading || !summary) {
+  if (error && !loading) {
     return (
-      <Screen section="Today">
+      <Screen section={describeFuelDay(day)} onRefresh={() => void refresh()}>
+        <Note>Could not read that day: {error}. Pull down to try again.</Note>
+      </Screen>
+    );
+  }
+
+  if (!ready || loading || !summary || summary.key !== dayKey(day)) {
+    return (
+      <Screen section={describeFuelDay(day)}>
         <View style={s.center}>
           <ActivityIndicator color={colors.accent} />
         </View>
@@ -57,18 +104,24 @@ export default function FuelScreen() {
     );
   }
 
-  const { goals, totals, partial, byMeal, logs } = summary;
+  const { goals, totals: dayTotals, partial, byMeal, logs } = summary.data;
   const logged = logs.length > 0;
+  // Only ever sent as a date, never a time: the add screens decide the hour
+  // from the meal slot, and a time here would override that.
+  const dayParam = dayKey(day);
+  const isToday = dayParam === dayKey(new Date());
 
   return (
-    <Screen section="Today">
+    <Screen section={describeFuelDay(day)}>
+      <DayStrip day={day} onChange={setDay} totals={totals} />
+
       <Card>
         <View style={s.ringrow}>
-          <CalorieRing consumed={logged ? totals.calories : null} target={goals.calorieTarget} />
+          <CalorieRing consumed={logged ? dayTotals.calories : null} target={goals.calorieTarget} />
           <View style={s.macros}>
-            <MacroBar label="Protein" value={logged ? totals.protein : null} target={goals.proteinTarget} tone="p" partial={partial.protein} />
-            <MacroBar label="Carbs" value={logged ? totals.carb : null} target={goals.carbTarget} tone="c" partial={partial.carb} />
-            <MacroBar label="Fat" value={logged ? totals.fat : null} target={goals.fatTarget} tone="f" partial={partial.fat} />
+            <MacroBar label="Protein" value={logged ? dayTotals.protein : null} target={goals.proteinTarget} tone="p" partial={partial.protein} />
+            <MacroBar label="Carbs" value={logged ? dayTotals.carb : null} target={goals.carbTarget} tone="c" partial={partial.carb} />
+            <MacroBar label="Fat" value={logged ? dayTotals.fat : null} target={goals.fatTarget} tone="f" partial={partial.fat} />
           </View>
         </View>
       </Card>
@@ -77,11 +130,11 @@ export default function FuelScreen() {
         items={[
           // AI first: describing a meal or photographing it is the fastest way
           // in for anything the catalog does not have.
-          { icon: '✦', label: 'AI', onPress: () => router.push('/fuel/ai') },
-          { icon: '▣', label: 'SCAN', onPress: () => router.push('/fuel/scan') },
-          { icon: '⌕', label: 'SEARCH', onPress: () => router.push('/fuel/add') },
-          { icon: '◉', label: 'LABEL', onPress: () => router.push('/fuel/label') },
-          { icon: '✎', label: 'CUSTOM', onPress: () => router.push('/fuel/custom-hub') },
+          { icon: '✦', label: 'AI', onPress: () => router.push(`/fuel/ai?day=${dayParam}`) },
+          { icon: '▣', label: 'SCAN', onPress: () => router.push(`/fuel/scan?day=${dayParam}`) },
+          { icon: '⌕', label: 'SEARCH', onPress: () => router.push(`/fuel/add?day=${dayParam}`) },
+          { icon: '◉', label: 'LABEL', onPress: () => router.push(`/fuel/label?day=${dayParam}`) },
+          { icon: '✎', label: 'CUSTOM', onPress: () => router.push(`/fuel/custom-hub?day=${dayParam}`) },
         ]}
       />
 
@@ -121,7 +174,10 @@ export default function FuelScreen() {
               ))
             )}
 
-            <Pressable style={s.addf} onPress={() => router.push('/fuel/add')}>
+            <Pressable
+              style={s.addf}
+              onPress={() => router.push(`/fuel/add?meal=${meal}&day=${dayParam}`)}
+            >
               <Text style={s.addfT}>+ Add food</Text>
             </Pressable>
           </View>
@@ -135,8 +191,10 @@ export default function FuelScreen() {
       <MenuRow
         icon="▥"
         name="Detailed nutrition"
-        sub="Every vitamin and mineral today, and the 7- and 30-day averages"
-        onPress={() => router.push('/fuel/detail')}
+        sub={`Every vitamin and mineral ${
+          isToday ? 'today' : `on ${describeFuelDay(day)}`
+        }, and the 7- and 30-day averages`}
+        onPress={() => router.push(`/fuel/detail?day=${dayParam}`)}
       />
     </Screen>
   );

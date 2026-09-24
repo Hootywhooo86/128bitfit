@@ -1,4 +1,4 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, MenuRow, Note, Screen } from '@/components/ui';
@@ -6,6 +6,7 @@ import { listUserFoods } from '@/db/barcode-queries';
 import { useDb } from '@/db/DatabaseProvider';
 import { logFoodFromCatalog } from '@/db/food-queries';
 import type { Food } from '@/db/schema';
+import { parseDayKey } from '@/lib/fuel-day';
 import { mealTimestamp } from '@/lib/meal-time';
 import {
   defaultMealTypeForHour,
@@ -29,6 +30,9 @@ import { colors, fonts, spacing } from '@/lib/theme';
 export default function CustomHubScreen() {
   const { ready } = useDb();
   const router = useRouter();
+  const params = useLocalSearchParams<{ day?: string }>();
+  const mealDay = parseDayKey(params.day) ?? 'today';
+  const dayQuery = params.day ? `&day=${params.day}` : '';
   const [recipes, setRecipes] = useState<Food[]>([]);
   const [customs, setCustoms] = useState<Food[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,13 +60,15 @@ export default function CustomHubScreen() {
     if (logging) return;
     setLogging(food.id);
     try {
-      // One tap still means "now", but the slot decides the time the same way
-      // every other screen does, so a late-night tap does not land tomorrow.
+      // The slot comes from the clock even on a past day — there is nothing
+      // better to go on, and it keeps a late-night tap from landing tomorrow.
+      // The day comes from wherever Fuel was, so one tap on a day you have
+      // navigated back to logs onto that day rather than onto today.
       const meal = defaultMealTypeForHour(new Date().getHours());
       await logFoodFromCatalog(food, {
         servings: 1,
         mealType: meal,
-        loggedAt: mealTimestamp(meal, 'today'),
+        loggedAt: mealTimestamp(meal, mealDay),
       });
       router.replace('/(tabs)/fuel');
     } catch (e) {
@@ -89,13 +95,13 @@ export default function CustomHubScreen() {
         icon="✦"
         name="New recipe"
         sub="Photograph it or paste a link — saved per serving"
-        onPress={() => router.push('/fuel/ai?mode=recipe')}
+        onPress={() => router.push(`/fuel/ai?mode=recipe${dayQuery}`)}
       />
       <MenuRow
         icon="✎"
         name="New custom food"
         sub="One item the catalogue does not have"
-        onPress={() => router.push('/fuel/custom')}
+        onPress={() => router.push(params.day ? `/fuel/custom?day=${params.day}` : '/fuel/custom')}
       />
 
       <Label>MY RECIPES</Label>

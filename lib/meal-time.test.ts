@@ -98,3 +98,64 @@ describe('telling the user what it chose', () => {
     expect(s).not.toMatch(/today|yesterday/);
   });
 });
+
+describe('logging onto a day you navigated back to', () => {
+  const now = at(2026, 9, 24, 21, 5);
+  const sep18 = new Date(2026, 8, 18, 0, 0, 0, 0);
+
+  it('puts the meal on that day, not on today', () => {
+    const t = mealTimestamp('dinner', sep18, now);
+    expect(t.getFullYear()).toBe(2026);
+    expect(t.getMonth()).toBe(8);
+    expect(t.getDate()).toBe(18);
+    expect(t.getHours()).toBe(19);
+  });
+
+  it('keeps the slots in order on that day too', () => {
+    const b = mealTimestamp('breakfast', sep18, now).getTime();
+    const l = mealTimestamp('lunch', sep18, now).getTime();
+    const d = mealTimestamp('dinner', sep18, now).getTime();
+    expect(b).toBeLessThan(l);
+    expect(l).toBeLessThan(d);
+  });
+
+  it('lands a snack on that day, at the hour you are logging it', () => {
+    const t = mealTimestamp('snack', sep18, now);
+    expect(t.getDate()).toBe(18);
+    expect(t.getHours()).toBe(21);
+    expect(t.getMinutes()).toBe(5);
+  });
+
+  it('reads only the calendar date, so the time on the Date cannot leak in', () => {
+    const noon = new Date(2026, 8, 18, 12, 45, 0, 0);
+    expect(mealTimestamp('dinner', noon, now).getHours()).toBe(19);
+    expect(mealTimestamp('snack', noon, now).getHours()).toBe(21);
+  });
+
+  it('still refuses the future if it is handed a day that has not happened', () => {
+    const tomorrow = new Date(2026, 8, 25, 0, 0, 0, 0);
+    for (const meal of ['breakfast', 'lunch', 'dinner', 'snack'] as const) {
+      expect(mealTimestamp(meal, tomorrow, now).getTime()).toBeLessThanOrEqual(now.getTime());
+    }
+  });
+
+  it('matches the string form when handed today or yesterday as a Date', () => {
+    const today = new Date(2026, 8, 24, 3, 0, 0, 0);
+    const yesterday = new Date(2026, 8, 23, 3, 0, 0, 0);
+    for (const meal of ['breakfast', 'lunch', 'dinner'] as const) {
+      expect(mealTimestamp(meal, today, now).getTime()).toBe(
+        mealTimestamp(meal, 'today', now).getTime()
+      );
+      expect(mealTimestamp(meal, yesterday, now).getTime()).toBe(
+        mealTimestamp(meal, 'yesterday', now).getTime()
+      );
+    }
+  });
+
+  it('crosses a month end without landing on day zero', () => {
+    const aug31 = new Date(2026, 7, 31, 0, 0, 0, 0);
+    const t = mealTimestamp('lunch', aug31, now);
+    expect(t.getMonth()).toBe(7);
+    expect(t.getDate()).toBe(31);
+  });
+});

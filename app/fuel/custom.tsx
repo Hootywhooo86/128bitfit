@@ -20,6 +20,7 @@ import { saveFoodPhoto } from '@/lib/food-photo-store';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
 import { MealSlot } from '@/components/MealSlot';
 import { mealTimestamp, type MealDay } from '@/lib/meal-time';
+import { parseDayKey } from '@/lib/fuel-day';
 import type { LabelReading } from '@/lib/nutrition-label';
 import { colors, spacing } from '@/lib/theme';
 import { Screen } from '@/components/ui';
@@ -62,6 +63,8 @@ export default function CustomFoodScreen() {
     /** Read off the front of the pack. A guess, and editable — never saved as read. */
     nameGuess?: string;
     reading?: string;
+    /** The day Fuel was showing, carried through the scan and label flows. */
+    day?: string;
   }>();
   const reading = useMemo(() => readingFromParams(params.reading), [params.reading]);
   const f = reading?.fields ?? {};
@@ -86,7 +89,7 @@ export default function CustomFoodScreen() {
   const [mealType, setMealType] = useState<MealType>(
     defaultMealTypeForHour(new Date().getHours())
   );
-  const [mealDay, setMealDay] = useState<MealDay>('today');
+  const [mealDay, setMealDay] = useState<MealDay>(() => parseDayKey(params.day) ?? 'today');
   const [saving, setSaving] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
 
