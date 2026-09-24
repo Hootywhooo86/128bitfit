@@ -63,25 +63,40 @@ export function StepsCard() {
 
   if (state.status === 'denied') {
     return (
-      <Pressable style={styles.wrap} onPress={onConnect}>
-        <View style={styles.row}>
-          <Text style={styles.title}>Steps</Text>
-          <Text style={styles.link}>Connect →</Text>
-        </View>
-        <Text style={styles.dash}>—</Text>
-        <Text style={styles.hint}>Not connected to Health Connect.</Text>
-      </Pressable>
+      <View style={styles.wrap}>
+        <Pressable onPress={onConnect}>
+          <View style={styles.row}>
+            <Text style={styles.title}>Steps</Text>
+            <Text style={styles.link}>Connect →</Text>
+          </View>
+          <Text style={styles.dash}>—</Text>
+          <Text style={styles.hint}>Not connected to Health Connect.</Text>
+        </Pressable>
+        {/*
+          This state covers more than a refused permission — Health Connect
+          failing to start looks identical here. Rather than guess at the
+          user's expense, offer the screen that says which it actually is.
+        */}
+        <Pressable onPress={() => router.push('/settings/health')} hitSlop={8}>
+          <Text style={styles.why}>Already connected? Check what it reports →</Text>
+        </Pressable>
+      </View>
     );
   }
 
   // Connected. A null reading means the day could not be read — still not zero.
   if (state.steps == null) {
     return (
-      <Pressable style={styles.wrap} onPress={openSettings}>
-        <Text style={styles.title}>Steps</Text>
-        <Text style={styles.dash}>—</Text>
-        <Text style={styles.hint}>No reading from Health Connect.</Text>
-      </Pressable>
+      <View style={styles.wrap}>
+        <Pressable onPress={openSettings}>
+          <Text style={styles.title}>Steps</Text>
+          <Text style={styles.dash}>—</Text>
+          <Text style={styles.hint}>No reading from Health Connect.</Text>
+        </Pressable>
+        <Pressable onPress={() => router.push('/settings/health')} hitSlop={8}>
+          <Text style={styles.why}>Check what it reports →</Text>
+        </Pressable>
+      </View>
     );
   }
 
@@ -114,4 +129,5 @@ const styles = StyleSheet.create({
   hint: { color: colors.textMuted, fontSize: 12 },
   source: { color: colors.textMuted, fontSize: 11 },
   link: { color: colors.accent, fontWeight: '700', fontSize: 13 },
+  why: { color: colors.textMuted, fontSize: 12, textDecorationLine: 'underline', marginTop: 2 },
 });

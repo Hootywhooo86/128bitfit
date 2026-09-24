@@ -22,6 +22,7 @@ import {
 import type { Permission } from 'react-native-health-connect';
 import { SCOPE_RECORDS, healthConnectPermissions, type Direction } from './scopes';
 import { dayKey, eachDay, endOfLocalDay, previousDay, startOfLocalDay } from './dates';
+import { describeError, type DiagnosticStep } from './diagnose';
 import { sleepMinutesByWakeDay } from './sleep';
 import {
   HEALTH_SCOPES,
@@ -517,4 +518,90 @@ function writeError(e: unknown, what: string): string {
     return `Health Connect has not granted permission to write ${what}.`;
   }
   return `Could not write ${what} to Health Connect: ${detail}`;
+}
+
+/**
+ * Every step of the steps read, reported separately.
+ *
+ * The provider above deliberately collapses failures into "not connected",
+ * which is right for the card and useless for finding out why. This runs the
+ * same sequence with nothing swallowed, so a report can say which step failed
+ * rather than leaving a dash to be interpreted.
+ *
+ * Deliberately does not reuse `initialized`: a cached true from earlier tells
+ * us nothing about whether initialize() works now.
+ */
+export async function diagnoseHealthConnect(): Promise<DiagnosticStep[]> {
+  const out: DiagnosticStep[] = [];
+  const add = (label: string, value: string, ok: boolean | null = null) =>
+    out.push({ label, value, ok });
+
+  let status: number | null = null;
+  try {
+    status = await getSdkStatus();
+    const names: Record<number, string> = {
+      [SdkAvailabilityStatus.SDK_AVAILABLE]: 'available',
+      [SdkAvailabilityStatus.SDK_UNAVAILABLE]: 'no Health Connect on this phone',
+      [SdkAvailabilityStatus.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED]: 'needs updating',
+    };
+    add('SDK status', `${names[status] ?? 'unknown'} (${status})`,
+      status === SdkAvailabilityStatus.SDK_AVAILABLE);
+  } catch (e) {
+    add('SDK status', describeError(e), false);
+    return out;
+  }
+
+  let started = false;
+  try {
+    started = await initialize();
+    add('initialize()', started ? 'true' : 'returned false', started);
+  } catch (e) {
+    // The case the card cannot distinguish from a refused permission.
+    add('initialize()', `threw — ${describeError(e)}`, false);
+    return out;
+  }
+  if (!started) return out;
+
+  let granted: Granted = [];
+  try {
+    granted = (await getGrantedPermissions()) as Granted;
+    add('Permissions granted', `${granted.length} of ${PERMISSIONS.length}`, granted.length > 0);
+  } catch (e) {
+    add('Permissions granted', `threw — ${describeError(e)}`, false);
+    return out;
+  }
+
+  const grants = grantsFrom(granted);
+  const readsSteps = grants.read.includes('steps');
+  add('Steps permission', readsSteps ? 'granted' : 'NOT granted', readsSteps);
+  add('All read scopes', grants.read.join(', ') || 'none', null);
+
+  // The exact window the real read uses, so a timezone fault is visible.
+  const day = dayKey(new Date());
+  const start = startOfLocalDay(day);
+  const end = endOfLocalDay(day);
+  add('Day queried', day, null);
+  add('Range sent', `${start.toISOString()} -> ${end.toISOString()}`, null);
+  add('Device time', `${new Date().toString()}`, null);
+
+  if (!readsSteps) return out;
+
+  try {
+    const { records } = await readRecords('Steps', {
+      timeRangeFilter: { operator: 'between', startTime: start.toISOString(), endTime: end.toISOString() },
+    });
+    const rows = (records ?? []) as { startTime?: string; count?: number }[];
+    const total = rows.reduce((n, r) => n + (typeof r.count === 'number' ? r.count : 0), 0);
+    add('Steps records', String(rows.length), rows.length > 0);
+    add('Steps total', String(total), null);
+    // Which app wrote them, and when — a count of 0 with records present is a
+    // different problem from no records at all.
+    for (const r of rows.slice(0, 3)) {
+      add('  record', `${r.startTime ?? '?'} count=${r.count ?? '?'}`, null);
+    }
+  } catch (e) {
+    add('Steps read', `threw — ${describeError(e)}`, false);
+  }
+
+  return out;
 }
