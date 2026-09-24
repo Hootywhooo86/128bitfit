@@ -10,6 +10,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { readiness, restQuality, type Readiness, type RestQuality } from '../readiness';
 import { dayKey } from './dates';
 import { health } from './index';
+import { useAppResume } from './use-app-resume';
 
 export type ReadinessState =
   | { status: 'checking' }
@@ -72,6 +73,13 @@ export function useReadiness(recentSets: number | null) {
       alive = false;
     };
   }, [refresh]);
+
+  // Last night's sleep lands in Health Connect while the app is closed.
+  useAppResume(() => {
+    refresh().catch(() => {
+      /* Already handled on mount; a failed resume keeps the last reading. */
+    });
+  });
 
   return { state, refresh };
 }

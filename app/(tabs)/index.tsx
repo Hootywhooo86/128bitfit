@@ -20,7 +20,6 @@ import {
   type WorkoutSummary,
 } from '@/db/workout-queries';
 import { useTodaySteps } from '@/lib/health/use-health';
-import { useLatestWeight } from '@/lib/health/use-weight';
 import { formatKg } from '@/lib/weight-source';
 import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
 import type { WeightUnit } from '@/db/settings-queries';

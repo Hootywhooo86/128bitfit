@@ -9,61 +9,41 @@
  *   update       — provider installed but needs updating
  *   denied       — available, but not connected / permission refused
  *   ready        — connected; `steps` is a real reading (0 is a real zero)
+ *
+ * The state itself lives in ./today-store, shared by every mount. See the note
+ * there: this hook is mounted twice on Home, and per-hook state let the two
+ * copies disagree.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { health } from './index';
-import { today } from './dates';
+import type { TodayHealth } from './today-gate';
+import { getTodayHealth, refreshTodayHealth, subscribeTodayHealth } from './today-store';
 
-export type TodayHealth =
-  | { status: 'checking' }
-  | { status: 'unavailable' }
-  | { status: 'update' }
-  | { status: 'denied' }
-  | { status: 'ready'; steps: number | null };
+export type { TodayHealth };
 
 export function useTodaySteps() {
-  const [state, setState] = useState<TodayHealth>({ status: 'checking' });
+  const state = useSyncExternalStore(subscribeTodayHealth, getTodayHealth, getTodayHealth);
 
-  const refresh = useCallback(async () => {
-    const availability = await health.getAvailability();
-    if (availability === 'unavailable') return setState({ status: 'unavailable' });
-    if (availability === 'update_required') return setState({ status: 'update' });
-
-    // Ask whether *steps* was granted, not whether everything was. The app
-    // requests 27 permissions and Health Connect lets the user tick some and
-    // not others, so requiring the full set reported "denied" to anyone who
-    // had connected and granted steps — which is most people.
-    const grants = await health.getGrants();
-    if (!grants.read.includes('steps')) return setState({ status: 'denied' });
-
-    const day = today();
-    const [reading] = await health.readDays(day, day);
-    setState({ status: 'ready', steps: reading?.steps ?? null });
-  }, []);
+  const refresh = useCallback(() => refreshTodayHealth(), []);
 
   /** Prompts, so only call from a button press. */
   const connect = useCallback(async () => {
     // Partial counts: the prompt succeeded if the user granted anything, and
-    // refresh() decides whether steps specifically came through.
+    // the refresh decides whether steps specifically came through.
     const permission = await health.requestPermissions();
-    if (permission === 'granted' || permission === 'partial') {
-      await refresh();
-      return true;
-    }
-    setState({ status: 'denied' });
-    return false;
-  }, [refresh]);
+
+    // Refresh either way. A refusal still has to be re-read rather than
+    // assumed: the user may have granted steps from the Health Connect screen
+    // and backed out of the rest, which arrives here as a refusal.
+    await refreshTodayHealth();
+    return permission === 'granted' || permission === 'partial';
+  }, []);
 
   useEffect(() => {
-    let alive = true;
-    // A failure here must not leave the card stuck on "checking" forever.
-    refresh().catch(() => {
-      if (alive) setState({ status: 'denied' });
-    });
-    return () => {
-      alive = false;
-    };
-  }, [refresh]);
+    // Only the first mount reads; the store shares the result with the rest,
+    // and refreshes itself on app resume.
+    if (getTodayHealth().status === 'checking') void refreshTodayHealth();
+  }, []);
 
   return { state, refresh, connect, openSettings: health.openSettings };
 }

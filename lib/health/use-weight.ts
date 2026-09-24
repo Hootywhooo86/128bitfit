@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { latestWeight, type LatestWeight, type WeightReading } from '../weight-source';
 import { dayKey } from './dates';
 import { health } from './index';
+import { useAppResume } from './use-app-resume';
 
 /** Far enough back to catch a scale used weekly, short enough to stay cheap. */
 const LOOKBACK_DAYS = 14;
@@ -72,6 +73,10 @@ export function useLatestWeight(local: WeightReading | null) {
       alive = false;
     };
   }, [local]);
+
+  // A scale pushes its reading while the app is backgrounded; without this the
+  // weigh-in does not appear until the screen is mounted again.
+  useAppResume(() => void refresh());
 
   return { state, refresh };
 }
