@@ -108,6 +108,16 @@ function stateFrom(granted: Granted): HealthPermissionState {
   return got >= PERMISSIONS.length ? 'granted' : 'partial';
 }
 
+/**
+ * Why the last read of each record type failed, for the diagnostics screen.
+ *
+ * tryRead has to return null on failure so one refused scope cannot blank the
+ * others, but a bare null tells nobody anything — it is indistinguishable from
+ * "not granted", which is how the steps fault stayed invisible through four
+ * rounds of fixes. The reason is kept here instead of being thrown away.
+ */
+export const lastReadErrors = new Map<string, string>();
+
 /** A read that was not granted must not come back as zero. */
 async function tryRead<T>(recordType: string, start: string, end: string): Promise<T[] | null> {
   try {
@@ -118,8 +128,10 @@ async function tryRead<T>(recordType: string, start: string, end: string): Promi
         endTime: endOfLocalDay(end).toISOString(),
       },
     });
+    lastReadErrors.delete(recordType);
     return records as T[];
-  } catch {
+  } catch (e) {
+    lastReadErrors.set(recordType, describeError(e));
     return null;
   }
 }
@@ -184,29 +196,54 @@ export const healthConnectProvider: HealthProvider = {
       return t ? byDate.get(dayKey(new Date(t))) : undefined;
     };
 
-    // Each read is independent: one denied scope must not blank the others.
-    const [steps, hr, resting, active, total, distance, sleep, weight, fat, water, spo2, resp] =
-      await Promise.all([
-        tryRead<{ startTime: string; count?: number }>('Steps', startDate, endDate),
-        tryRead<{ startTime: string; samples?: { beatsPerMinute?: number }[] }>('HeartRate', startDate, endDate),
-        tryRead<{ time: string; beatsPerMinute?: number }>('RestingHeartRate', startDate, endDate),
-        tryRead<{ startTime: string; energy?: { inKilocalories?: number } }>('ActiveCaloriesBurned', startDate, endDate),
-        tryRead<{ startTime: string; energy?: { inKilocalories?: number } }>('TotalCaloriesBurned', startDate, endDate),
-        tryRead<{ startTime: string; distance?: { inMeters?: number } }>('Distance', startDate, endDate),
+    // Read one at a time, not with Promise.all.
+    //
+    // Twelve concurrent reads is twelve simultaneous IPC calls into the Health
+    // Connect provider, and tryRead turns any failure into null, which the UI
+    // renders as a dash. The diagnostics screen proved a single Steps read
+    // returning 95 records and 5170 steps on a device where the card showed
+    // nothing, so the difference between the two paths is the batching. These
+    // are local calls that take milliseconds; doing them in sequence costs
+    // nothing worth the risk.
+    const readAll = async () => {
+      const out: (unknown[] | null)[] = [];
+      for (const [type, from] of [
+        ['Steps', startDate],
+        ['HeartRate', startDate],
+        ['RestingHeartRate', startDate],
+        ['ActiveCaloriesBurned', startDate],
+        ['TotalCaloriesBurned', startDate],
+        ['Distance', startDate],
         // One day earlier than the rest: a night that ends inside the range
         // may have begun the evening before it, and reading from the range's
         // own start would miss the session entirely rather than misfile it.
-        tryRead<{ startTime: string; endTime: string }>(
-          'SleepSession',
-          previousDay(startDate),
-          endDate
-        ),
-        tryRead<{ time: string; weight?: { inKilograms?: number } }>('Weight', startDate, endDate),
-        tryRead<{ time: string; percentage?: number }>('BodyFat', startDate, endDate),
-        tryRead<{ startTime: string; volume?: { inMilliliters?: number } }>('Hydration', startDate, endDate),
-        tryRead<{ time: string; percentage?: number }>('OxygenSaturation', startDate, endDate),
-        tryRead<{ time: string; rate?: number }>('RespiratoryRate', startDate, endDate),
-      ]);
+        ['SleepSession', previousDay(startDate)],
+        ['Weight', startDate],
+        ['BodyFat', startDate],
+        ['Hydration', startDate],
+        ['OxygenSaturation', startDate],
+        ['RespiratoryRate', startDate],
+      ] as const) {
+        out.push(await tryRead<unknown>(type, from, endDate));
+      }
+      return out;
+    };
+
+    const [steps, hr, resting, active, total, distance, sleep, weight, fat, water, spo2, resp] =
+      (await readAll()) as [
+        { startTime: string; count?: number }[] | null,
+        { startTime: string; samples?: { beatsPerMinute?: number }[] }[] | null,
+        { time: string; beatsPerMinute?: number }[] | null,
+        { startTime: string; energy?: { inKilocalories?: number } }[] | null,
+        { startTime: string; energy?: { inKilocalories?: number } }[] | null,
+        { startTime: string; distance?: { inMeters?: number } }[] | null,
+        { startTime: string; endTime: string }[] | null,
+        { time: string; weight?: { inKilograms?: number } }[] | null,
+        { time: string; percentage?: number }[] | null,
+        { startTime: string; volume?: { inMilliliters?: number } }[] | null,
+        { time: string; percentage?: number }[] | null,
+        { time: string; rate?: number }[] | null,
+      ];
 
     // A successful query means every day in range has a real reading, so days
     // with no records are genuinely zero. A failed or ungranted one stays null.
@@ -601,6 +638,27 @@ export async function diagnoseHealthConnect(): Promise<DiagnosticStep[]> {
     }
   } catch (e) {
     add('Steps read', `threw — ${describeError(e)}`, false);
+  }
+
+  // The direct read above is NOT the path the Home card uses. The card goes
+  // through readDays, which reads every record type and aggregates them. The
+  // first report showed the direct read returning 5170 steps on a phone whose
+  // card showed nothing, so the two have to be compared side by side rather
+  // than one of them trusted.
+  try {
+    const [today] = await healthConnectProvider.readDays(day, day);
+    add(
+      'readDays steps (what the card shows)',
+      today?.steps == null ? 'null — this is the dash' : String(today.steps),
+      today?.steps != null
+    );
+  } catch (e) {
+    add('readDays', `threw — ${describeError(e)}`, false);
+  }
+
+  // Anything tryRead swallowed on that call. Empty is the good case.
+  for (const [type, reason] of lastReadErrors) {
+    add(`  ${type} read failed`, reason, false);
   }
 
   return out;
