@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,14 +16,18 @@ import {
   addSet,
   completeSession,
   completeSet,
+  deleteSet,
   discardSession,
   loadActiveWorkout,
+  removeSessionExercise,
+  setSessionExerciseNote,
   updateSet,
   type ActiveWorkout,
   type SessionExerciseWithMeta,
 } from '@/db/workout-queries';
-import type { WorkoutSet, SetType } from '@/db/schema';
-import { getAppSettings } from '@/db/settings-queries';
+import type { WorkoutSet } from '@/db/schema';
+import { getAppSettings, type WeightUnit } from '@/db/settings-queries';
+import { exerciseImageUrl } from '@/lib/exercise-images';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
@@ -30,66 +35,71 @@ import { describeLastPerformance } from '@/lib/set-prefill';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { formatElapsed, sessionStats } from '@/lib/session-stats';
 
+type SetPatch = Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed'>>;
+
 export default function ActiveWorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const timer = useRestTimer();
   const [workout, setWorkout] = useState<ActiveWorkout | null>(null);
   const [loading, setLoading] = useState(true);
-  const [elapsedMs, setElapsedMs] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   const [keepAwake, setKeepAwake] = useState(false);
+  const [units, setUnits] = useState<WeightUnit>('lb');
   const [currentExerciseId, setCurrentExerciseId] = useState<string | null>(null);
 
   const sessionId = id ? decodeURIComponent(id) : '';
 
   useSessionAwake(shouldKeepAwake(keepAwake, workout?.session.status));
 
+  useEffect(() => {
+    let alive = true;
+    void getAppSettings()
+      .then((settings) => {
+        if (!alive) return;
+        setKeepAwake(settings.keepAwake);
+        setUnits(settings.units);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   const refresh = useCallback(async () => {
     const w = await loadActiveWorkout(sessionId);
     setWorkout(w);
-    if (w && currentExerciseId === null) {
-      const first = w.exercises.find(ex => !ex.sets.every(s => s.completed));
-      setCurrentExerciseId(first?.id ?? w.exercises[0]?.id ?? null);
-    }
+    if (!w) return;
+    // Keep the user's choice of current exercise across reloads; only pick one
+    // when there is none yet, or when the chosen one was removed or swapped out.
+    setCurrentExerciseId((prev) => {
+      if (prev && w.exercises.some((ex) => ex.id === prev)) return prev;
+      const firstOpen = w.exercises.find((ex) => ex.sets.some((s) => !s.completed));
+      return firstOpen?.id ?? w.exercises[0]?.id ?? null;
+    });
   }, [sessionId]);
 
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
       refresh().finally(() => setLoading(false));
-      const interval = setInterval(() => {
-        if (workout?.session.startedAt) {
-          setElapsedMs(Date.now() - workout.session.startedAt.getTime());
-        }
-      }, 1000);
-      return () => clearInterval(interval);
-    }, [refresh, workout?.session.startedAt])
+    }, [refresh])
   );
 
-  const onAddSet = async (se: SessionExerciseWithMeta) => {
-    await addSet(se.id);
-    await refresh();
-  };
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const onMarkComplete = async (
     se: SessionExerciseWithMeta,
     set: WorkoutSet,
-    values?: { reps?: number | null; weight?: number | null }
+    values: { reps: number | null; weight: number | null }
   ) => {
-    await completeSet(set.id, {
-      reps: values?.reps !== undefined ? values.reps : set.reps,
-      weight: values?.weight !== undefined ? values.weight : set.weight,
-    });
+    await completeSet(set.id, values);
+    if (values.weight != null) await updateSet(set.id, { weightUnit: units });
     const rest = se.restSeconds ?? DEFAULT_REST_SECONDS;
     timer.start(rest, se.id, sessionId);
-    await refresh();
-  };
-
-  const patchSet = async (
-    setId: string,
-    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed' | 'setType'>>
-  ) => {
-    await updateSet(setId, patch);
     await refresh();
   };
 
@@ -122,7 +132,17 @@ export default function ActiveWorkoutScreen() {
     ]);
   };
 
-  if (loading) {
+  /** Runs a write, then reloads; a failure is said, not swallowed. */
+  const act = async (work: () => Promise<unknown>) => {
+    try {
+      await work();
+    } catch (e) {
+      Alert.alert('That did not save', e instanceof Error ? e.message : String(e));
+    }
+    await refresh();
+  };
+
+  if (loading && !workout) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} />
@@ -141,8 +161,9 @@ export default function ActiveWorkoutScreen() {
     );
   }
 
-  const allSets = workout.exercises.flatMap(ex => ex.sets);
+  const allSets = workout.exercises.flatMap((ex) => ex.sets);
   const stats = sessionStats(allSets);
+  const elapsedMs = workout.session.startedAt ? now - workout.session.startedAt.getTime() : 0;
 
   return (
     <>
@@ -169,7 +190,7 @@ export default function ActiveWorkoutScreen() {
               {stats.volume.toLocaleString()}
               {stats.volumePartial ? '+' : ''}
             </Text>
-            <Text style={styles.statL}>LB VOLUME</Text>
+            <Text style={styles.statL}>{units.toUpperCase()} VOLUME</Text>
           </View>
           <View style={styles.stat}>
             <Text style={styles.statV}>{formatElapsed(elapsedMs)}</Text>
@@ -177,7 +198,7 @@ export default function ActiveWorkoutScreen() {
           </View>
         </View>
         <RestTimerBar />
-        <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
           {workout.exercises.length === 0 ? (
             <Text style={styles.empty}>
               No exercises yet. Add one from the library to start logging sets.
@@ -189,36 +210,56 @@ export default function ActiveWorkoutScreen() {
                 se={se}
                 index={idx}
                 total={workout.exercises.length}
+                units={units}
                 isCurrent={se.id === currentExerciseId}
                 onSetCurrent={() => setCurrentExerciseId(se.id)}
-                onAddSet={() => onAddSet(se)}
-                onAddWarmupSet={async () => {
-                  await addSet(se.id, { isWarmup: true });
-                  await refresh();
-                }}
-                onAddDropSet={async () => {
-                  await addSet(se.id, { setType: 'drop' });
-                  await refresh();
-                }}
-                onAddRestPause={async () => {
-                  await addSet(se.id, { setType: 'rp' });
-                  await refresh();
-                }}
-                onRemoveSet={async (setId: string) => {
-                  Alert.alert('Remove set?', 'This set will be deleted.', [
-                    { text: 'Cancel', style: 'cancel' },
+                onHow={() => router.push({ pathname: '/exercise/[id]', params: { id: se.exerciseId } })}
+                onSwap={() =>
+                  router.push({ pathname: '/train/add-exercise', params: { sessionId, swap: se.id } })
+                }
+                onOptions={() =>
+                  Alert.alert(se.exerciseName, undefined, [
                     {
-                      text: 'Remove',
+                      text: 'Remove from workout',
                       style: 'destructive',
-                      onPress: async () => {
-                        // TODO: implement set deletion
-                        await refresh();
-                      },
+                      onPress: () =>
+                        Alert.alert(
+                          'Remove this exercise?',
+                          se.sets.some((s) => s.completed)
+                            ? 'Its logged sets are deleted with it.'
+                            : 'It has no logged sets.',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Remove', style: 'destructive', onPress: () => void act(() => removeSessionExercise(se.id)) },
+                          ]
+                        ),
                     },
+                    { text: 'Cancel', style: 'cancel' },
+                  ])
+                }
+                onSaveNote={(note) => void act(() => setSessionExerciseNote(se.id, note))}
+                onAddSet={() => void act(() => addSet(se.id))}
+                onAddWarmupSet={() => void act(() => addSet(se.id, { isWarmup: true }))}
+                onAddDropSet={() => void act(() => addSet(se.id, { setType: 'drop' }))}
+                onAddRestPause={() => void act(() => addSet(se.id, { setType: 'rp' }))}
+                onRemoveLastSet={() => {
+                  const last = se.sets[se.sets.length - 1];
+                  if (!last) return;
+                  if (!last.completed) return void act(() => deleteSet(last.id));
+                  Alert.alert('Remove the last set?', 'It is already logged — removing it deletes it.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Remove', style: 'destructive', onPress: () => void act(() => deleteSet(last.id)) },
                   ]);
                 }}
-                onComplete={(set, values) => onMarkComplete(se, set, values)}
-                onPatch={patchSet}
+                onComplete={(set, values) => void onMarkComplete(se, set, values)}
+                onUncomplete={(set) => void act(() => updateSet(set.id, { completed: false }))}
+                onSave={(setId, patch) => {
+                  // Written straight through without a reload, so stepping a
+                  // weight never waits on the whole workout being re-read.
+                  void updateSet(setId, patch).catch((e) =>
+                    Alert.alert('That did not save', e instanceof Error ? e.message : String(e))
+                  );
+                }}
               />
             ))
           )}
@@ -246,59 +287,71 @@ function ExerciseCard({
   se,
   index,
   total,
+  units,
   isCurrent,
   onSetCurrent,
+  onHow,
+  onSwap,
+  onOptions,
+  onSaveNote,
   onAddSet,
   onAddWarmupSet,
   onAddDropSet,
   onAddRestPause,
-  onRemoveSet,
+  onRemoveLastSet,
   onComplete,
-  onPatch,
+  onUncomplete,
+  onSave,
 }: {
   se: SessionExerciseWithMeta;
   index: number;
   total: number;
+  units: WeightUnit;
   isCurrent: boolean;
   onSetCurrent: () => void;
+  onHow: () => void;
+  onSwap: () => void;
+  onOptions: () => void;
+  onSaveNote: (note: string) => void;
   onAddSet: () => void;
   onAddWarmupSet: () => void;
   onAddDropSet: () => void;
   onAddRestPause: () => void;
-  onRemoveSet: (setId: string) => void;
-  onComplete: (
-    set: WorkoutSet,
-    values?: { reps?: number | null; weight?: number | null }
-  ) => void;
-  onPatch: (
-    setId: string,
-    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed' | 'setType'>>
-  ) => void;
+  onRemoveLastSet: () => void;
+  onComplete: (set: WorkoutSet, values: { reps: number | null; weight: number | null }) => void;
+  onUncomplete: (set: WorkoutSet) => void;
+  onSave: (setId: string, patch: SetPatch) => void;
 }) {
-  const completedSets = se.sets.filter(s => s.completed).length;
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [note, setNote] = useState(se.notes ?? '');
+  const [imageFailed, setImageFailed] = useState(false);
+  const completedSets = se.sets.filter((s) => s.completed).length;
   const totalSets = se.sets.length;
   const allDone = completedSets === totalSets && totalSets > 0;
   const stateChip = allDone ? 'DONE' : isCurrent ? 'CURRENT' : `${completedSets}/${totalSets}`;
   const lastLine = describeLastPerformance(se.lastPerformance);
+  const lastDate = se.lastPerformance?.performedAt
+    ? new Date(se.lastPerformance.performedAt).toLocaleDateString([], { day: 'numeric', month: 'short' })
+    : null;
   const primaryMuscle = se.primaryMuscles?.[0] ?? '';
   const initials = se.exerciseName
     .split(/\s+/)
     .slice(0, 2)
-    .map(w => w[0])
+    .map((w) => w[0])
     .join('')
     .toUpperCase();
+  const imageUrl = imageFailed ? null : exerciseImageUrl(se.image);
+  const caption = [primaryMuscle.toUpperCase(), se.equipment?.toUpperCase()].filter(Boolean).join(' · ');
 
   return (
     <View style={[styles.card, isCurrent && styles.cardCurrent]}>
-      {/* Header with counter and state chip */}
       <View style={styles.cardHeader}>
-        <Text style={styles.cardCounter}>EXERCISE {index + 1} / {total}</Text>
-        <Text style={[styles.stateChip, isCurrent && styles.stateChipCurrent]}>
-          {stateChip}
+        <Text style={styles.cardCounter}>
+          EXERCISE {index + 1} / {total}
         </Text>
+        <Text style={[styles.stateChip, (isCurrent || allDone) && styles.stateChipCurrent]}>{stateChip}</Text>
       </View>
 
-      {/* Exercise tile: thumbnail + name */}
       <View style={styles.exTile}>
         <View style={styles.exThumb}>
           <Text style={styles.exThumbText}>{initials}</Text>
@@ -306,28 +359,30 @@ function ExerciseCard({
         <Text style={styles.exName}>{se.exerciseName}</Text>
       </View>
 
-      {/* Chips: muscle, equipment, best */}
       <View style={styles.chipRow}>
-        {primaryMuscle && <Text style={styles.chip}>{primaryMuscle.toUpperCase()}</Text>}
-        {se.equipment && <Text style={styles.chip}>{se.equipment.toUpperCase()}</Text>}
-        {se.bestWeight !== null && <Text style={styles.chip}>Best {se.bestWeight} lb</Text>}
+        {primaryMuscle ? <Text style={styles.chip}>{primaryMuscle.toUpperCase()}</Text> : null}
+        {se.equipment ? <Text style={styles.chip}>{se.equipment.toUpperCase()}</Text> : null}
+        {se.best ? (
+          <Text style={styles.chip}>
+            Best {se.best.weight} {se.best.unit}
+          </Text>
+        ) : null}
       </View>
 
-      {/* Buttons: Swap, How, Options, Set current */}
       <View style={styles.buttonRow}>
-        <Pressable style={styles.outlineBtn}>
+        <Pressable style={styles.outlineBtn} onPress={onSwap}>
           <Text style={styles.outlineBtnText}>⇄ Swap</Text>
         </Pressable>
-        <Pressable style={styles.outlineBtn}>
+        <Pressable style={styles.outlineBtn} onPress={onHow}>
           <Text style={styles.outlineBtnText}>? How</Text>
         </Pressable>
-        <Pressable style={styles.outlineBtn}>
+        <Pressable style={styles.outlineBtn} onPress={onOptions}>
           <Text style={styles.outlineBtnText}>⚙ Options</Text>
         </Pressable>
         {isCurrent ? (
-          <Pressable style={styles.accentBtn}>
+          <View style={styles.accentBtn}>
             <Text style={styles.accentBtnText}>● Current</Text>
-          </Pressable>
+          </View>
         ) : (
           <Pressable style={styles.outlineBtn} onPress={onSetCurrent}>
             <Text style={styles.outlineBtnText}>Set current</Text>
@@ -335,59 +390,86 @@ function ExerciseCard({
         )}
       </View>
 
-      {/* Reference photo panel - only on current card */}
-      {isCurrent && (
-        <View style={styles.photoPanel}>
-          <View style={styles.photoPlaceholder}>
-            <Text style={styles.photoInitials}>{initials}</Text>
-            <Text style={styles.photoHint}>Tap to add a reference photo</Text>
-          </View>
-          <Text style={styles.photoCaption}>
-            {primaryMuscle.toUpperCase()} · {se.equipment?.toUpperCase() ?? 'N/A'}
-          </Text>
-        </View>
-      )}
+      {/* The library's own picture of the movement, on the exercise in hand. */}
+      {isCurrent ? (
+        <Pressable style={styles.photoPanel} onPress={onHow}>
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.photoImage}
+              resizeMode="contain"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <View style={styles.photoPlaceholder}>
+              <Text style={styles.photoInitials}>{initials}</Text>
+            </View>
+          )}
+          {caption ? <Text style={styles.photoCaption}>{caption}</Text> : null}
+          <Text style={styles.photoHint}>Tap for how to do it</Text>
+        </Pressable>
+      ) : null}
 
-      {/* Last performance line */}
-      {lastLine ? (
-        <Text style={styles.lastLine}>Last time ({lastLine})</Text>
-      ) : (
-        <Text style={styles.lastLine}>First time — no previous sets</Text>
-      )}
+      <Text style={styles.lastLine}>
+        {lastLine ? `Last time${lastDate ? ` (${lastDate})` : ''}: ${lastLine}` : 'First time — no previous sets'}
+      </Text>
 
-      {/* Set table header */}
+      {se.notes && !noteOpen ? (
+        <Pressable onPress={() => setNoteOpen(true)}>
+          <Text style={styles.noteText}>✎ {se.notes}</Text>
+        </Pressable>
+      ) : null}
+      {noteOpen ? (
+        <TextInput
+          style={styles.noteInput}
+          value={note}
+          onChangeText={setNote}
+          placeholder="Seat height 4, pause at the bottom…"
+          placeholderTextColor={colors.textDim}
+          autoFocus
+          multiline
+          onBlur={() => {
+            setNoteOpen(false);
+            if (note.trim() !== (se.notes ?? '')) onSaveNote(note);
+          }}
+        />
+      ) : null}
+
       <View style={styles.setHeader}>
         <Text style={[styles.col, styles.colSet]}>SET</Text>
-        <Text style={[styles.col, styles.colNum]}>WEIGHT (LB)</Text>
+        <Text style={[styles.col, styles.colNum]}>WEIGHT ({units.toUpperCase()})</Text>
         <Text style={[styles.col, styles.colNum]}>REPS</Text>
-        <Text style={[styles.col, styles.colDone]}></Text>
+        <Text style={[styles.col, styles.colDone]} />
       </View>
 
-      {/* Set rows */}
       {se.sets.map((set, setIdx) => {
-        const isWarmup = set.isWarmup;
-        const workingSetsBeforeThis = se.sets
+        const workingBefore = se.sets
           .slice(0, setIdx)
-          .filter(s => !s.isWarmup && s.setType === 'normal').length;
-        const setNum = isWarmup ? 'W' : (workingSetsBeforeThis + 1).toString();
-
+          .filter((s) => !s.isWarmup && s.setType === 'normal').length;
+        const label = set.isWarmup
+          ? 'W'
+          : set.setType === 'drop'
+            ? 'D'
+            : set.setType === 'rp'
+              ? 'RP'
+              : String(workingBefore + 1);
         return (
           <SetRow
             key={set.id}
             set={set}
-            setNum={setNum}
-            isWarmup={isWarmup}
-            setType={set.setType as SetType}
+            label={label}
+            step={units === 'kg' ? 2.5 : 5}
+            units={units}
             onComplete={(values) => onComplete(set, values)}
-            onPatch={onPatch}
+            onUncomplete={() => onUncomplete(set)}
+            onSave={onSave}
           />
         );
       })}
 
-      {/* Action buttons */}
       <View style={styles.actionGrid}>
-        <Pressable style={styles.dashedBtn}>
-          <Text style={styles.dashedBtnText}>+ Note</Text>
+        <Pressable style={styles.dashedBtn} onPress={() => setNoteOpen(true)}>
+          <Text style={styles.dashedBtnText}>{se.notes ? '✎ Edit note' : '+ Note'}</Text>
         </Pressable>
         <Pressable style={styles.dashedBtn} onPress={onAddWarmupSet}>
           <Text style={styles.dashedBtnText}>+ Warm-up set</Text>
@@ -401,7 +483,11 @@ function ExerciseCard({
         <Pressable style={styles.dashedBtn} onPress={onAddRestPause}>
           <Text style={styles.dashedBtnText}>+ Rest-pause</Text>
         </Pressable>
-        <Pressable style={styles.dashedBtn}>
+        <Pressable
+          style={[styles.dashedBtn, totalSets === 0 && { opacity: 0.4 }]}
+          onPress={onRemoveLastSet}
+          disabled={totalSets === 0}
+        >
           <Text style={styles.dashedBtnText}>− Remove set</Text>
         </Pressable>
       </View>
@@ -410,81 +496,115 @@ function ExerciseCard({
 }
 
 function parseNum(text: string): number | null {
-  const t = text.trim();
+  const t = text.trim().replace(',', '.');
   if (t === '') return null;
   const n = Number(t);
-  return Number.isNaN(n) ? null : n;
+  return Number.isFinite(n) ? n : null;
 }
+
+const show = (n: number | null | undefined) => (n == null ? '' : String(n));
 
 function SetRow({
   set,
-  setNum,
-  isWarmup,
-  setType,
+  label,
+  step,
+  units,
   onComplete,
-  onPatch,
+  onUncomplete,
+  onSave,
 }: {
   set: WorkoutSet;
-  setNum: string;
-  isWarmup: boolean;
-  setType: SetType;
-  onComplete: (values: { reps?: number | null; weight?: number | null }) => void;
-  onPatch: (
-    setId: string,
-    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed' | 'setType'>>
-  ) => void;
+  label: string;
+  step: number;
+  units: WeightUnit;
+  onComplete: (values: { reps: number | null; weight: number | null }) => void;
+  onUncomplete: () => void;
+  onSave: (setId: string, patch: SetPatch) => void;
 }) {
-  const [weight, setWeight] = useState(set.weight?.toString() ?? '');
-  const [reps, setReps] = useState(set.reps?.toString() ?? '');
+  const [weight, setWeight] = useState(show(set.weight));
+  const [reps, setReps] = useState(show(set.reps));
 
-  const displayNum =
-    setType === 'drop' ? 'D' : setType === 'rp' ? 'RP' : setNum;
+  // A reload that changes the stored numbers (a swap re-seeds them) must show
+  // through; typing does not trigger it because it only fires on a new value.
+  useEffect(() => setWeight(show(set.weight)), [set.weight]);
+  useEffect(() => setReps(show(set.reps)), [set.reps]);
+
+  const saveWeight = (next: number | null) => {
+    setWeight(show(next));
+    onSave(set.id, { weight: next, weightUnit: units });
+  };
+  const saveReps = (next: number | null) => {
+    setReps(show(next));
+    onSave(set.id, { reps: next });
+  };
+  const round = (n: number) => Math.round(n * 100) / 100;
 
   return (
-    <View style={[styles.setRow, isWarmup && styles.warmupRow]}>
-      <Text style={[styles.col, styles.colSet, isWarmup && styles.warmText]}>
-        {displayNum}
-      </Text>
+    <View style={[styles.setRow, set.isWarmup && styles.warmupRow, set.completed && styles.doneRow]}>
+      <Text style={[styles.col, styles.colSet, set.isWarmup && styles.warmText]}>{label}</Text>
       <View style={[styles.col, styles.colNum, styles.numGroup]}>
-        <Pressable onPress={() => setWeight(prev => parseNum(prev) ? String(Math.max(0, parseNum(prev)! - 5)) : prev)}>
+        <Pressable
+          style={styles.stepBtn}
+          hitSlop={4}
+          onPress={() => {
+            const n = parseNum(weight);
+            if (n != null) saveWeight(round(Math.max(0, n - step)));
+          }}
+        >
           <Text style={styles.stepperBtn}>−</Text>
         </Pressable>
         <TextInput
           style={styles.numInput}
           value={weight}
           onChangeText={setWeight}
-          keyboardType="number-pad"
-          placeholder="0"
+          onEndEditing={() => saveWeight(parseNum(weight))}
+          keyboardType="decimal-pad"
+          placeholder="–"
+          placeholderTextColor={colors.textDim}
+          selectTextOnFocus
         />
-        <Pressable onPress={() => setWeight(prev => parseNum(prev) ? String(parseNum(prev)! + 5) : '5')}>
+        <Pressable
+          style={styles.stepBtn}
+          hitSlop={4}
+          onPress={() => saveWeight(round((parseNum(weight) ?? 0) + step))}
+        >
           <Text style={styles.stepperBtn}>+</Text>
         </Pressable>
       </View>
       <View style={[styles.col, styles.colNum, styles.numGroup]}>
-        <Pressable onPress={() => setReps(prev => parseNum(prev) ? String(Math.max(0, parseNum(prev)! - 1)) : prev)}>
+        <Pressable
+          style={styles.stepBtn}
+          hitSlop={4}
+          onPress={() => {
+            const n = parseNum(reps);
+            if (n != null) saveReps(Math.max(0, n - 1));
+          }}
+        >
           <Text style={styles.stepperBtn}>−</Text>
         </Pressable>
         <TextInput
           style={styles.numInput}
           value={reps}
           onChangeText={setReps}
+          onEndEditing={() => saveReps(parseNum(reps))}
           keyboardType="number-pad"
-          placeholder="0"
+          placeholder="–"
+          placeholderTextColor={colors.textDim}
+          selectTextOnFocus
         />
-        <Pressable onPress={() => setReps(prev => parseNum(prev) ? String(parseNum(prev)! + 1) : '1')}>
+        <Pressable style={styles.stepBtn} hitSlop={4} onPress={() => saveReps((parseNum(reps) ?? 0) + 1)}>
           <Text style={styles.stepperBtn}>+</Text>
         </Pressable>
       </View>
       <Pressable
-        style={styles.tickCircle}
-        onPress={() => {
-          onComplete({
-            weight: parseNum(weight),
-            reps: parseNum(reps),
-          });
-        }}
+        style={[styles.tickCircle, set.completed && styles.tickOn]}
+        hitSlop={6}
+        accessibilityLabel={set.completed ? 'Un-tick set' : 'Log set'}
+        onPress={() =>
+          set.completed ? onUncomplete() : onComplete({ weight: parseNum(weight), reps: parseNum(reps) })
+        }
       >
-        <Text style={styles.tickText}>{set.completed ? '✓' : '○'}</Text>
+        <Text style={[styles.tickText, set.completed && styles.tickTextOn]}>✓</Text>
       </Pressable>
     </View>
   );
@@ -547,10 +667,11 @@ const styles = themedStyles(() => StyleSheet.create({
     marginHorizontal: spacing.md,
     marginVertical: spacing.sm,
     padding: spacing.md,
-    borderRadius: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   cardCurrent: {
-    borderWidth: 2,
     borderColor: colors.accent,
   },
   cardHeader: {
@@ -682,6 +803,29 @@ const styles = themedStyles(() => StyleSheet.create({
     fontSize: 12,
     color: colors.textDim,
   },
+  photoImage: {
+    width: '100%',
+    height: 160,
+    marginBottom: spacing.sm,
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
+  },
+  noteText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  noteInput: {
+    fontSize: 14,
+    color: colors.text,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+    minHeight: 44,
+  },
   lastLine: {
     fontSize: 13,
     color: colors.textDim,
@@ -705,7 +849,7 @@ const styles = themedStyles(() => StyleSheet.create({
     flex: 1,
   },
   colDone: {
-    width: 30,
+    width: 40,
     flex: 0,
   },
   setRow: {
@@ -721,19 +865,28 @@ const styles = themedStyles(() => StyleSheet.create({
   warmText: {
     color: colors.textDim,
   },
+  doneRow: {
+    opacity: 0.75,
+  },
   numGroup: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
   },
+  stepBtn: {
+    width: 34,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   stepperBtn: {
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '600',
     color: colors.accent,
-    paddingHorizontal: spacing.xs,
   },
   numInput: {
-    width: 50,
+    flex: 1,
+    minWidth: 40,
     textAlign: 'center',
     fontSize: 14,
     fontWeight: '600',
@@ -744,14 +897,26 @@ const styles = themedStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
   tickCircle: {
-    width: 30,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: colors.borderBright,
     alignItems: 'center',
     justifyContent: 'center',
+    marginLeft: spacing.xs,
+  },
+  tickOn: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
   },
   tickText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.accent,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textDim,
+  },
+  tickTextOn: {
+    color: colors.onAccent,
   },
   actionGrid: {
     flexDirection: 'row',

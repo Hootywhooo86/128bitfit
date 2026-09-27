@@ -32,7 +32,10 @@ export type SessionExerciseWithMeta = SessionExercise & {
   exerciseName: string;
   primaryMuscles: string[];
   equipment: string | null;
-  bestWeight: number | null;
+  /** First library image path, for the reference panel. Null for custom exercises. */
+  image: string | null;
+  /** Heaviest completed working set in a finished session, with its unit. */
+  best: { weight: number; unit: string } | null;
   sets: WorkoutSet[];
   /** What was lifted the last time this exercise was completed, for the UI hint. */
   lastPerformance: LastPerformance | null;
@@ -156,6 +159,7 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       exerciseName: exercises.name,
       primaryMuscles: exercises.primaryMuscles,
       equipment: exercises.equipment,
+      images: exercises.images,
     })
     .from(sessionExercises)
     .innerJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
@@ -170,9 +174,10 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       .where(eq(sets.sessionExerciseId, se.id))
       .orderBy(asc(sets.setIndex));
 
-    // Calculate best weight (PR) for this exercise from all completed sets
-    const bestWeightResult = await db
-      .select({ maxWeight: sql<number>`MAX(${sets.weight})` })
+    // Best = heaviest working set actually finished. An abandoned session is
+    // full of pre-filled numbers nobody lifted, and a drop set is not a best.
+    const bestRow = await db
+      .select({ weight: sets.weight, unit: sets.weightUnit })
       .from(sets)
       .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
       .innerJoin(workoutSessions, eq(sessionExercises.sessionId, workoutSessions.id))
@@ -180,12 +185,26 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
         and(
           eq(sessionExercises.exerciseId, se.exerciseId),
           ne(workoutSessions.id, sessionId),
+          eq(workoutSessions.status, 'completed'),
           eq(sets.completed, true),
-          eq(sets.isWarmup, false)
+          eq(sets.isWarmup, false),
+          eq(sets.setType, 'normal'),
+          sql`${sets.weight} > 0`
         )
-      );
-
-    const bestWeight = bestWeightResult[0]?.maxWeight ?? null;
+      )
+      .orderBy(desc(sets.weight))
+      .limit(1);
+    const best = bestRow[0]?.weight != null
+      ? { weight: bestRow[0].weight, unit: bestRow[0].unit ?? 'lb' }
+      : null;
+    const images = (() => {
+      try {
+        const v = JSON.parse(se.images ?? '[]');
+        return Array.isArray(v) ? v : [];
+      } catch {
+        return [];
+      }
+    })();
 
     exerciseList.push({
       id: se.id,
@@ -197,7 +216,8 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       exerciseName: se.exerciseName,
       primaryMuscles: JSON.parse(se.primaryMuscles ?? '[]'),
       equipment: se.equipment,
-      bestWeight,
+      image: typeof images[0] === 'string' ? images[0] : null,
+      best,
       sets: setRows,
       lastPerformance: await getLastPerformance(se.exerciseId, sessionId),
     });
@@ -461,6 +481,59 @@ export async function completeSet(
 
 export async function deleteSet(setId: string): Promise<void> {
   await db.delete(sets).where(eq(sets.id, setId));
+}
+
+/** Takes an exercise, and its sets, out of today's session. */
+export async function removeSessionExercise(sessionExerciseId: string): Promise<void> {
+  await db.delete(sets).where(eq(sets.sessionExerciseId, sessionExerciseId));
+  await db.delete(sessionExercises).where(eq(sessionExercises.id, sessionExerciseId));
+}
+
+export async function setSessionExerciseNote(sessionExerciseId: string, note: string): Promise<void> {
+  await db
+    .update(sessionExercises)
+    .set({ notes: note.trim() || null })
+    .where(eq(sessionExercises.id, sessionExerciseId));
+}
+
+/**
+ * Swaps an exercise in today's session for another — bench taken, shoulder
+ * complaining.
+ *
+ * Sets already ticked stay as they were logged. The rest are re-seeded from
+ * the new exercise's own history: the old lift's weights say nothing about
+ * the new one, and pre-filling them would put a number on the bar nobody
+ * chose.
+ */
+export async function swapSessionExercise(sessionExerciseId: string, exerciseId: string): Promise<void> {
+  const owner = await db
+    .select({ sessionId: sessionExercises.sessionId })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.id, sessionExerciseId))
+    .limit(1);
+  if (!owner[0]) throw new Error('That exercise is no longer in the workout.');
+  await db.update(sessionExercises).set({ exerciseId }).where(eq(sessionExercises.id, sessionExerciseId));
+
+  const last = await getLastPerformance(exerciseId, owner[0].sessionId);
+  const block = await db
+    .select()
+    .from(sets)
+    .where(eq(sets.sessionExerciseId, sessionExerciseId))
+    .orderBy(asc(sets.setIndex));
+  let working = 0;
+  for (const set of block) {
+    const isWorking = !set.isWarmup && set.setType === 'normal';
+    if (set.completed) {
+      if (isWorking) working++;
+      continue;
+    }
+    const seed = isWorking ? resolveSetSeed({ last, index: working }) : { reps: null, weight: null, weightUnit: set.weightUnit ?? 'lb' };
+    if (isWorking) working++;
+    await db
+      .update(sets)
+      .set({ reps: seed.reps ?? set.reps, weight: seed.weight, weightUnit: seed.weightUnit })
+      .where(eq(sets.id, set.id));
+  }
 }
 
 export async function setSessionStatus(sessionId: string, status: SessionStatus): Promise<void> {
