@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { coachChat, withSources, type ChatMessage } from './ai-coach';
+import { coachChat, providerCanSearchWeb, webSearchUnavailableReason, withSources, type ChatMessage } from './ai-coach';
 
 const KEY = 'sk-test-key-1234567890';
 const MESSAGES: ChatMessage[] = [
@@ -129,6 +129,63 @@ describe('web search per provider', () => {
     const res = await coachChat({ provider: 'openrouter', apiKey: KEY, model: 'x/y', messages: MESSAGES, webSearch: true });
     expect(calls[0].body.plugins).toEqual([{ id: 'web' }]);
     expect(res.web).toEqual({ status: 'on', sources: [{ url: 'https://b.com', title: 'B' }] });
+  });
+
+  it('Groq: browser search on GPT-OSS, sources from executed_tools, citation marks stripped', async () => {
+    const calls = stubFetch({
+      json: {
+        choices: [
+          {
+            message: {
+              content: '{"items":[{"name":"Tortellini【2†L6-L10】","calories":700}]}',
+              executed_tools: [
+                {
+                  type: 'browser_search',
+                  browser_results: [{ url: 'https://www.hellofresh.com/r/1', title: 'Tortellini' }],
+                  search_results: { results: [{ url: 'https://example.com/x', title: 'X' }] },
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const res = await coachChat({
+      provider: 'groq',
+      apiKey: KEY,
+      model: 'openai/gpt-oss-120b',
+      messages: MESSAGES,
+      webSearch: true,
+      forceSearch: true,
+    });
+    expect(calls[0].url).toBe('https://api.groq.com/openai/v1/chat/completions');
+    expect(calls[0].body.tools).toEqual([{ type: 'browser_search' }]);
+    expect(calls[0].body.tool_choice).toBe('required');
+    expect(calls[0].body.plugins).toBeUndefined();
+    expect(JSON.parse(res.content).items[0].name).toBe('Tortellini');
+    expect(res.web).toEqual({
+      status: 'on',
+      sources: [
+        { url: 'https://www.hellofresh.com/r/1', title: 'Tortellini' },
+        { url: 'https://example.com/x', title: 'X' },
+      ],
+    });
+  });
+
+  it('Groq: leaves searching to the model when not forced', async () => {
+    const calls = stubFetch({ json: { choices: [{ message: { content: 'ok' } }] } });
+    await coachChat({ provider: 'groq', apiKey: KEY, model: 'openai/gpt-oss-20b', messages: MESSAGES, webSearch: true });
+    expect(calls[0].body.tool_choice).toBe('auto');
+  });
+
+  it('Groq: a model without browser search is told apart from a provider without it', async () => {
+    const calls = stubFetch({ json: { choices: [{ message: { content: 'ok' } }] } });
+    const res = await coachChat({ provider: 'groq', apiKey: KEY, model: 'qwen/qwen3.8-27b', messages: MESSAGES, webSearch: true });
+    expect(calls[0].body.tools).toBeUndefined();
+    expect(res.web).toEqual({ status: 'unsupported' });
+    expect(providerCanSearchWeb('groq', 'qwen/qwen3.8-27b')).toBe(false);
+    expect(providerCanSearchWeb('groq', 'openai/gpt-oss-120b')).toBe(true);
+    expect(webSearchUnavailableReason('groq', 'qwen/qwen3.8-27b')).toContain('gpt-oss');
   });
 
   it('Hugging Face: says it cannot search rather than pretending to', async () => {

@@ -15,6 +15,7 @@ export type AiProviderId =
   | 'openai'
   | 'gemini'
   | 'openrouter'
+  | 'groq'
   | 'huggingface'
   | 'custom';
 
@@ -60,6 +61,16 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     defaultBaseUrl: 'https://openrouter.ai/api/v1',
     needsBaseUrl: false,
     hint: 'Key from openrouter.ai — OpenAI-compatible',
+  },
+  {
+    id: 'groq',
+    label: 'Groq',
+    // GPT-OSS because it is the family Groq's browser search runs on; its
+    // Compound search models were shut down on 21 Sep 2026.
+    defaultModel: 'openai/gpt-oss-120b',
+    defaultBaseUrl: 'https://api.groq.com/openai/v1',
+    needsBaseUrl: false,
+    hint: 'API key from console.groq.com — OpenAI-compatible',
   },
   {
     id: 'huggingface',
@@ -120,7 +131,7 @@ export const VISION_PROVIDERS: AiProviderId[] = ['anthropic', 'openai', 'gemini'
  * error or, worse, a confident answer about an image it never saw. Only the
  * model id settles it.
  */
-export const MODEL_DEPENDENT_VISION: AiProviderId[] = ['huggingface'];
+export const MODEL_DEPENDENT_VISION: AiProviderId[] = ['huggingface', 'groq'];
 
 export type VisionSupport =
   /** Send the photo. */
@@ -171,10 +182,38 @@ export function providerSupportsVision(
  * Each uses its provider's built-in search, so there is still no server of
  * ours in the path. Hugging Face and custom endpoints have no equivalent.
  */
-export const WEB_SEARCH_PROVIDERS: AiProviderId[] = ['anthropic', 'gemini', 'openai', 'openrouter'];
+export const WEB_SEARCH_PROVIDERS: AiProviderId[] = ['anthropic', 'gemini', 'openai', 'openrouter', 'groq'];
 
-export function providerCanSearchWeb(id: AiProviderId): boolean {
-  return WEB_SEARCH_PROVIDERS.includes(id);
+/** Groq's browser search runs only on these models. */
+export function groqModelCanSearch(model: string): boolean {
+  return /^openai\/gpt-oss-/i.test(model.trim());
+}
+
+export type WebSearchSupport = 'yes' | 'no' | 'model-cannot';
+
+/**
+ * Whether this provider and model can search the web.
+ *
+ * On Groq it depends on the model, like vision on Hugging Face: browser search
+ * is a GPT-OSS feature, and any other Groq model would reject the tool.
+ */
+export function webSearchSupport(id: AiProviderId, model?: string | null): WebSearchSupport {
+  if (!WEB_SEARCH_PROVIDERS.includes(id)) return 'no';
+  if (id === 'groq' && !groqModelCanSearch(model ?? '')) return 'model-cannot';
+  return 'yes';
+}
+
+export function providerCanSearchWeb(id: AiProviderId, model?: string | null): boolean {
+  return webSearchSupport(id, model ?? getProviderMeta(id).defaultModel) === 'yes';
+}
+
+/** One sentence on why Look up online is unavailable, for the screens that offer it. */
+export function webSearchUnavailableReason(id: AiProviderId, model: string): string {
+  const label = getProviderMeta(id).label;
+  if (webSearchSupport(id, model) === 'model-cannot') {
+    return `${model} on ${label} cannot search the web — switch to openai/gpt-oss-120b or openai/gpt-oss-20b in Settings → AI.`;
+  }
+  return `${label} cannot search the web. Anthropic, Google Gemini, OpenAI, OpenRouter and Groq (GPT-OSS models) can.`;
 }
 
 /** A page the provider reported using. Taken from the API response, never from the model's text. */
@@ -200,6 +239,11 @@ export type CoachChatRequest = {
   messages: ChatMessage[];
   /** Let the provider search the web. Ignored where it cannot. */
   webSearch?: boolean;
+  /**
+   * Make it search rather than leaving it to the model. Only Groq takes this;
+   * set for "Look up online", where an answer from memory would defeat it.
+   */
+  forceSearch?: boolean;
   /** Abort / timeout via AbortSignal */
   signal?: AbortSignal;
 };
@@ -300,8 +344,16 @@ async function chatOpenAiCompatible(
     ),
     temperature: 0.6,
   };
-  // OpenRouter's web plugin works with any model it routes to.
-  if (web) body.plugins = [{ id: 'web' }];
+  if (web && req.provider === 'groq') {
+    body.tools = [{ type: 'browser_search' }];
+    body.tool_choice = req.forceSearch ? 'required' : 'auto';
+    // Groq's own advice: higher effort means longer browsing sessions and
+    // many more tokens for no better answer on a question this size.
+    body.reasoning_effort = 'low';
+  } else if (web) {
+    // OpenRouter's web plugin works with any model it routes to.
+    body.plugins = [{ id: 'web' }];
+  }
 
   const res = await fetchWithTimeout(url, {
     method: 'POST',
@@ -320,15 +372,30 @@ async function chatOpenAiCompatible(
       message?: {
         content?: string;
         annotations?: { type?: string; url_citation?: { url?: string; title?: string } }[];
+        /** Groq: the searches and page visits it ran server-side. */
+        executed_tools?: {
+          browser_results?: { url?: string; title?: string }[];
+          search_results?: { results?: { url?: string; title?: string }[] } | null;
+        }[];
       };
     }[];
   };
   const message = data.choices?.[0]?.message;
-  const content = message?.content?.trim();
+  // Groq's browser search marks citations inline as 【2†L6-L10】. They mean
+  // nothing outside its own UI and would land in food names and notes.
+  const content = message?.content?.replace(/【[^】]*】/g, '').trim();
   if (!content) throw new AiCoachError('Empty response from provider');
-  const sources = (message?.annotations ?? [])
-    .filter((a) => a.type === 'url_citation' && a.url_citation?.url)
-    .map((a) => ({ url: a.url_citation!.url!, title: a.url_citation!.title ?? null }));
+  const sources = [
+    ...(message?.annotations ?? [])
+      .filter((a) => a.type === 'url_citation' && a.url_citation?.url)
+      .map((a) => ({ url: a.url_citation!.url!, title: a.url_citation!.title ?? null })),
+    ...(message?.executed_tools ?? []).flatMap((t) => [
+      ...(t.browser_results ?? []),
+      ...(t.search_results?.results ?? []),
+    ])
+      .filter((r) => r.url)
+      .map((r) => ({ url: r.url!, title: r.title ?? null })),
+  ];
   return { text: content, sources: dedupeSources(sources) };
 }
 
@@ -542,6 +609,10 @@ async function chatOnce(req: CoachChatRequest, web: boolean): Promise<Reply> {
         req.baseUrl?.trim() || getProviderMeta('openrouter').defaultBaseUrl!;
       return chatOpenAiCompatible(req, base, web);
     }
+    case 'groq': {
+      const base = req.baseUrl?.trim() || getProviderMeta('groq').defaultBaseUrl!;
+      return chatOpenAiCompatible(req, base, web);
+    }
     case 'huggingface': {
       const base =
         req.baseUrl?.trim() || getProviderMeta('huggingface').defaultBaseUrl!;
@@ -590,7 +661,7 @@ export async function coachChat(req: CoachChatRequest): Promise<CoachChatResult>
   });
 
   if (!req.webSearch) return done(await chatOnce(req, false), { status: 'off' });
-  if (!providerCanSearchWeb(req.provider)) {
+  if (!providerCanSearchWeb(req.provider, req.model)) {
     return done(await chatOnce(req, false), { status: 'unsupported' });
   }
 

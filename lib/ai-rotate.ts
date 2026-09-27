@@ -66,7 +66,7 @@ export async function hfVisionChain(
 export async function callWithRotation(
   messages: ChatMessage[],
   signal?: AbortSignal,
-  opts: { webSearch?: boolean } = {}
+  opts: { webSearch?: boolean; forceSearch?: boolean } = {}
 ): Promise<VisionAttempt> {
   const cfg = await getAiRuntimeConfig();
   if (!cfg.apiKey) throw new AiCoachError('No AI key set.', 401);
@@ -80,6 +80,7 @@ export async function callWithRotation(
       signal,
       messages,
       webSearch: opts.webSearch,
+      forceSearch: opts.forceSearch,
     });
 
   if (cfg.provider !== 'huggingface') {
