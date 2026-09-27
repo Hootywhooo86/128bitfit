@@ -3,6 +3,7 @@ import {
   DEFAULT_WEIGHT_UNIT,
   describeLastPerformance,
   describePrefill,
+  seedForNewSet,
   prefillForIndex,
   resolveSetSeed,
   type LastPerformance,
@@ -148,5 +149,48 @@ describe('describing a whole previous session', () => {
   it('says nothing without history', () => {
     expect(describeLastPerformance(null)).toBeNull();
     expect(describeLastPerformance({ performedAt: new Date(), sets: [] })).toBeNull();
+  });
+});
+
+describe('seeding a set added mid-session', () => {
+  const last = {
+    performedAt: new Date(2026, 8, 20),
+    sets: [
+      { reps: 8, weight: 135, weightUnit: 'lb' },
+      { reps: 8, weight: 140, weightUnit: 'lb' },
+      { reps: 6, weight: 145, weightUnit: 'lb' },
+    ],
+  };
+  const warm = (weight: number, reps = 5) => ({ reps, weight, weightUnit: 'lb', isWarmup: true, setType: 'normal' as const });
+  const work = (weight: number, reps = 8) => ({ reps, weight, weightUnit: 'lb', isWarmup: false, setType: 'normal' as const });
+
+  it('starts working set 1 from last week’s set 1, however many warm-ups came first', () => {
+    const seed = seedForNewSet({ kind: 'working', block: [warm(45), warm(95)], last });
+    expect(seed).toEqual({ reps: 8, weight: 135, weightUnit: 'lb' });
+  });
+
+  it('carries a working set from the working set before it, never from a warm-up', () => {
+    const seed = seedForNewSet({ kind: 'working', block: [work(135), warm(95)], last });
+    expect(seed.weight).toBe(135);
+  });
+
+  it('starts the first warm-up blank rather than at the working weight', () => {
+    expect(seedForNewSet({ kind: 'warmup', block: [], last })).toEqual({ reps: null, weight: null, weightUnit: 'lb' });
+  });
+
+  it('carries a warm-up from the warm-up before it', () => {
+    expect(seedForNewSet({ kind: 'warmup', block: [warm(45, 10)], last }).weight).toBe(45);
+  });
+
+  it('starts a drop set from the set it follows', () => {
+    const seed = seedForNewSet({ kind: 'drop', block: [work(135), work(145, 6)], last });
+    expect(seed).toEqual({ reps: 6, weight: 145, weightUnit: 'lb' });
+  });
+
+  it('does not count a drop set as a working set for position', () => {
+    const drop = { ...work(100, 10), setType: 'drop' as const };
+    const seed = seedForNewSet({ kind: 'working', block: [work(135), drop], last });
+    // Second working set: carries from the working set, not the drop.
+    expect(seed.weight).toBe(135);
   });
 });

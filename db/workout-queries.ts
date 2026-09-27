@@ -3,7 +3,7 @@ import { db } from './client';
 import { newId } from './id';
 import { getDefaultRestSeconds } from './rest-settings';
 import { isUserExercise } from '@/lib/exercise-sources';
-import { resolveSetSeed, type LastPerformance } from '@/lib/set-prefill';
+import { resolveSetSeed, seedForNewSet, type LastPerformance } from '@/lib/set-prefill';
 import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import {
   prFor,
@@ -224,20 +224,22 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
  *
  * `excludeSessionId` keeps the session being built now out of its own history.
  *
- * NOTE for whoever wires up warm-up sets in the live session: `sets.isWarmup`
- * exists in the schema and nothing writes it yet, so this query cannot see the
- * difference today. The moment the live session starts setting it, a warm-up
- * will be in this list and set 1 will pre-fill with the empty bar. Decide then
- * whether warm-ups seed warm-ups or are excluded outright — do not let it be
- * settled by omission.
+ * Warm-ups, drop sets and rest-pause sets are excluded outright: the list is
+ * what working set N starts from, and an empty bar or a drop set's lighter
+ * weight in position 1 would pre-fill the wrong number. Warm-ups seed from the
+ * warm-up before them instead — see seedForNewSet.
  */
 export async function getLastPerformance(
   exerciseId: string,
   excludeSessionId?: string
 ): Promise<LastPerformance | null> {
+  // Working sets only. A warm-up is the empty bar and a drop set is the
+  // lighter tail of a set; neither is what set 1 should start from next week.
   const where = [
     eq(sessionExercises.exerciseId, exerciseId),
     eq(sets.completed, true),
+    eq(sets.isWarmup, false),
+    eq(sets.setType, 'normal'),
     eq(workoutSessions.status, 'completed'),
   ];
   if (excludeSessionId) where.push(ne(workoutSessions.id, excludeSessionId));
@@ -268,7 +270,12 @@ export async function getLastPerformance(
     })
     .from(sets)
     .where(
-      and(eq(sets.sessionExerciseId, found.sessionExerciseId), eq(sets.completed, true))
+      and(
+        eq(sets.sessionExerciseId, found.sessionExerciseId),
+        eq(sets.completed, true),
+        eq(sets.isWarmup, false),
+        eq(sets.setType, 'normal')
+      )
     )
     .orderBy(asc(sets.setIndex));
 
@@ -386,17 +393,16 @@ export async function addSet(
     setType?: 'normal' | 'drop' | 'rp'
   }
 ): Promise<WorkoutSet> {
-  const existing = await db
+  const block = await db
     .select()
     .from(sets)
     .where(eq(sets.sessionExerciseId, sessionExerciseId))
-    .orderBy(desc(sets.setIndex))
-    .limit(1);
-  const previous = existing[0];
+    .orderBy(asc(sets.setIndex));
+  const previous = block[block.length - 1];
   const setIndex = previous ? previous.setIndex + 1 : 0;
 
-  // Carrying from the set just logged wins; otherwise reach back to the last
-  // session, which is what makes the first set of an exercise pre-filled too.
+  // Carrying from this session wins; otherwise reach back to the last one,
+  // which is what makes the first set of an exercise pre-filled too.
   const owner = await db
     .select({ exerciseId: sessionExercises.exerciseId, sessionId: sessionExercises.sessionId })
     .from(sessionExercises)
@@ -406,12 +412,12 @@ export async function addSet(
     ? await getLastPerformance(owner[0].exerciseId, owner[0].sessionId)
     : null;
 
-  const seed = resolveSetSeed({
+  const setType = defaults?.setType ?? 'normal';
+  const isWarmup = defaults?.isWarmup ?? false;
+  const seed = seedForNewSet({
+    kind: isWarmup ? 'warmup' : setType === 'normal' ? 'working' : setType,
+    block,
     last: lastPerformance,
-    index: setIndex,
-    carryFrom: previous
-      ? { reps: previous.reps, weight: previous.weight, weightUnit: previous.weightUnit }
-      : null,
   });
 
   const row: WorkoutSet = {
@@ -422,8 +428,8 @@ export async function addSet(
     weight: defaults?.weight ?? seed.weight,
     weightUnit: defaults?.weightUnit ?? seed.weightUnit,
     completed: false,
-    isWarmup: defaults?.isWarmup ?? false,
-    setType: defaults?.setType ?? 'normal',
+    isWarmup,
+    setType,
     rpe: null,
   };
   await db.insert(sets).values(row);
