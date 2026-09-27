@@ -398,7 +398,7 @@ export default function SettingsScreen() {
             <Text style={styles.toggleTitle}>Look things up online</Text>
             <Text style={[styles.muted, { marginBottom: 0 }]}>
               {providerCanSearchWeb(aiProvider)
-                ? `${providerMeta.label} searches the web for a named product's real nutrition — a HelloFresh recipe, a restaurant dish — instead of guessing, and the coach can check facts. Searches can cost extra on your key.`
+                ? `Lets the coach, meal photos and recipe links search the web for real figures instead of guessing. Describing a meal has its own Estimate and Look up online buttons either way. Searches can cost extra on your key.`
                 : `${providerMeta.label} cannot search the web, so food figures stay estimates. Anthropic, Google Gemini, OpenAI and OpenRouter can.`}
             </Text>
           </View>

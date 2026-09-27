@@ -18,7 +18,7 @@ import { describeIngredients, fallbackRecipeName, recipeTotals } from '@/lib/rec
 import type { MealType } from '@/db/schema';
 import { MAX_RECIPE_PHOTOS, estimateFood, type AiPhoto } from '@/lib/ai-food-client';
 import { getAiSettings } from '@/db/ai-settings';
-import { providerCanSearchWeb, type WebSearchOutcome } from '@/lib/ai-coach';
+import { getProviderMeta, providerCanSearchWeb, type WebSearchOutcome } from '@/lib/ai-coach';
 import { totalsOf, type AiFoodItem } from '@/lib/ai-food';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
 import { MealSlot } from '@/components/MealSlot';
@@ -57,9 +57,11 @@ export default function AiFoodScreen() {
   const [items, setItems] = useState<AiFoodItem[] | null>(null);
   const [web, setWeb] = useState<WebSearchOutcome | null>(null);
   const [providerLabel, setProviderLabel] = useState('');
-  /** Whether a request from here will search: the setting is on and the provider can. */
+  /** Whether the provider can search the web at all. */
   const [canSearch, setCanSearch] = useState(false);
-  const [webOff, setWebOff] = useState(false);
+  const [providerName, setProviderName] = useState('');
+  /** Which Describe button is running, for its label. */
+  const [running, setRunning] = useState<'estimate' | 'lookup' | null>(null);
   const [mealDay, setMealDay] = useState<MealDay>(() => parseDayKey(params.day) ?? 'today');
   const [mealType, setMealType] = useState<MealType>(
     defaultMealTypeForHour(new Date().getHours())
@@ -69,8 +71,8 @@ export default function AiFoodScreen() {
 
   useEffect(() => {
     void getAiSettings().then((a) => {
-      setCanSearch(a.webSearch && providerCanSearchWeb(a.provider));
-      setWebOff(!a.webSearch);
+      setCanSearch(providerCanSearchWeb(a.provider));
+      setProviderName(getProviderMeta(a.provider).label);
     });
   }, []);
 
@@ -92,14 +94,16 @@ export default function AiFoodScreen() {
   const noteFor = (it: AiFoodItem) =>
     it.estimated ? 'AI estimate' : `Looked up: ${it.source}`;
 
-  const runDescribe = async () => {
+  const runDescribe = async (lookup: boolean) => {
     if (!text.trim() || busy) return;
     setBusy(true);
+    setRunning(lookup ? 'lookup' : 'estimate');
     setError(null);
     try {
-      handle(await estimateFood({ kind: 'describe', text }));
+      handle(await estimateFood({ kind: 'describe', text }, undefined, { webSearch: lookup }));
     } finally {
       setBusy(false);
+      setRunning(null);
     }
   };
 
@@ -263,17 +267,10 @@ export default function AiFoodScreen() {
       {mode === 'describe' ? (
         <Card>
           <Text style={s.help}>
-            {canSearch
-              ? 'Write what you ate. Name the brand, meal kit or restaurant and it is looked up online — “HelloFresh cheese tortellini with sun-dried tomato pesto”, “Chipotle chicken burrito bowl”.'
-              : 'Write what you ate. Quantities help: “3 eggs, 2 slices of toast, 50 g cottage cheese”.'}
+            Write what you ate. Quantities help: “3 eggs, 2 slices of toast, 50 g cottage cheese”.
+            For a brand, meal kit or restaurant dish — “HelloFresh cheese tortellini with sun-dried
+            tomato pesto” — use Look up online to get its published numbers.
           </Text>
-          {!canSearch ? (
-            <Text style={s.modelNote}>
-              {webOff
-                ? 'Web lookup is off in Settings → AI, so figures will be the model’s estimates.'
-                : 'Your AI provider cannot search the web, so figures will be the model’s estimates. Anthropic, Google Gemini, OpenAI and OpenRouter can look them up.'}
-            </Text>
-          ) : null}
           <TextInput
             style={s.input}
             value={text}
@@ -283,15 +280,27 @@ export default function AiFoodScreen() {
             multiline
             editable={!busy}
           />
-          <Pressable
-            style={[s.primary, (busy || !text.trim()) && { opacity: 0.5 }]}
-            onPress={() => void runDescribe()}
-            disabled={busy || !text.trim()}
-          >
-            <Text style={s.primaryT}>
-              {busy ? (canSearch ? 'LOOKING UP…' : 'ESTIMATING…') : canSearch ? 'LOOK UP' : 'ESTIMATE'}
-            </Text>
-          </Pressable>
+          <View style={s.row}>
+            <Pressable
+              style={[s.secondary, s.half, (busy || !text.trim()) && { opacity: 0.5 }]}
+              onPress={() => void runDescribe(false)}
+              disabled={busy || !text.trim()}
+            >
+              <Text style={s.secondaryT}>{running === 'estimate' ? 'Estimating…' : 'AI estimate'}</Text>
+            </Pressable>
+            <Pressable
+              style={[s.primary, s.half, (busy || !text.trim() || !canSearch) && { opacity: 0.5 }]}
+              onPress={() => void runDescribe(true)}
+              disabled={busy || !text.trim() || !canSearch}
+            >
+              <Text style={s.primaryT}>{running === 'lookup' ? 'LOOKING UP…' : 'LOOK UP ONLINE'}</Text>
+            </Pressable>
+          </View>
+          <Text style={s.modelNote}>
+            {canSearch
+              ? 'Estimate is quick and uses no web search. Look up online searches first and shows where the numbers came from — it can cost a little more on your key.'
+              : `${providerName || 'Your AI provider'} cannot search the web, so only Estimate is available. Anthropic, Google Gemini, OpenAI and OpenRouter can look things up.`}
+          </Text>
         </Card>
       ) : mode === 'recipe' ? null : !permission ? (
         <View style={s.center}>
@@ -580,7 +589,7 @@ function lookupSummary(
   if (web?.status === 'unsupported') {
     return `${provider} cannot search the web, so these are the model's estimates, not measurements. ${check}`;
   }
-  return `These are the model's estimates, not measurements — web lookup is off in Settings → AI. ${check}`;
+  return `These are the model's estimates, not measurements — nothing was looked up online. ${check}`;
 }
 
 function hostOf(url: string): string {
@@ -646,6 +655,7 @@ const s = themedStyles(() => StyleSheet.create({
   srcT: { color: colors.text, fontSize: 13, fontFamily: fonts.bodyMedium },
   srcU: { color: colors.accent, fontSize: 11.5, marginTop: 2, fontFamily: fonts.body },
   row: { flexDirection: 'row', gap: 6 },
+  half: { flex: 1, marginTop: 12, marginBottom: 10 },
   count: { color: colors.textDim, fontSize: 12, textAlign: 'center', marginBottom: 8, fontFamily: fonts.body },
   input2: {
     backgroundColor: colors.surfaceAlt,
