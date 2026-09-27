@@ -62,6 +62,18 @@ export function UpdateCard() {
         </>
       ) : null}
 
+      {result?.status === 'hidden' ? (
+        <>
+          <Text style={s.muted}>
+            The releases aren&apos;t visible to the app — the repository may be private. They still
+            open in a browser signed in to GitHub.
+          </Text>
+          <Pressable style={s.btn} onPress={() => open(result.pageUrl)}>
+            <Text style={s.btnT}>Open releases on GitHub</Text>
+          </Pressable>
+        </>
+      ) : null}
+
       {result?.status === 'failed' ? <Text style={s.err}>{result.message}</Text> : null}
     </View>
   );
