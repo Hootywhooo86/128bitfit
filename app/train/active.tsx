@@ -21,7 +21,7 @@ import {
   type ActiveWorkout,
   type SessionExerciseWithMeta,
 } from '@/db/workout-queries';
-import type { WorkoutSet } from '@/db/schema';
+import type { WorkoutSet, SetType } from '@/db/schema';
 import { getAppSettings } from '@/db/settings-queries';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
@@ -38,60 +38,32 @@ export default function ActiveWorkoutScreen() {
   const [loading, setLoading] = useState(true);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [keepAwake, setKeepAwake] = useState(false);
+  const [currentExerciseId, setCurrentExerciseId] = useState<string | null>(null);
 
   const sessionId = id ? decodeURIComponent(id) : '';
 
-  // Hold the screen only while this session is genuinely running. Starts false
-  // so the setting is read before anything is locked, and drops the moment the
-  // session stops being in progress — finishing and discarding both go through
-  // that state, so neither has to remember to release it.
   useSessionAwake(shouldKeepAwake(keepAwake, workout?.session.status));
 
-  useEffect(() => {
-    let alive = true;
-    getAppSettings()
-      .then((settings) => {
-        if (alive) setKeepAwake(settings.keepAwake);
-      })
-      // A setting we could not read is not a reason to hold someone's screen on.
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   const refresh = useCallback(async () => {
-    if (!sessionId) return;
-    const data = await loadActiveWorkout(sessionId);
-    setWorkout(data);
-    setLoading(false);
+    const w = await loadActiveWorkout(sessionId);
+    setWorkout(w);
+    if (w && currentExerciseId === null) {
+      const first = w.exercises.find(ex => !ex.sets.every(s => s.completed));
+      setCurrentExerciseId(first?.id ?? w.exercises[0]?.id ?? null);
+    }
   }, [sessionId]);
 
   useFocusEffect(
     useCallback(() => {
-      void refresh();
-    }, [refresh])
-  );
-
-  useEffect(() => {
-    if (!workout?.session.startedAt) return;
-    const started = new Date(workout.session.startedAt).getTime();
-    const tick = () => setElapsedMs(Date.now() - started);
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [workout?.session.startedAt]);
-
-  // Flattened across every exercise: the header counts the session, not a block.
-  const stats = sessionStats(
-    (workout?.exercises ?? []).flatMap((se) =>
-      se.sets.map((st) => ({
-        completed: st.completed,
-        reps: st.reps,
-        weight: st.weight,
-        isWarmup: st.isWarmup,
-      }))
-    )
+      setLoading(true);
+      refresh().finally(() => setLoading(false));
+      const interval = setInterval(() => {
+        if (workout?.session.startedAt) {
+          setElapsedMs(Date.now() - workout.session.startedAt.getTime());
+        }
+      }, 1000);
+      return () => clearInterval(interval);
+    }, [refresh, workout?.session.startedAt])
   );
 
   const onAddSet = async (se: SessionExerciseWithMeta) => {
@@ -115,7 +87,7 @@ export default function ActiveWorkoutScreen() {
 
   const patchSet = async (
     setId: string,
-    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed'>>
+    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed' | 'setType'>>
   ) => {
     await updateSet(setId, patch);
     await refresh();
@@ -169,6 +141,9 @@ export default function ActiveWorkoutScreen() {
     );
   }
 
+  const allSets = workout.exercises.flatMap(ex => ex.sets);
+  const stats = sessionStats(allSets);
+
   return (
     <>
       <Stack.Screen
@@ -182,11 +157,6 @@ export default function ActiveWorkoutScreen() {
         }}
       />
       <View style={styles.container}>
-        {/*
-          The three numbers you glance at between sets. Elapsed used to be a
-          few small characters in the navigation title, which is the one of
-          the three you actually look at mid-session.
-        */}
         <View style={styles.stats}>
           <View style={styles.stat}>
             <Text style={styles.statV}>
@@ -213,11 +183,40 @@ export default function ActiveWorkoutScreen() {
               No exercises yet. Add one from the library to start logging sets.
             </Text>
           ) : (
-            workout.exercises.map((se) => (
-              <ExerciseBlock
+            workout.exercises.map((se, idx) => (
+              <ExerciseCard
                 key={se.id}
                 se={se}
+                index={idx}
+                total={workout.exercises.length}
+                isCurrent={se.id === currentExerciseId}
+                onSetCurrent={() => setCurrentExerciseId(se.id)}
                 onAddSet={() => onAddSet(se)}
+                onAddWarmupSet={async () => {
+                  await addSet(se.id, { isWarmup: true });
+                  await refresh();
+                }}
+                onAddDropSet={async () => {
+                  await addSet(se.id, { setType: 'drop' });
+                  await refresh();
+                }}
+                onAddRestPause={async () => {
+                  await addSet(se.id, { setType: 'rp' });
+                  await refresh();
+                }}
+                onRemoveSet={async (setId: string) => {
+                  Alert.alert('Remove set?', 'This set will be deleted.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                      text: 'Remove',
+                      style: 'destructive',
+                      onPress: async () => {
+                        // TODO: implement set deletion
+                        await refresh();
+                      },
+                    },
+                  ]);
+                }}
                 onComplete={(set, values) => onMarkComplete(se, set, values)}
                 onPatch={patchSet}
               />
@@ -243,50 +242,169 @@ export default function ActiveWorkoutScreen() {
   );
 }
 
-function ExerciseBlock({
+function ExerciseCard({
   se,
+  index,
+  total,
+  isCurrent,
+  onSetCurrent,
   onAddSet,
+  onAddWarmupSet,
+  onAddDropSet,
+  onAddRestPause,
+  onRemoveSet,
   onComplete,
   onPatch,
 }: {
   se: SessionExerciseWithMeta;
+  index: number;
+  total: number;
+  isCurrent: boolean;
+  onSetCurrent: () => void;
   onAddSet: () => void;
+  onAddWarmupSet: () => void;
+  onAddDropSet: () => void;
+  onAddRestPause: () => void;
+  onRemoveSet: (setId: string) => void;
   onComplete: (
     set: WorkoutSet,
     values?: { reps?: number | null; weight?: number | null }
   ) => void;
   onPatch: (
     setId: string,
-    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed'>>
+    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed' | 'setType'>>
   ) => void;
 }) {
+  const completedSets = se.sets.filter(s => s.completed).length;
+  const totalSets = se.sets.length;
+  const allDone = completedSets === totalSets && totalSets > 0;
+  const stateChip = allDone ? 'DONE' : isCurrent ? 'CURRENT' : `${completedSets}/${totalSets}`;
   const lastLine = describeLastPerformance(se.lastPerformance);
-  return (
-    <View style={styles.card}>
-      <Text style={styles.exName}>{se.exerciseName}</Text>
-      <Text style={styles.exMeta}>Rest {se.restSeconds ?? 60}s</Text>
-      {lastLine ? (
-        // Says where the pre-filled numbers came from, so they read as last
-        // week's rather than as something already logged today.
-        <Text style={styles.exLast}>Last: {lastLine}</Text>
-      ) : (
-        <Text style={styles.exLast}>First time — no previous sets</Text>
-      )}
+  const primaryMuscle = se.primaryMuscles?.[0] ?? '';
+  const initials = se.exerciseName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(w => w[0])
+    .join('')
+    .toUpperCase();
 
-      <View style={styles.setHeader}>
-        <Text style={[styles.col, styles.colSet]}>Set</Text>
-        <Text style={[styles.col, styles.colNum]}>lbs</Text>
-        <Text style={[styles.col, styles.colNum]}>Reps</Text>
-        <Text style={[styles.col, styles.colDone]}> </Text>
+  return (
+    <View style={[styles.card, isCurrent && styles.cardCurrent]}>
+      {/* Header with counter and state chip */}
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardCounter}>EXERCISE {index + 1} / {total}</Text>
+        <Text style={[styles.stateChip, isCurrent && styles.stateChipCurrent]}>
+          {stateChip}
+        </Text>
       </View>
 
-      {se.sets.map((set) => (
-        <SetRow key={set.id} set={set} onComplete={(values) => onComplete(set, values)} onPatch={onPatch} />
-      ))}
+      {/* Exercise tile: thumbnail + name */}
+      <View style={styles.exTile}>
+        <View style={styles.exThumb}>
+          <Text style={styles.exThumbText}>{initials}</Text>
+        </View>
+        <Text style={styles.exName}>{se.exerciseName}</Text>
+      </View>
 
-      <Pressable style={styles.addSetBtn} onPress={onAddSet}>
-        <Text style={styles.addSetText}>+ Add set</Text>
-      </Pressable>
+      {/* Chips: muscle, equipment, best */}
+      <View style={styles.chipRow}>
+        {primaryMuscle && <Text style={styles.chip}>{primaryMuscle.toUpperCase()}</Text>}
+        {se.equipment && <Text style={styles.chip}>{se.equipment.toUpperCase()}</Text>}
+        {se.bestWeight !== null && <Text style={styles.chip}>Best {se.bestWeight} lb</Text>}
+      </View>
+
+      {/* Buttons: Swap, How, Options, Set current */}
+      <View style={styles.buttonRow}>
+        <Pressable style={styles.outlineBtn}>
+          <Text style={styles.outlineBtnText}>⇄ Swap</Text>
+        </Pressable>
+        <Pressable style={styles.outlineBtn}>
+          <Text style={styles.outlineBtnText}>? How</Text>
+        </Pressable>
+        <Pressable style={styles.outlineBtn}>
+          <Text style={styles.outlineBtnText}>⚙ Options</Text>
+        </Pressable>
+        {isCurrent ? (
+          <Pressable style={styles.accentBtn}>
+            <Text style={styles.accentBtnText}>● Current</Text>
+          </Pressable>
+        ) : (
+          <Pressable style={styles.outlineBtn} onPress={onSetCurrent}>
+            <Text style={styles.outlineBtnText}>Set current</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Reference photo panel - only on current card */}
+      {isCurrent && (
+        <View style={styles.photoPanel}>
+          <View style={styles.photoPlaceholder}>
+            <Text style={styles.photoInitials}>{initials}</Text>
+            <Text style={styles.photoHint}>Tap to add a reference photo</Text>
+          </View>
+          <Text style={styles.photoCaption}>
+            {primaryMuscle.toUpperCase()} · {se.equipment?.toUpperCase() ?? 'N/A'}
+          </Text>
+        </View>
+      )}
+
+      {/* Last performance line */}
+      {lastLine ? (
+        <Text style={styles.lastLine}>Last time ({lastLine})</Text>
+      ) : (
+        <Text style={styles.lastLine}>First time — no previous sets</Text>
+      )}
+
+      {/* Set table header */}
+      <View style={styles.setHeader}>
+        <Text style={[styles.col, styles.colSet]}>SET</Text>
+        <Text style={[styles.col, styles.colNum]}>WEIGHT (LB)</Text>
+        <Text style={[styles.col, styles.colNum]}>REPS</Text>
+        <Text style={[styles.col, styles.colDone]}></Text>
+      </View>
+
+      {/* Set rows */}
+      {se.sets.map((set, setIdx) => {
+        const isWarmup = set.isWarmup;
+        const workingSetsBeforeThis = se.sets
+          .slice(0, setIdx)
+          .filter(s => !s.isWarmup && s.setType === 'normal').length;
+        const setNum = isWarmup ? 'W' : (workingSetsBeforeThis + 1).toString();
+
+        return (
+          <SetRow
+            key={set.id}
+            set={set}
+            setNum={setNum}
+            isWarmup={isWarmup}
+            setType={set.setType as SetType}
+            onComplete={(values) => onComplete(set, values)}
+            onPatch={onPatch}
+          />
+        );
+      })}
+
+      {/* Action buttons */}
+      <View style={styles.actionGrid}>
+        <Pressable style={styles.dashedBtn}>
+          <Text style={styles.dashedBtnText}>+ Note</Text>
+        </Pressable>
+        <Pressable style={styles.dashedBtn} onPress={onAddWarmupSet}>
+          <Text style={styles.dashedBtnText}>+ Warm-up set</Text>
+        </Pressable>
+        <Pressable style={styles.dashedBtn} onPress={onAddSet}>
+          <Text style={styles.dashedBtnText}>+ Add set</Text>
+        </Pressable>
+        <Pressable style={styles.dashedBtn} onPress={onAddDropSet}>
+          <Text style={styles.dashedBtnText}>+ Drop set</Text>
+        </Pressable>
+        <Pressable style={styles.dashedBtn} onPress={onAddRestPause}>
+          <Text style={styles.dashedBtnText}>+ Rest-pause</Text>
+        </Pressable>
+        <Pressable style={styles.dashedBtn}>
+          <Text style={styles.dashedBtnText}>− Remove set</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -300,168 +418,389 @@ function parseNum(text: string): number | null {
 
 function SetRow({
   set,
+  setNum,
+  isWarmup,
+  setType,
   onComplete,
   onPatch,
 }: {
   set: WorkoutSet;
+  setNum: string;
+  isWarmup: boolean;
+  setType: SetType;
   onComplete: (values: { reps?: number | null; weight?: number | null }) => void;
   onPatch: (
     setId: string,
-    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed'>>
+    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed' | 'setType'>>
   ) => void;
 }) {
-  const [weightText, setWeightText] = useState(set.weight != null ? String(set.weight) : '');
-  const [repsText, setRepsText] = useState(set.reps != null ? String(set.reps) : '');
+  const [weight, setWeight] = useState(set.weight?.toString() ?? '');
+  const [reps, setReps] = useState(set.reps?.toString() ?? '');
 
-  useEffect(() => {
-    setWeightText(set.weight != null ? String(set.weight) : '');
-    setRepsText(set.reps != null ? String(set.reps) : '');
-  }, [set.weight, set.reps, set.id]);
-
-  const currentValues = () => {
-    const weight = parseNum(weightText);
-    const repsRaw = parseNum(repsText);
-    const reps = repsRaw == null ? null : Math.round(repsRaw);
-    return { weight, reps };
-  };
-
-  const commit = async () => {
-    const { weight, reps } = currentValues();
-    await onPatch(set.id, { weight, reps });
-  };
+  const displayNum =
+    setType === 'drop' ? 'D' : setType === 'rp' ? 'RP' : setNum;
 
   return (
-    <View style={[styles.setRow, set.completed && styles.setRowDone]}>
-      <Text style={[styles.col, styles.colSet, set.completed && styles.doneText]}>
-        {set.setIndex + 1}
+    <View style={[styles.setRow, isWarmup && styles.warmupRow]}>
+      <Text style={[styles.col, styles.colSet, isWarmup && styles.warmText]}>
+        {displayNum}
       </Text>
-      <TextInput
-        style={[styles.input, styles.colNum]}
-        keyboardType="decimal-pad"
-        value={weightText}
-        onChangeText={setWeightText}
-        onBlur={commit}
-        placeholder="—"
-        placeholderTextColor={colors.textMuted}
-        editable={!set.completed}
-      />
-      <TextInput
-        style={[styles.input, styles.colNum]}
-        keyboardType="number-pad"
-        value={repsText}
-        onChangeText={setRepsText}
-        onBlur={commit}
-        placeholder="—"
-        placeholderTextColor={colors.textMuted}
-        editable={!set.completed}
-      />
+      <View style={[styles.col, styles.colNum, styles.numGroup]}>
+        <Pressable onPress={() => setWeight(prev => parseNum(prev) ? String(Math.max(0, parseNum(prev)! - 5)) : prev)}>
+          <Text style={styles.stepperBtn}>−</Text>
+        </Pressable>
+        <TextInput
+          style={styles.numInput}
+          value={weight}
+          onChangeText={setWeight}
+          keyboardType="number-pad"
+          placeholder="0"
+        />
+        <Pressable onPress={() => setWeight(prev => parseNum(prev) ? String(parseNum(prev)! + 5) : '5')}>
+          <Text style={styles.stepperBtn}>+</Text>
+        </Pressable>
+      </View>
+      <View style={[styles.col, styles.colNum, styles.numGroup]}>
+        <Pressable onPress={() => setReps(prev => parseNum(prev) ? String(Math.max(0, parseNum(prev)! - 1)) : prev)}>
+          <Text style={styles.stepperBtn}>−</Text>
+        </Pressable>
+        <TextInput
+          style={styles.numInput}
+          value={reps}
+          onChangeText={setReps}
+          keyboardType="number-pad"
+          placeholder="0"
+        />
+        <Pressable onPress={() => setReps(prev => parseNum(prev) ? String(parseNum(prev)! + 1) : '1')}>
+          <Text style={styles.stepperBtn}>+</Text>
+        </Pressable>
+      </View>
       <Pressable
-        style={[styles.check, set.completed && styles.checkOn]}
-        onPress={async () => {
-          if (set.completed) {
-            await onPatch(set.id, { completed: false });
-          } else {
-            onComplete(currentValues());
-          }
+        style={styles.tickCircle}
+        onPress={() => {
+          onComplete({
+            weight: parseNum(weight),
+            reps: parseNum(reps),
+          });
         }}
       >
-        <Text style={styles.checkText}>{set.completed ? '✓' : '○'}</Text>
+        <Text style={styles.tickText}>{set.completed ? '✓' : '○'}</Text>
       </Pressable>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  stats: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: 2,
-  },
-  stat: {
+  container: {
     flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingVertical: 11,
-    alignItems: 'center',
-    gap: 3,
+    backgroundColor: colors.bg,
   },
-  statV: { color: colors.text, fontSize: 21, fontWeight: '700' },
-  statL: { color: colors.textDim, fontSize: 9.5, letterSpacing: 0.7, fontWeight: '700' },
-  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: spacing.md, paddingTop: spacing.sm },
-  center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  muted: { color: colors.textMuted },
-  empty: { color: colors.textMuted, textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+  },
+  muted: {
+    color: colors.textMuted,
     marginBottom: spacing.md,
   },
-  exName: { color: colors.text, fontWeight: '800', fontSize: 16 },
-  exLast: { color: colors.textMuted, fontSize: 11, marginBottom: 4 },
-  exMeta: { color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm, marginTop: 2 },
-  setHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  setRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  setRowDone: { opacity: 0.75 },
-  col: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
-  colSet: { width: 36, textAlign: 'center' },
-  colNum: { flex: 1, marginHorizontal: 4 },
-  colDone: { width: 40 },
-  input: {
-    backgroundColor: colors.surfaceAlt,
+  secondaryBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.textDim,
+    borderRadius: 6,
+  },
+  secondaryBtnText: {
+    color: colors.text,
+    fontWeight: '600',
+  },
+  stats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  stat: {
+    alignItems: 'center',
+  },
+  statV: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  statL: {
+    fontSize: 11,
+    color: colors.textDim,
+    marginTop: 4,
+    letterSpacing: 0.5,
+  },
+  empty: {
+    color: colors.textDim,
+    textAlign: 'center',
+    paddingVertical: spacing.xl,
+  },
+  card: {
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.md,
+    marginVertical: spacing.sm,
+    padding: spacing.md,
+    borderRadius: 8,
+  },
+  cardCurrent: {
+    borderWidth: 2,
+    borderColor: colors.accent,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  cardCounter: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textDim,
+    letterSpacing: 0.5,
+  },
+  stateChip: {
+    fontSize: 12,
+    fontWeight: '700',
+    backgroundColor: colors.textDim,
+    color: colors.bg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  stateChipCurrent: {
+    backgroundColor: colors.accent,
+    color: colors.onAccent,
+  },
+  exTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  exThumb: {
+    width: 44,
+    height: 44,
+    backgroundColor: colors.textDim,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  exThumbText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.bg,
+  },
+  exName: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    flexWrap: 'wrap',
+  },
+  chip: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text,
+    backgroundColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    flexWrap: 'wrap',
+  },
+  outlineBtn: {
+    flex: 1,
+    minWidth: '45%',
+    paddingVertical: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  outlineBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.text,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+  },
+  accentBtn: {
+    flex: 1,
+    minWidth: '45%',
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.accent,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  accentBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.onAccent,
+  },
+  photoPanel: {
+    backgroundColor: colors.border,
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+  },
+  photoPlaceholder: {
+    width: 100,
+    height: 100,
+    backgroundColor: colors.bg,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  photoInitials: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.textDim,
+  },
+  photoHint: {
+    fontSize: 12,
+    color: colors.textDim,
+    marginTop: spacing.xs,
     textAlign: 'center',
   },
-  check: {
-    width: 40,
-    height: 36,
+  photoCaption: {
+    fontSize: 12,
+    color: colors.textDim,
+  },
+  lastLine: {
+    fontSize: 13,
+    color: colors.textDim,
+    marginBottom: spacing.md,
+  },
+  setHeader: {
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.xs,
+  },
+  col: {
+    flex: 1,
+  },
+  colSet: {
+    width: 30,
+    flex: 0,
+  },
+  colNum: {
+    flex: 1,
+  },
+  colDone: {
+    width: 30,
+    flex: 0,
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  warmupRow: {
+    backgroundColor: colors.border,
+  },
+  warmText: {
+    color: colors.textDim,
+  },
+  numGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  stepperBtn: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.accent,
+    paddingHorizontal: spacing.xs,
+  },
+  numInput: {
+    width: 50,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    backgroundColor: colors.bg,
+    borderRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.xs,
+  },
+  tickCircle: {
+    width: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  checkOn: { backgroundColor: colors.track, borderColor: colors.accent },
-  checkText: { color: colors.accent, fontWeight: '800', fontSize: 16 },
-  doneText: { color: colors.accent },
-  addSetBtn: { marginTop: 8, paddingVertical: 8 },
-  addSetText: { color: colors.accent, fontWeight: '700', textAlign: 'center' },
+  tickText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    flexWrap: 'wrap',
+  },
+  dashedBtn: {
+    flex: 1,
+    minWidth: '45%',
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  dashedBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
   footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: spacing.md,
-    backgroundColor: colors.bg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    gap: 8,
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   addBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
     backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: 6,
+    alignItems: 'center',
   },
-  addBtnText: { color: colors.chipActiveText, fontWeight: '800', textAlign: 'center', fontSize: 16 },
-  discardLink: { paddingVertical: 6 },
-  discardLinkText: { color: colors.danger, textAlign: 'center', fontWeight: '600' },
-  secondaryBtn: {
-    marginTop: 8,
-    padding: spacing.md,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
+  addBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.onAccent,
   },
-  secondaryBtnText: { color: colors.text, fontWeight: '700' },
+  discardLink: {
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+  },
+  discardLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textDim,
+  },
 });

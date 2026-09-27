@@ -29,6 +29,9 @@ import {
 
 export type SessionExerciseWithMeta = SessionExercise & {
   exerciseName: string;
+  primaryMuscles: string[];
+  equipment: string | null;
+  bestWeight: number | null;
   sets: WorkoutSet[];
   /** What was lifted the last time this exercise was completed, for the UI hint. */
   lastPerformance: LastPerformance | null;
@@ -150,6 +153,8 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       restSeconds: sessionExercises.restSeconds,
       notes: sessionExercises.notes,
       exerciseName: exercises.name,
+      primaryMuscles: exercises.primaryMuscles,
+      equipment: exercises.equipment,
     })
     .from(sessionExercises)
     .innerJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
@@ -163,6 +168,24 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       .from(sets)
       .where(eq(sets.sessionExerciseId, se.id))
       .orderBy(asc(sets.setIndex));
+
+    // Calculate best weight (PR) for this exercise from all completed sets
+    const bestWeightResult = await db
+      .select({ maxWeight: sql<number>`MAX(${sets.weight})` })
+      .from(sets)
+      .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+      .innerJoin(workoutSessions, eq(sessionExercises.sessionId, workoutSessions.id))
+      .where(
+        and(
+          eq(sessionExercises.exerciseId, se.exerciseId),
+          ne(workoutSessions.id, sessionId),
+          eq(sets.completed, true),
+          eq(sets.isWarmup, false)
+        )
+      );
+
+    const bestWeight = bestWeightResult[0]?.maxWeight ?? null;
+
     exerciseList.push({
       id: se.id,
       sessionId: se.sessionId,
@@ -171,6 +194,9 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       restSeconds: se.restSeconds,
       notes: se.notes,
       exerciseName: se.exerciseName,
+      primaryMuscles: JSON.parse(se.primaryMuscles ?? '[]'),
+      equipment: se.equipment,
+      bestWeight,
       sets: setRows,
       lastPerformance: await getLastPerformance(se.exerciseId, sessionId),
     });
@@ -350,7 +376,13 @@ export async function addExerciseToSession(
 
 export async function addSet(
   sessionExerciseId: string,
-  defaults?: { reps?: number | null; weight?: number | null; weightUnit?: string }
+  defaults?: {
+    reps?: number | null
+    weight?: number | null
+    weightUnit?: string
+    isWarmup?: boolean
+    setType?: 'normal' | 'drop' | 'rp'
+  }
 ): Promise<WorkoutSet> {
   const existing = await db
     .select()
@@ -388,7 +420,8 @@ export async function addSet(
     weight: defaults?.weight ?? seed.weight,
     weightUnit: defaults?.weightUnit ?? seed.weightUnit,
     completed: false,
-    isWarmup: false,
+    isWarmup: defaults?.isWarmup ?? false,
+    setType: defaults?.setType ?? 'normal',
     rpe: null,
   };
   await db.insert(sets).values(row);
@@ -397,7 +430,7 @@ export async function addSet(
 
 export async function updateSet(
   setId: string,
-  patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed' | 'isWarmup' | 'rpe'>>
+  patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed' | 'isWarmup' | 'setType' | 'rpe'>>
 ): Promise<void> {
   await db.update(sets).set(patch).where(eq(sets.id, setId));
 }

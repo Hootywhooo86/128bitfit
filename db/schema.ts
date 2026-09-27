@@ -84,6 +84,9 @@ export const sessionExercises = sqliteTable('session_exercises', {
   notes: text('notes'),
 });
 
+export const SET_TYPES = ['normal', 'drop', 'rp'] as const;
+export type SetType = (typeof SET_TYPES)[number];
+
 export const sets = sqliteTable('sets', {
   id: text('id').primaryKey(),
   sessionExerciseId: text('session_exercise_id').notNull(),
@@ -93,6 +96,7 @@ export const sets = sqliteTable('sets', {
   weightUnit: text('weight_unit').default('lb'),
   completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
   isWarmup: integer('is_warmup', { mode: 'boolean' }).notNull().default(false),
+  setType: text('set_type', { enum: SET_TYPES }).notNull().default('normal'),
   rpe: real('rpe'),
 });
 
