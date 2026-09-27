@@ -72,6 +72,19 @@ export function ReadinessCard({ recentSets }: { recentSets: number | null }) {
       {r.status === 'scored' && r.reasons.length > 0 ? (
         <Text style={s.why}>{r.reasons.join(' · ')}</Text>
       ) : null}
+
+      {/* Readiness legend */}
+      <View style={s.legendContainer}>
+        <Text style={s.legendTitle}>Readiness Scale</Text>
+        <View style={s.legend}>
+          {(['bad', 'poor', 'ok', 'good', 'great'] as const).map((grade) => (
+            <View key={grade} style={s.legendItem}>
+              <Text style={s.legendEmoji}>{GRADE_EMOJI[grade]}</Text>
+              <Text style={s.legendLabel}>{GRADE_LABEL[grade]}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
     </Card>
   );
 }
@@ -96,5 +109,39 @@ const s = StyleSheet.create({
     lineHeight: 17,
     textAlign: 'center',
     fontFamily: fonts.body,
+  },
+  legendContainer: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  legendTitle: {
+    fontSize: 11,
+    fontFamily: fonts.bodySemi,
+    color: colors.textDim,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  legendItem: {
+    alignItems: 'center',
+    minWidth: '30%',
+  },
+  legendEmoji: {
+    fontSize: 18,
+    marginBottom: 2,
+  },
+  legendLabel: {
+    fontSize: 10,
+    color: colors.textDim,
+    fontFamily: fonts.body,
+    textAlign: 'center',
   },
 });
