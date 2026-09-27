@@ -44,6 +44,7 @@ import {
 import { colors, spacing } from '@/lib/theme';
 import { HfModelPicker } from '@/components/HfModelPicker';
 import { Screen } from '@/components/ui';
+import { UpdateCard } from '@/components/UpdateCard';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -485,6 +486,7 @@ export default function SettingsScreen() {
         <Text style={styles.saveText}>{saving ? 'Saving…' : savedFlash ? 'Saved' : 'Save'}</Text>
       </Pressable>
 
+      <UpdateCard />
 
       <View style={styles.aiCard}>
         <Text style={styles.aiTitle}>About / data licenses</Text>
