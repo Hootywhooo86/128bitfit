@@ -1,10 +1,12 @@
-import { and, asc, count, eq, like, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, like, or, sql } from 'drizzle-orm';
+import { equipmentGroup, type EquipmentGroup } from '@/lib/equipment-groups';
 import { db } from './client';
 import { exercises, type Exercise } from './schema';
 
 export type ExerciseFilters = {
   search?: string;
-  equipment?: string | null;
+  /** One of the library's merged groups, not a raw equipment value. */
+  equipmentGroup?: EquipmentGroup | null;
   primaryMuscle?: string | null;
 };
 
@@ -37,8 +39,15 @@ export async function listExercises(filters: ExerciseFilters = {}): Promise<Exer
       )
     );
   }
-  if (filters.equipment) {
-    clauses.push(eq(exercises.equipment, filters.equipment));
+  if (filters.equipmentGroup) {
+    const group = filters.equipmentGroup;
+    const raw = (await distinctEquipment()).filter((v) => equipmentGroup(v) === group);
+    const matches = [];
+    if (raw.length > 0) matches.push(inArray(exercises.equipment, raw));
+    // An exercise with no equipment recorded is filed under "other".
+    if (group === 'other') matches.push(isNull(exercises.equipment), eq(exercises.equipment, ''));
+    // A group nothing belongs to matches nothing, rather than dropping the filter.
+    clauses.push(matches.length > 0 ? or(...matches) : sql`0`);
   }
   if (filters.primaryMuscle) {
     // Quoted, so "lats" cannot match "latissimus" in some other entry.
@@ -46,21 +55,32 @@ export async function listExercises(filters: ExerciseFilters = {}): Promise<Exer
   }
   const where = clauses.length ? and(...clauses) : undefined;
 
+  const query = db.select().from(exercises).where(where);
+  if (!term) return query.orderBy(asc(exercises.name));
+
   // SQLite's LIKE is case-insensitive for ASCII, so this needs no lowering.
-  const rank = term
-    ? sql`case
+  // Only with a search term: a bare constant here, `ORDER BY 0`, is read by
+  // SQLite as "the 0th column" and fails, which emptied the whole library.
+  const rank = sql`case
           when ${exercises.name} like ${`%${term}%`} then 0
           when ${exercises.primaryMuscles} like ${`%${term}%`} then 1
           else 2
-        end`
-    : sql`0`;
+        end`;
+  return query.orderBy(rank, asc(exercises.name));
+}
 
-  return db
-    .select()
+/** How many exercises fall in each equipment group, for the library's chips. */
+export async function equipmentGroupCounts(): Promise<Map<EquipmentGroup, number>> {
+  const rows = await db
+    .select({ equipment: exercises.equipment, n: count() })
     .from(exercises)
-    .where(where)
-    .orderBy(rank, asc(exercises.name))
-    .limit(500);
+    .groupBy(exercises.equipment);
+  const counts = new Map<EquipmentGroup, number>();
+  for (const r of rows) {
+    const g = equipmentGroup(r.equipment);
+    counts.set(g, (counts.get(g) ?? 0) + r.n);
+  }
+  return counts;
 }
 
 export async function getExerciseById(id: string): Promise<Exercise | null> {
