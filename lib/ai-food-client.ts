@@ -10,7 +10,7 @@
  * in one sentence and pointed at the manual form.
  */
 import { getAiRuntimeConfig } from '@/db/ai-settings';
-import { AiCoachError, getProviderMeta, visionSupport } from './ai-coach';
+import { AiCoachError, getProviderMeta, visionSupport, type WebSearchOutcome } from './ai-coach';
 import { callWithRotation } from './ai-rotate';
 import { describeNetworkFailure } from './net-errors';
 import {
@@ -36,7 +36,8 @@ export type AiFoodRequest =
 export const MAX_RECIPE_PHOTOS = 5;
 
 export type AiFoodOutcome =
-  | AiFoodResult
+  | (Exclude<AiFoodResult, { status: 'ok' }>)
+  | (Extract<AiFoodResult, { status: 'ok' }> & { web: WebSearchOutcome; providerLabel: string })
   | { status: 'unavailable'; message: string }
   | { status: 'failed'; message: string };
 
@@ -75,7 +76,7 @@ export async function estimateFood(
   }
 
   const messages: ChatMessage[] = [
-    { role: 'system', content: systemPrompt() },
+    { role: 'system', content: systemPrompt(cfg.webSearch) },
     ...userMessages(req),
   ];
 
@@ -84,8 +85,11 @@ export async function estimateFood(
     // call on a provider that does not rotate, so this is the old behaviour
     // everywhere except Hugging Face — where describing a meal now falls over
     // to the next model exactly as photographing one does.
-    const attempt = await callWithRotation(messages, signal);
-    return parseAiFood(attempt.content);
+    const attempt = await callWithRotation(messages, signal, { webSearch: cfg.webSearch });
+    const searched = attempt.web.status === 'on' && attempt.web.sources.length > 0;
+    const parsed = parseAiFood(attempt.content, new Date(), searched);
+    if (parsed.status !== 'ok') return parsed;
+    return { ...parsed, web: attempt.web, providerLabel: getProviderMeta(cfg.provider).label };
   } catch (e) {
     if (e instanceof AiCoachError) {
       // The provider's own words when it answered; a translated sentence when

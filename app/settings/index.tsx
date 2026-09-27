@@ -25,7 +25,7 @@ import {
   type AppSettings,
   type WeightUnit,
 } from '@/db/settings-queries';
-import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
+import { getProviderMeta, providerCanSearchWeb, type AiProviderId } from '@/lib/ai-coach';
 import { explainFloor } from '@/lib/calorie-floor';
 import { HF_VISION_FAMILIES } from '@/lib/ai-fallback';
 import { AiKeyStoreError } from '@/lib/ai-secure';
@@ -68,6 +68,7 @@ export default function SettingsScreen() {
   const [aiBaseUrl, setAiBaseUrl] = useState('');
   const [aiKeyDraft, setAiKeyDraft] = useState('');
   const [aiHasKey, setAiHasKey] = useState(false);
+  const [aiWebSearch, setAiWebSearch] = useState(true);
   const [clearKeyConfirm, setClearKeyConfirm] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -88,6 +89,7 @@ export default function SettingsScreen() {
     setAiModel(s.model);
     setAiBaseUrl(s.baseUrl);
     setAiHasKey(s.hasKey);
+    setAiWebSearch(s.webSearch);
     setAiKeyDraft('');
     setClearKeyConfirm(false);
   };
@@ -155,6 +157,7 @@ export default function SettingsScreen() {
         model: aiModel,
         baseUrl: aiBaseUrl,
         modelVision: aiModelVision,
+        webSearch: aiWebSearch,
       };
       if (aiKeyDraft.trim()) {
         aiPatch.apiKey = aiKeyDraft;
@@ -374,6 +377,25 @@ export default function SettingsScreen() {
           ))}
         </View>
         <Text style={styles.hint}>{providerMeta.hint}</Text>
+
+        <Pressable
+          style={[styles.toggleRow, { marginTop: spacing.md }]}
+          onPress={() => setAiWebSearch((v) => !v)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: aiWebSearch }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toggleTitle}>Look things up online</Text>
+            <Text style={[styles.muted, { marginBottom: 0 }]}>
+              {providerCanSearchWeb(aiProvider)
+                ? `${providerMeta.label} searches the web for a named product's real nutrition — a HelloFresh recipe, a restaurant dish — instead of guessing, and the coach can check facts. Searches can cost extra on your key.`
+                : `${providerMeta.label} cannot search the web, so food figures stay estimates. Anthropic, Google Gemini, OpenAI and OpenRouter can.`}
+            </Text>
+          </View>
+          <View style={[styles.switch, aiWebSearch && styles.switchOn]}>
+            <View style={[styles.knob, aiWebSearch && styles.knobOn]} />
+          </View>
+        </Pressable>
 
         <Text style={styles.label}>Model</Text>
         <TextInput

@@ -29,6 +29,7 @@ import {
   buildSystemPrompt,
   coachChat,
   defaultUserPromptForMode,
+  withSources,
 } from '@/lib/ai-coach';
 import {
   buildCoachMessages,
@@ -124,7 +125,7 @@ export default function CoachSessionScreen() {
       // is the only message that does. Follow-ups are just what was asked —
       // the model already has the rest of the thread.
       const messages = buildCoachMessages({
-        system: buildSystemPrompt(),
+        system: buildSystemPrompt(runtime.webSearch),
         opening: defaultUserPromptForMode(mode, ctx.promptBlock, openingQuestion.current),
         turns: opening ? [] : [...turns, asked],
       });
@@ -143,11 +144,13 @@ export default function CoachSessionScreen() {
         model: runtime.model,
         baseUrl: runtime.baseUrl,
         messages,
+        webSearch: runtime.webSearch,
         signal: controller.signal,
       });
 
-      setTurns((prev) => [...prev, { role: 'assistant', content: result.content }]);
-      await appendCoachMessage(tid, 'assistant', result.content);
+      const reply = withSources(result.content, result.web);
+      setTurns((prev) => [...prev, { role: 'assistant', content: reply }]);
+      await appendCoachMessage(tid, 'assistant', reply);
     } catch (e) {
       if (controller.signal.aborted) return;
       setAskError(e instanceof Error ? e.message : String(e));

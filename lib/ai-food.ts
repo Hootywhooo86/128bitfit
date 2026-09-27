@@ -25,8 +25,17 @@ export type AiFoodItem = {
   protein: number | null;
   fat: number | null;
   carb: number | null;
-  /** Always true today. Present so nothing downstream can treat it as read. */
-  estimated: true;
+  /**
+   * Where the figures came from, as the model named it — "hellofresh.com".
+   * Null when it estimated.
+   */
+  source: string | null;
+  /**
+   * False only when the provider reported searching the web *and* the model
+   * named a source for this item. The model's own claim of a source is not
+   * enough on its own: a model with no search can still write "hellofresh.com".
+   */
+  estimated: boolean;
 };
 
 export type AiFoodResult =
@@ -48,6 +57,23 @@ Rules:
 - Do not invent foods that were not described or visible.
 - If you cannot identify any food at all, reply {"items":[],"note":"<why>"}.
 - Put any caveat about portion size in "note". Keep it to one sentence.`;
+
+const WEB = `
+
+You can search the web. Use it — the user wants real figures, not guesses.
+- When the user names a brand, a meal kit (HelloFresh, Gousto, Green Chef…), a
+  restaurant or chain dish, or a packaged product, search for its published
+  nutrition and use those exact figures. Prefer the brand's own site.
+- Published figures are per serving or per 100 g. Scale them to the portion
+  described; with no portion given, use one published serving and say so in
+  "portion".
+- A meal kit recipe is one item with the recipe's own per-serving figures, not
+  a list of ingredients you estimated.
+- Add "source" to each item: the site you took its figures from, e.g.
+  "hellofresh.com". Use null when you could not find a published figure and
+  estimated instead — and say so in "note".
+- Never give a source for a number you did not read there.
+Item shape with search: {"name":"…","portion":"1 serving","calories":<number>,"protein":<number>,"fat":<number>,"carb":<number>,"source":"<site>"}`;
 
 export function describePrompt(text: string): string {
   return `Estimate the nutrition for this meal: ${text.trim()}`;
@@ -85,8 +111,8 @@ export function recipeLinkPrompt(url: string, servings: number): string {
   );
 }
 
-export function systemPrompt(): string {
-  return SYSTEM;
+export function systemPrompt(webSearch = false): string {
+  return webSearch ? SYSTEM + WEB : SYSTEM;
 }
 
 /** Strips a ```json fence, which models add despite being asked not to. */
@@ -114,7 +140,15 @@ function calories(v: unknown): number | null {
   return Math.round(v);
 }
 
-export function parseAiFood(raw: string, now: Date = new Date()): AiFoodResult {
+/**
+ * @param searched Whether the provider reported actually searching the web on
+ *   this call. Without it no item can be marked as looked up.
+ */
+export function parseAiFood(
+  raw: string,
+  now: Date = new Date(),
+  searched = false
+): AiFoodResult {
   const text = unfence(raw);
   let data: unknown;
   try {
@@ -147,6 +181,7 @@ export function parseAiFood(raw: string, now: Date = new Date()): AiFoodResult {
     // A row with no name or no calories is not a food log line. Dropping it
     // beats saving a blank or a zero that claims to be a reading.
     if (!name || kcal == null) continue;
+    const source = typeof e.source === 'string' && e.source.trim() ? e.source.trim() : null;
     items.push({
       name,
       portion: typeof e.portion === 'string' && e.portion.trim() ? e.portion.trim() : '1 serving',
@@ -154,7 +189,8 @@ export function parseAiFood(raw: string, now: Date = new Date()): AiFoodResult {
       protein: macro(e.protein),
       fat: macro(e.fat),
       carb: macro(e.carb),
-      estimated: true,
+      source,
+      estimated: !(searched && source),
     });
   }
 
