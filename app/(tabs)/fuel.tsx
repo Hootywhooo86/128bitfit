@@ -3,6 +3,7 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CalorieRing } from '@/components/CalorieRing';
 import { DayStrip } from '@/components/DayStrip';
+import { FastingCard } from '@/components/FastingCard';
 import { Card, MacroBar, MenuRow, Note, QuickActions, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import {
@@ -19,6 +20,7 @@ import {
   fuelWindow,
   startOfDay,
 } from '@/lib/fuel-day';
+import { useFast } from '@/lib/fasting-store';
 import { formatKcal } from '@/lib/nutrition';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
@@ -55,6 +57,7 @@ export default function FuelScreen() {
   const [totals, setTotals] = useState<Map<string, DayTotal>>(() => new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { fast } = useFast();
 
   const refresh = useCallback(async () => {
     if (!ready) return;
@@ -113,6 +116,7 @@ export default function FuelScreen() {
 
   return (
     <Screen section={describeFuelDay(day)}>
+      <FastingCard />
       <DayStrip day={day} onChange={setDay} totals={totals} />
 
       <Card>
@@ -195,6 +199,13 @@ export default function FuelScreen() {
           isToday ? 'today' : `on ${describeFuelDay(day)}`
         }, and the 7- and 30-day averages`}
         onPress={() => router.push(`/fuel/detail?day=${dayParam}`)}
+      />
+      <MenuRow
+        icon="◷"
+        name="Fasting timer"
+        sub="Off until you start it · shows at the top of Fuel while it runs"
+        value={fast ? `${fast.hours}h` : 'Off'}
+        onPress={() => router.push('/fuel/fasting')}
       />
     </Screen>
   );
