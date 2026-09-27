@@ -5,6 +5,9 @@
     "paths": {
       "@/*": [
         "./*"
+      ],
+      "repdb-generated": [
+        "./lib/repdb-stub.ts"
       ]
     },
     "resolveJsonModule": true
@@ -14,5 +17,9 @@
     "**/*.tsx",
     ".expo/types/**/*.ts",
     "expo-env.d.ts"
+  ],
+  "exclude": [
+    "generated",
+    "node_modules"
   ]
 }

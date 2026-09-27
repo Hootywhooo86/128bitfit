@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareTags, decide, newestRelease } from './update-check';
+import { RELEASES_PAGE, compareTags, decide, failureFor, newestRelease } from './update-check';
 
 describe('ordering release tags', () => {
   it('orders this repo’s alpha tags numerically, not as strings', () => {
@@ -55,5 +55,18 @@ describe('deciding whether to offer an update', () => {
 
   it('does not guess for a build that does not know its own tag', () => {
     expect(decide(null, latest)).toEqual({ status: 'unknown-build', latest });
+  });
+});
+
+describe('when GitHub will not answer', () => {
+  it('reads a 404 as releases hidden from the app, with the page to open instead', () => {
+    expect(failureFor(404)).toEqual({ status: 'hidden', pageUrl: RELEASES_PAGE });
+  });
+
+  it('says rate limiting for 403 and never shows a bare status code', () => {
+    const r403 = failureFor(403);
+    expect(r403.status === 'failed' && r403.message).toMatch(/rate-limiting/);
+    const r500 = failureFor(500);
+    expect(r500.status === 'failed' && r500.message).not.toMatch(/answered/);
   });
 });

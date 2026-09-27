@@ -15,6 +15,9 @@ import { describeNetworkFailure } from './net-errors';
 
 const RELEASES_URL = 'https://api.github.com/repos/Hootywhooo86/128bitfit/releases?per_page=10';
 
+/** The releases page, for when the app cannot read the list itself. */
+export const RELEASES_PAGE = 'https://github.com/Hootywhooo86/128bitfit/releases/latest';
+
 export type Release = {
   tag: string;
   pageUrl: string;
@@ -27,7 +30,22 @@ export type UpdateCheck =
   | { status: 'current'; tag: string }
   | { status: 'available'; current: string; latest: Release }
   | { status: 'unknown-build'; latest: Release }
+  /**
+   * GitHub answered 404: the releases exist but not to an anonymous request,
+   * which is what a private repository looks like from outside. A browser
+   * signed in to GitHub can still see them.
+   */
+  | { status: 'hidden'; pageUrl: string }
   | { status: 'failed'; message: string };
+
+/** What a failed HTTP answer means for the user, in words rather than a status code. */
+export function failureFor(status: number): UpdateCheck {
+  if (status === 404) return { status: 'hidden', pageUrl: RELEASES_PAGE };
+  if (status === 403) {
+    return { status: 'failed', message: 'GitHub is rate-limiting update checks from this network. Try again in an hour.' };
+  }
+  return { status: 'failed', message: `GitHub could not answer just now (HTTP ${status}). Try again later.` };
+}
 
 export function installedReleaseTag(): string | null {
   const tag = process.env.EXPO_PUBLIC_RELEASE_TAG;
@@ -104,15 +122,7 @@ export async function checkForUpdate(signal?: AbortSignal): Promise<UpdateCheck>
       { headers: { Accept: 'application/vnd.github+json' }, signal },
       { timeoutMs: LOOKUP_TIMEOUT_MS * 2, label: 'Update check' }
     );
-    if (!res.ok) {
-      return {
-        status: 'failed',
-        message:
-          res.status === 403
-            ? 'GitHub is rate-limiting update checks from this network. Try again in an hour.'
-            : `GitHub answered ${res.status}. Try again later.`,
-      };
-    }
+    if (!res.ok) return failureFor(res.status);
     const latest = newestRelease((await res.json()) as ApiRelease[]);
     if (!latest) return { status: 'failed', message: 'No releases are published yet.' };
     return decide(installedReleaseTag(), latest);

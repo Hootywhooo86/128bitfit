@@ -58,6 +58,12 @@ for (const [key, value] of Object.entries(expected)) {
 const exBuf = fs.readFileSync(exercisesPath);
 const foodBuf = fs.readFileSync(foodsPath);
 const exercises = JSON.parse(exBuf);
+
+// RepDB, when scripts/build-repdb.mjs has run (the APK workflow does). The app
+// imports these alongside the catalogue, so check they fit the same table: a
+// duplicate id would abort the whole import on the phone.
+const repdbPath = path.join(root, 'generated/repdb/exercises.json');
+const repdb = fs.existsSync(repdbPath) ? JSON.parse(fs.readFileSync(repdbPath, 'utf8')) : [];
 const foods = JSON.parse(foodBuf);
 
 const checksum = (buf) => crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16);
@@ -107,7 +113,7 @@ const insertFood = db.prepare(`INSERT INTO foods (
 const insertMeta = db.prepare(`INSERT INTO meta (key, value) VALUES (?, ?)`);
 
 db.exec('BEGIN');
-for (const e of exercises) {
+for (const e of [...exercises, ...repdb]) {
   insertEx.run(
     e.id,
     e.name,
@@ -147,11 +153,12 @@ const exCount = db.prepare('SELECT COUNT(*) AS n FROM exercises').get().n;
 const foodCount = db.prepare('SELECT COUNT(*) AS n FROM foods').get().n;
 const sample = db.prepare('SELECT id, name, equipment FROM exercises WHERE id = ?').get('3_4_Sit-Up');
 
-const ok = exCount === expected.exercises && foodCount === expected.foods;
+const ok = exCount === expected.exercises + repdb.length && foodCount === expected.foods;
 
 console.log(JSON.stringify({
   ok,
   exercises: exCount,
+  repdb: repdb.length,
   foods: foodCount,
   expected,
   sample,
@@ -164,7 +171,7 @@ console.log(JSON.stringify({
 if (!ok) {
   console.error(
     `Import count mismatch against db/data-manifest.ts: ` +
-      `exercises ${exCount} (expected ${expected.exercises}), ` +
+      `exercises ${exCount} (expected ${expected.exercises} + ${repdb.length} RepDB), ` +
       `foods ${foodCount} (expected ${expected.foods}). ` +
       'Recompute the manifest if the JSON was regenerated on purpose.'
   );

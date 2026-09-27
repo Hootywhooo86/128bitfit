@@ -3,6 +3,7 @@ import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -51,6 +52,8 @@ import { HfModelPicker } from '@/components/HfModelPicker';
 import { Screen } from '@/components/ui';
 import { accentName } from '@/lib/accent';
 import { UpdateCard } from '@/components/UpdateCard';
+import { REPDB } from 'repdb-generated';
+import { REPDB_CREDIT, REPDB_URL } from '@/lib/exercise-images';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -509,6 +512,15 @@ export default function SettingsScreen() {
           from Open Food Facts and are available under the Open Database License (ODbL). Cached
           barcode results stay on-device only — no bulk OFF import.
         </Text>
+        <Text style={styles.muted}>
+          Exercises: free-exercise-db (public domain).
+          {REPDB.exercises.length > 0 ? ` ${REPDB.exercises.length} more, with pictures:` : ''}
+        </Text>
+        {REPDB.exercises.length > 0 ? (
+          <Pressable onPress={() => void Linking.openURL(REPDB_URL)}>
+            <Text style={[styles.muted, { textDecorationLine: 'underline' }]}>{REPDB_CREDIT}</Text>
+          </Pressable>
+        ) : null}
       </View>
     </Screen>
   );

@@ -46,3 +46,7 @@ expo-env.d.ts
 # generated native folders
 /ios
 /android
+
+# RepDB bundle — built by scripts/build-repdb.mjs, never committed (licence forbids
+# republishing the dataset, and this repository is public).
+/generated

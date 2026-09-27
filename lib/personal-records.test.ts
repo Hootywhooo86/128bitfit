@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   estimateOneRepMax,
+  livePr,
   NO_RECORD,
   prFor,
   recordFrom,
@@ -134,5 +135,26 @@ describe('prFor', () => {
   it('gives a high-rep set no estimate PR, since there is no estimate', () => {
     const r = prFor(lb(100, 25), recordFrom([lb(95, 5)]));
     expect(r.kinds).toEqual(['weight']);
+  });
+});
+
+describe('livePr — the trophy on a set just ticked', () => {
+  const lb = (weight: number, reps: number) => ({ weight, reps, unit: 'lb' as const });
+  const history = [lb(200, 5), lb(190, 8)];
+
+  it('awards one when the set beats every earlier session', () => {
+    expect(livePr(lb(205, 5), history, []).kinds).toContain('weight');
+  });
+
+  it('awards another when a later set today beats the first record', () => {
+    expect(livePr(lb(210, 3), history, [lb(205, 5)]).kinds).toContain('weight');
+  });
+
+  it('does not award one for a set that only beats history but not an earlier set today', () => {
+    expect(livePr(lb(202, 1), history, [lb(205, 5)]).kinds).toEqual([]);
+  });
+
+  it('never awards one on the first session of an exercise', () => {
+    expect(livePr(lb(135, 5), [], [lb(95, 8)]).kinds).toEqual([]);
   });
 });

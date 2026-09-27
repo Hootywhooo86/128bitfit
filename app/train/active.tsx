@@ -1,5 +1,5 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { PixelTrophy } from '@/components/PixelTrophy';
 import { RestTimerBar } from '@/components/RestTimerBar';
 import {
   addSet,
@@ -18,6 +19,7 @@ import {
   completeSet,
   deleteSet,
   discardSession,
+  liveRecordFor,
   loadActiveWorkout,
   removeSessionExercise,
   setSessionExerciseNote,
@@ -27,12 +29,12 @@ import {
 } from '@/db/workout-queries';
 import type { WorkoutSet } from '@/db/schema';
 import { getAppSettings, type WeightUnit } from '@/db/settings-queries';
-import { exerciseImageUrl } from '@/lib/exercise-images';
+import { exerciseImageSource } from '@/lib/exercise-images';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
 import { describeLastPerformance } from '@/lib/set-prefill';
-import { colors, spacing, themedStyles } from '@/lib/theme';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 import { formatElapsed, sessionStats } from '@/lib/session-stats';
 
 type SetPatch = Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed'>>;
@@ -47,6 +49,13 @@ export default function ActiveWorkoutScreen() {
   const [keepAwake, setKeepAwake] = useState(false);
   const [units, setUnits] = useState<WeightUnit>('lb');
   const [currentExerciseId, setCurrentExerciseId] = useState<string | null>(null);
+  /** Sets ticked this visit that were records, for the trophy on the row. */
+  const [prSets, setPrSets] = useState<ReadonlySet<string>>(new Set());
+  const [prBanner, setPrBanner] = useState<{ name: string; note: string } | null>(null);
+  const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (bannerTimer.current) clearTimeout(bannerTimer.current);
+  }, []);
 
   const sessionId = id ? decodeURIComponent(id) : '';
 
@@ -101,6 +110,17 @@ export default function ActiveWorkoutScreen() {
     const rest = se.restSeconds ?? DEFAULT_REST_SECONDS;
     timer.start(rest, se.id, sessionId);
     await refresh();
+    // After the tick has saved and the rest has started, so it never costs
+    // the three seconds. A failed check just means no trophy this time.
+    void liveRecordFor(set.id)
+      .then((pr) => {
+        if (pr.kinds.length === 0 || !pr.note) return;
+        setPrSets((prev) => new Set(prev).add(set.id));
+        setPrBanner({ name: se.exerciseName, note: pr.note });
+        if (bannerTimer.current) clearTimeout(bannerTimer.current);
+        bannerTimer.current = setTimeout(() => setPrBanner(null), 5000);
+      })
+      .catch(() => undefined);
   };
 
   const onFinish = () => {
@@ -198,6 +218,15 @@ export default function ActiveWorkoutScreen() {
           </View>
         </View>
         <RestTimerBar />
+        {prBanner ? (
+          <Pressable style={styles.prBanner} onPress={() => setPrBanner(null)}>
+            <PixelTrophy size={32} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.prBannerHead}>NEW PR · {prBanner.name.toUpperCase()}</Text>
+              <Text style={styles.prBannerNote}>{prBanner.note}</Text>
+            </View>
+          </Pressable>
+        ) : null}
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
           {workout.exercises.length === 0 ? (
             <Text style={styles.empty}>
@@ -252,7 +281,15 @@ export default function ActiveWorkoutScreen() {
                   ]);
                 }}
                 onComplete={(set, values) => void onMarkComplete(se, set, values)}
-                onUncomplete={(set) => void act(() => updateSet(set.id, { completed: false }))}
+                onUncomplete={(set) => {
+                  setPrSets((prev) => {
+                    const next = new Set(prev);
+                    next.delete(set.id);
+                    return next;
+                  });
+                  void act(() => updateSet(set.id, { completed: false }));
+                }}
+                prSets={prSets}
                 onSave={(setId, patch) => {
                   // Written straight through without a reload, so stepping a
                   // weight never waits on the whole workout being re-read.
@@ -302,7 +339,9 @@ function ExerciseCard({
   onComplete,
   onUncomplete,
   onSave,
+  prSets,
 }: {
+  prSets: ReadonlySet<string>;
   se: SessionExerciseWithMeta;
   index: number;
   total: number;
@@ -340,7 +379,7 @@ function ExerciseCard({
     .map((w) => w[0])
     .join('')
     .toUpperCase();
-  const imageUrl = imageFailed ? null : exerciseImageUrl(se.image);
+  const imageSource = imageFailed ? null : exerciseImageSource(se.image);
   const caption = [primaryMuscle.toUpperCase(), se.equipment?.toUpperCase()].filter(Boolean).join(' · ');
 
   return (
@@ -393,9 +432,9 @@ function ExerciseCard({
       {/* The library's own picture of the movement, on the exercise in hand. */}
       {isCurrent ? (
         <Pressable style={styles.photoPanel} onPress={onHow}>
-          {imageUrl ? (
+          {imageSource ? (
             <Image
-              source={{ uri: imageUrl }}
+              source={imageSource}
               style={styles.photoImage}
               resizeMode="contain"
               onError={() => setImageFailed(true)}
@@ -463,6 +502,7 @@ function ExerciseCard({
             onComplete={(values) => onComplete(set, values)}
             onUncomplete={() => onUncomplete(set)}
             onSave={onSave}
+            isPr={prSets.has(set.id)}
           />
         );
       })}
@@ -512,7 +552,9 @@ function SetRow({
   onComplete,
   onUncomplete,
   onSave,
+  isPr,
 }: {
+  isPr: boolean;
   set: WorkoutSet;
   label: string;
   step: number;
@@ -605,6 +647,11 @@ function SetRow({
         }
       >
         <Text style={[styles.tickText, set.completed && styles.tickTextOn]}>✓</Text>
+        {isPr && set.completed ? (
+          <View style={styles.prBadge} pointerEvents="none">
+            <PixelTrophy size={16} />
+          </View>
+        ) : null}
       </Pressable>
     </View>
   );
@@ -897,6 +944,7 @@ const styles = themedStyles(() => StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
   tickCircle: {
+    overflow: 'visible',
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -906,6 +954,21 @@ const styles = themedStyles(() => StyleSheet.create({
     justifyContent: 'center',
     marginLeft: spacing.xs,
   },
+  prBadge: { position: 'absolute', top: -8, right: -8 },
+  prBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
+  },
+  prBannerHead: { color: colors.text, fontFamily: fonts.pixel, fontSize: 9, letterSpacing: 1 },
+  prBannerNote: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
   tickOn: {
     backgroundColor: colors.accent,
     borderColor: colors.accent,

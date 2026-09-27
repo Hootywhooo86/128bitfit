@@ -1,6 +1,7 @@
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { PixelTrophy } from '@/components/PixelTrophy';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { listPersonalRecords, type ExerciseBest } from '@/db/workout-queries';
@@ -69,9 +70,12 @@ export default function RecordsScreen() {
               <Card key={r.exerciseId}>
                 <Text style={s.name}>{r.name.toUpperCase()}</Text>
                 {h ? (
-                  <Text style={s.best}>
-                    {fmt(h.weight)} {h.unit} × {h.reps}
-                  </Text>
+                  <View style={s.bestRow}>
+                    <PixelTrophy size={32} />
+                    <Text style={s.best}>
+                      {fmt(h.weight)} {h.unit} × {h.reps}
+                    </Text>
+                  </View>
                 ) : null}
                 <Text style={s.meta}>
                   {e
@@ -104,6 +108,7 @@ const s = StyleSheet.create({
     letterSpacing: 1.2,
     marginBottom: 6,
   },
+  bestRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   best: { color: colors.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.6 },
   meta: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18, marginTop: 5 },
 });

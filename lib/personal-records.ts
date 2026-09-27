@@ -136,3 +136,22 @@ function trim(n: number): string {
   const r = Math.round(n * 10) / 10;
   return Number.isInteger(r) ? String(r) : r.toFixed(1);
 }
+
+/**
+ * Whether a set just ticked mid-workout is a record, for the trophy on the spot.
+ *
+ * It has to beat every earlier session *and* every other set already logged
+ * today — a second, heavier set of the same exercise is a new record too, and
+ * gets its own trophy. What it never does is award one on the first session of
+ * an exercise: with no history there is nothing to beat, and "heavier than the
+ * set you did five minutes ago" on day one is not a personal record, it is a
+ * warm-up. Same rule as prFor, applied to the history alone.
+ */
+export function livePr(
+  set: RecordSet,
+  before: readonly RecordSet[],
+  earlierToday: readonly RecordSet[]
+): PrResult {
+  if (recordFrom(before).heaviest == null) return NOT_A_PR;
+  return prFor(set, recordFrom([...before, ...earlierToday]));
+}

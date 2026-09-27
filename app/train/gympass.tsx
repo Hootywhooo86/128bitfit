@@ -1,3 +1,4 @@
+import * as DocumentPicker from 'expo-document-picker';
 import React, { useEffect, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { PhotoCapture } from '@/components/PhotoCapture';
@@ -64,6 +65,17 @@ export default function GymPassScreen() {
     }
   };
 
+  /** A screenshot of a gym app's pass, or a photo already on the phone. */
+  const pickFromGallery = async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({ type: 'image/*', copyToCacheDirectory: true });
+      if (res.canceled || !res.assets?.[0]) return;
+      await onPhoto(res.assets[0].uri);
+    } catch (e) {
+      setError(`Could not open that image: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
   const remove = () => {
     if (!pass) return;
     Alert.alert('Remove gym pass?', 'Deletes the photo and number from this phone.', [
@@ -104,6 +116,12 @@ export default function GymPassScreen() {
         name={pass.photoUri ? 'Retake photo' : 'Photograph the barcode'}
         sub="Fill the frame with the barcode, flat and in focus"
         onPress={() => setCamera(true)}
+      />
+      <MenuRow
+        icon="▤"
+        name="Choose from gallery"
+        sub="A screenshot of your gym's app works too"
+        onPress={() => void pickFromGallery()}
       />
 
       <Label>MEMBER NUMBER</Label>
