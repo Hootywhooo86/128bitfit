@@ -7,6 +7,7 @@ import {
   type SessionPr,
   type WorkoutSummary,
 } from '@/db/workout-queries';
+import { PixelTrophy } from '@/components/PixelTrophy';
 import { useWorkoutEnergy } from '@/lib/health/use-workout-energy';
 import type { EnergyResult } from '@/lib/workout-energy';
 import { colors, spacing, themedStyles } from '@/lib/theme';
@@ -114,9 +115,12 @@ function PrCard({ prs }: { prs: SessionPr[] }) {
 
   return (
     <View style={styles.pr}>
-      <Text style={styles.prHead}>
-        🏆 {prs.length} PERSONAL RECORD{prs.length === 1 ? '' : 'S'}
-      </Text>
+      <View style={styles.prTop}>
+        <PixelTrophy size={32} />
+        <Text style={styles.prHead}>
+          {prs.length} PERSONAL RECORD{prs.length === 1 ? '' : 'S'}
+        </Text>
+      </View>
       {prs.map((pr) => (
         <View key={pr.exerciseId} style={styles.prRow}>
           <Text style={styles.prName}>{pr.exerciseName}</Text>
@@ -213,6 +217,7 @@ const styles = themedStyles(() => StyleSheet.create({
     marginBottom: spacing.lg,
     gap: spacing.sm,
   },
+  prTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   prHead: { color: colors.text, fontSize: 12, letterSpacing: 1, fontWeight: '800' },
   prRow: { gap: 2 },
   prName: { color: colors.text, fontSize: 15, fontWeight: '700' },

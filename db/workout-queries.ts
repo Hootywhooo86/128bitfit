@@ -6,10 +6,12 @@ import { isUserExercise } from '@/lib/exercise-sources';
 import { resolveSetSeed, seedForNewSet, type LastPerformance } from '@/lib/set-prefill';
 import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import {
+  livePr,
   prFor,
   recordFrom,
   type ExerciseRecord,
   type PrKind,
+  type PrResult,
   type RecordSet,
 } from '@/lib/personal-records';
 import {
@@ -956,10 +958,12 @@ export async function mergeExerciseInto(fromId: string, toId: string): Promise<v
  * would beat itself and every lift would be a trophy. Warm-ups are left out:
  * they are not attempts at anything.
  */
-export async function recordBefore(
-  exerciseId: string,
-  before: Date | null
-): Promise<ExerciseRecord> {
+/**
+ * The working sets a record is built from. Drop and rest-pause sets are out:
+ * a rest-pause mini-set's reps would inflate the estimated 1RM, and neither is
+ * a lift anyone would call their best.
+ */
+async function recordSetsBefore(exerciseId: string, before: Date | null): Promise<RecordSet[]> {
   const rows = await db
     .select({
       weight: sets.weight,
@@ -974,17 +978,69 @@ export async function recordBefore(
         eq(sessionExercises.exerciseId, exerciseId),
         eq(sets.completed, true),
         eq(sets.isWarmup, false),
+        eq(sets.setType, 'normal'),
         eq(workoutSessions.status, 'completed'),
         ...(before ? [lt(workoutSessions.startedAt, before)] : [])
       )
     );
+  return rows.map(toRecordSet);
+}
 
-  return recordFrom(
-    rows.map((r) => ({
-      weight: r.weight,
-      reps: r.reps,
-      unit: r.unit === 'kg' ? ('kg' as const) : ('lb' as const),
-    }))
+const toRecordSet = (r: { weight: number | null; reps: number | null; unit: string | null }): RecordSet => ({
+  weight: r.weight,
+  reps: r.reps,
+  unit: r.unit === 'kg' ? 'kg' : 'lb',
+});
+
+export async function recordBefore(
+  exerciseId: string,
+  before: Date | null
+): Promise<ExerciseRecord> {
+  return recordFrom(await recordSetsBefore(exerciseId, before));
+}
+
+/**
+ * Whether the set just ticked is a record — for the trophy during the workout.
+ * Read after the tick has saved, so it never slows logging. See livePr.
+ */
+export async function liveRecordFor(setId: string): Promise<PrResult> {
+  const [row] = await db
+    .select({
+      weight: sets.weight,
+      reps: sets.reps,
+      unit: sets.weightUnit,
+      isWarmup: sets.isWarmup,
+      setType: sets.setType,
+      exerciseId: sessionExercises.exerciseId,
+      sessionId: sessionExercises.sessionId,
+      startedAt: workoutSessions.startedAt,
+    })
+    .from(sets)
+    .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+    .innerJoin(workoutSessions, eq(sessionExercises.sessionId, workoutSessions.id))
+    .where(eq(sets.id, setId))
+    .limit(1);
+  if (!row || row.isWarmup || row.setType !== 'normal') return { kinds: [], note: null };
+
+  const today = await db
+    .select({ weight: sets.weight, reps: sets.reps, unit: sets.weightUnit })
+    .from(sets)
+    .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+    .where(
+      and(
+        eq(sessionExercises.sessionId, row.sessionId),
+        eq(sessionExercises.exerciseId, row.exerciseId),
+        eq(sets.completed, true),
+        eq(sets.isWarmup, false),
+        eq(sets.setType, 'normal'),
+        ne(sets.id, setId)
+      )
+    );
+
+  return livePr(
+    toRecordSet(row),
+    await recordSetsBefore(row.exerciseId, row.startedAt ?? null),
+    today.map(toRecordSet)
   );
 }
 
@@ -1029,7 +1085,8 @@ export async function personalRecordsIn(sessionId: string): Promise<SessionPr[]>
       and(
         eq(sessionExercises.sessionId, sessionId),
         eq(sets.completed, true),
-        eq(sets.isWarmup, false)
+        eq(sets.isWarmup, false),
+        eq(sets.setType, 'normal')
       )
     );
 
