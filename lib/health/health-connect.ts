@@ -10,6 +10,7 @@
  */
 import {
   SdkAvailabilityStatus,
+  aggregateRecord,
   deleteRecordsByUuids,
   getGrantedPermissions,
   getSdkStatus,
@@ -274,6 +275,56 @@ export const healthConnectProvider: HealthProvider = {
       zeroAll('distanceMeters');
       for (const r of distance) addTo('distanceMeters', dayOf(r), num(r.distance?.inMeters));
     }
+    // Summing raw records double-counts whenever two apps record the same
+    // thing — a watch and the phone both writing steps is the common case.
+    // Health Connect's aggregate call removes the overlap by data-origin
+    // priority, so each counter above is replaced with its aggregate where
+    // one comes back. The sum stays only as the fallback for a day the
+    // aggregate call refuses, with the reason recorded.
+    const counters = [
+      ['Steps', 'steps', steps, (r: Record<string, unknown>) => num(r.COUNT_TOTAL)],
+      [
+        'ActiveCaloriesBurned',
+        'activeCalories',
+        active,
+        (r: Record<string, unknown>) => num((r.ACTIVE_CALORIES_TOTAL as { inKilocalories?: number })?.inKilocalories),
+      ],
+      [
+        'TotalCaloriesBurned',
+        'totalCalories',
+        total,
+        (r: Record<string, unknown>) => num((r.ENERGY_TOTAL as { inKilocalories?: number })?.inKilocalories),
+      ],
+      [
+        'Distance',
+        'distanceMeters',
+        distance,
+        (r: Record<string, unknown>) => num((r.DISTANCE as { inMeters?: number })?.inMeters),
+      ],
+    ] as const;
+    for (const [recordType, field, read, pick] of counters) {
+      // Not granted, or the read failed: stays null, exactly as before.
+      if (!read) continue;
+      for (const [key, day] of byDate) {
+        try {
+          const result = (await aggregateRecord({
+            recordType,
+            timeRangeFilter: {
+              operator: 'between',
+              startTime: startOfLocalDay(key).toISOString(),
+              endTime: endOfLocalDay(key).toISOString(),
+            },
+          } as never)) as unknown as Record<string, unknown>;
+          const v = pick(result);
+          // An aggregate over a day with no records is 0 — a real reading.
+          (day[field] as number | null) = v ?? 0;
+          lastReadErrors.delete(`${recordType} (aggregate)`);
+        } catch (e) {
+          lastReadErrors.set(`${recordType} (aggregate)`, describeError(e));
+        }
+      }
+    }
+
     if (water) {
       zeroAll('hydrationMl');
       for (const r of water) addTo('hydrationMl', dayOf(r), num(r.volume?.inMilliliters));
