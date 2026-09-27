@@ -27,7 +27,7 @@ import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
 import { describeLastPerformance } from '@/lib/set-prefill';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { formatElapsed, sessionStats } from '@/lib/session-stats';
 
 export default function ActiveWorkoutScreen() {
@@ -490,7 +490,7 @@ function SetRow({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -803,4 +803,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textDim,
   },
-});
+}));

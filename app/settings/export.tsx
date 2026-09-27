@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import { runExport, type ExportResult } from '@/lib/export';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 
 function formatSize(bytes: number | null): string {
@@ -101,7 +101,7 @@ export default function ExportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   muted: { color: colors.textMuted, fontSize: 13, marginBottom: spacing.sm, lineHeight: 19 },
   section: {
@@ -132,4 +132,4 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   fileName: { color: colors.text, fontWeight: '700', fontSize: 14 },
   link: { color: colors.accent, fontWeight: '700', fontSize: 13 },
-});
+}));

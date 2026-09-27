@@ -6,7 +6,7 @@ import { useDb } from '@/db/DatabaseProvider';
 import { suggestWorkout, type WorkoutSuggestion } from '@/db/gap-queries';
 import { createRoutine, startRoutineWorkout } from '@/db/workout-queries';
 import { MUSCLE_LABELS, type MuscleGroup } from '@/lib/muscle-load';
-import { colors, fonts, spacing } from '@/lib/theme';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 const SETS = 3;
 const REPS = 10;
@@ -145,7 +145,7 @@ export default function SuggestedWorkoutScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 80, alignItems: 'center' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.sm },
   chip: {
@@ -177,4 +177,4 @@ const s = StyleSheet.create({
     marginTop: spacing.sm,
   },
   secondaryT: { color: colors.text, fontSize: 13, fontFamily: fonts.bodySemi },
-});
+}));

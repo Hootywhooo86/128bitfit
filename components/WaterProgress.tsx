@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 type Props = {
   ml: number;
@@ -25,7 +25,7 @@ export function WaterProgress({ ml, targetMl }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   wrap: {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -45,4 +45,4 @@ const styles = StyleSheet.create({
   },
   fill: { height: '100%', backgroundColor: colors.accent, borderRadius: 4 },
   hint: { color: colors.textMuted, fontSize: 12 },
-});
+}));

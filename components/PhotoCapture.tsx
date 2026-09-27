@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * Camera sheet for photographing a food.
@@ -94,7 +94,7 @@ export function PhotoCapture({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pad: { padding: spacing.lg, gap: spacing.sm },
@@ -118,4 +118,4 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: { color: colors.text, fontWeight: '700' },
   error: { color: colors.danger, lineHeight: 20 },
-});
+}));

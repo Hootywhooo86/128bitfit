@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { lookupBarcode } from '@/db/barcode-queries';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 export default function ScanBarcodeScreen() {
   const router = useRouter();
@@ -144,7 +144,7 @@ export default function ScanBarcodeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: {
     flex: 1,
@@ -215,4 +215,4 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: colors.chipActiveText, fontWeight: '900', fontSize: 16 },
   error: { color: colors.danger, marginTop: 4 },
   hint: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
-});
+}));

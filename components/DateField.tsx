@@ -2,7 +2,7 @@ import DateTimePicker, { type DateTimePickerEvent } from '@react-native-communit
 import React, { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatBirthday, fromIsoDate, maxBirthday, minBirthday, toIsoDate } from '@/lib/birthday';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * A date button that opens the OS calendar.
@@ -73,7 +73,7 @@ export function DateField({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
   field: {
     flex: 1,
@@ -103,4 +103,4 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   doneText: { color: colors.chipActiveText, fontWeight: '900' },
-});
+}));

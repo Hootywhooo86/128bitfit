@@ -9,7 +9,7 @@ import {
   describeFuelDay,
   fuelWindow,
 } from '@/lib/fuel-day';
-import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /** Fixed so the scroll position of a chip is arithmetic, not a measurement. */
 const CHIP_W = 46;
@@ -124,7 +124,7 @@ export function DayStrip({
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   wrap: { marginBottom: spacing.md },
   head: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   stripFlex: { flex: 1 },
@@ -165,4 +165,4 @@ const s = StyleSheet.create({
     fontFamily: fonts.body,
     alignSelf: 'flex-end',
   },
-});
+}));

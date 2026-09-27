@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { checkForUpdate, installedReleaseTag, type UpdateCheck } from '@/lib/update-check';
-import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /** Settings → which build this is, and whether GitHub has a newer one. */
 export function UpdateCard() {
@@ -67,7 +67,7 @@ export function UpdateCard() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   card: {
     marginTop: spacing.lg,
     padding: spacing.md,
@@ -89,4 +89,4 @@ const s = StyleSheet.create({
   btnT: { color: colors.onAccent, fontFamily: fonts.bodyBold, fontSize: 14 },
   link: { color: colors.accent, fontFamily: fonts.bodySemi, fontSize: 13 },
   err: { color: colors.danger, marginTop: 10, lineHeight: 19, fontFamily: fonts.body },
-});
+}));

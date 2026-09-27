@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { filterHfModels, listHfModels, type HfModel } from '@/lib/hf-models';
-import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * Browse the models Hugging Face's router can actually serve.
@@ -131,7 +131,7 @@ export function HfModelPicker({
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.bg, padding: spacing.md, paddingTop: 48 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { fontFamily: fonts.pixel, fontSize: 10, color: colors.text, letterSpacing: 1 },
@@ -175,4 +175,4 @@ const s = StyleSheet.create({
   filterOn: { borderColor: colors.accent, backgroundColor: colors.track },
   filterText: { color: colors.textMuted, fontSize: 12, fontFamily: fonts.body },
   filterTextOn: { color: colors.text, fontWeight: '700' },
-});
+}));

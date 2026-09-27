@@ -1,7 +1,8 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { StyleSheet, Text } from 'react-native';
-import { colors, fonts } from '@/lib/theme';
+import { useAccent } from '@/lib/accent';
+import { colors, fonts, themedStyles } from '@/lib/theme';
 
 /**
  * Bottom tabs from prototype/app-shell.html `.tabs`: four pixel-type words, no
@@ -13,6 +14,9 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
 }
 
 export default function TabLayout() {
+  // The labels read the accent; without this they keep the old one until the
+  // next tab switch.
+  useAccent();
   return (
     <Tabs
       screenOptions={{
@@ -49,7 +53,7 @@ export default function TabLayout() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   tab: {
     fontFamily: fonts.pixel,
     fontSize: 11.5,
@@ -59,4 +63,4 @@ const s = StyleSheet.create({
     width: 90,
   },
   tabOn: { color: colors.accent },
-});
+}));

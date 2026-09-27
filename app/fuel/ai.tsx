@@ -24,7 +24,7 @@ import { defaultMealTypeForHour } from '@/lib/nutrition';
 import { MealSlot } from '@/components/MealSlot';
 import { mealTimestamp, type MealDay } from '@/lib/meal-time';
 import { parseDayKey } from '@/lib/fuel-day';
-import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * Log a meal by describing it, or by photographing it.
@@ -588,7 +588,7 @@ function hostOf(url: string): string {
   return m ? m[1].replace(/^www\./, '') : url;
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 60, alignItems: 'center' },
   seg: { flexDirection: 'row', gap: 4, marginBottom: 12 },
   segBtn: {
@@ -688,4 +688,4 @@ const s = StyleSheet.create({
   mealOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   mealT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textMuted, letterSpacing: 0.5 },
   mealTOn: { color: colors.onAccent },
-});
+}));

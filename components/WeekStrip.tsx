@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import type { TrainingDayDot } from '@/db/workout-queries';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 type Props = {
   days: TrainingDayDot[];
@@ -23,7 +23,7 @@ export function WeekStrip({ days }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   wrap: {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -39,4 +39,4 @@ const styles = StyleSheet.create({
   dot: { width: 12, height: 12, borderRadius: 6 },
   dotOn: { backgroundColor: colors.accent },
   dotOff: { backgroundColor: colors.border },
-});
+}));

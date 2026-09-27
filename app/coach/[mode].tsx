@@ -37,7 +37,7 @@ import {
   threadTitle,
   type CoachTurn,
 } from '@/lib/coach-thread';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 function isCoachMode(v: string): v is CoachMode {
   return v === 'debrief' || v === 'ask' || v === 'checkin';
@@ -333,7 +333,7 @@ export default function CoachSessionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   thread: { gap: spacing.sm, marginTop: spacing.sm },
   labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -453,4 +453,4 @@ const styles = StyleSheet.create({
   },
   muted: { color: colors.textMuted, textAlign: 'center' },
   footer: { color: colors.textMuted, fontSize: 11, marginTop: spacing.md },
-});
+}));

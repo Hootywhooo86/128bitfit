@@ -3,7 +3,7 @@ import React from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { health } from '@/lib/health';
 import { HealthSyncCard } from '@/components/HealthSyncCard';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 
 const POLICY_URL = 'https://github.com/Hootywhooo86/128bitfit/blob/main/docs/privacy-policy.md';
@@ -144,7 +144,7 @@ export default function PrivacyScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   h1: { color: colors.text, fontWeight: '900', fontSize: 17, marginBottom: spacing.xs },
   section: {
@@ -182,4 +182,4 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.chipActiveText, fontWeight: '800', letterSpacing: 1 },
   link: { marginTop: spacing.lg, alignItems: 'center' },
   linkText: { color: colors.accent, fontWeight: '700' },
-});
+}));

@@ -7,7 +7,7 @@ import {
   type LoadLevel,
   type MuscleTally,
 } from '@/lib/muscle-load';
-import { colors, muscleHeat, spacing } from '@/lib/theme';
+import { colors, muscleHeat, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * The muscles you have trained most, on Home.
@@ -102,7 +102,7 @@ const levelText: Record<LoadLevel, { color: string }> = {
   heavy: { color: muscleHeat.heavy },
 };
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   strip: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   chip: {
     backgroundColor: colors.surfaceAlt,
@@ -137,4 +137,4 @@ const styles = StyleSheet.create({
   },
   warnText: { color: colors.textMuted, fontSize: 11.5, lineHeight: 16 },
   warnLink: { color: colors.accent, fontSize: 11.5, fontWeight: '700' },
-});
+}));

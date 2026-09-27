@@ -25,7 +25,7 @@ import {
   type SexOption,
 } from '@/lib/body';
 import { explainFloor } from '@/lib/calorie-floor';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 const STEPS = ['Basics', 'Goals', 'Done'] as const;
 type Step = (typeof STEPS)[number];
@@ -317,7 +317,7 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   center: {
@@ -428,4 +428,4 @@ const styles = StyleSheet.create({
   },
   nextText: { color: colors.chipActiveText, fontWeight: '900', fontSize: 16 },
   muted: { color: colors.textMuted },
-});
+}));

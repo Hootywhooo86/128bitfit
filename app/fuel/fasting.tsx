@@ -4,7 +4,7 @@ import { useNow } from '@/components/FastingCard';
 import { Bar, Card, Label, Note, Screen } from '@/components/ui';
 import { FAST_PLANS, fastProgress, formatElapsed } from '@/lib/fasting';
 import { endFast, startFast, useFast } from '@/lib/fasting-store';
-import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * The fasting timer, from prototype/app-shell.html `fuel:fasting`.
@@ -112,7 +112,7 @@ export default function FastingScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   hero: { color: colors.textMuted, fontSize: 13, lineHeight: 19, fontFamily: fonts.body },
   opt: {
     flexDirection: 'row',
@@ -144,4 +144,4 @@ const s = StyleSheet.create({
   clockS: { fontSize: 13, color: colors.textMuted, marginTop: 6, fontFamily: fonts.body },
   started: { fontSize: 11.5, color: colors.textDim, marginTop: 12, fontFamily: fonts.body },
   warn: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18, marginBottom: 10, fontFamily: fonts.body },
-});
+}));

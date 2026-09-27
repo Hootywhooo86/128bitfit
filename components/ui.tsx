@@ -10,7 +10,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { TopBar } from '@/components/TopBar';
-import { CONTENT_MAX_WIDTH, colors, fonts, radius, spacing } from '@/lib/theme';
+import { useAccent } from '@/lib/accent';
+import { CONTENT_MAX_WIDTH, colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * The shell's building blocks, ported from prototype/app-shell.html.
@@ -44,6 +45,9 @@ export function Screen({
   refreshing?: boolean;
 }) {
   const router = useRouter();
+  // Keyed on the accent so a colour change repaints the screen's content
+  // without resetting navigation: styles are rebuilt on the remount.
+  const accent = useAccent();
   const bar = (
     <TopBar
       section={section}
@@ -62,7 +66,7 @@ export function Screen({
     return (
       <View style={s.screen}>
         {bar}
-        <View style={[s.main, s.fill, s.noTabGap]}>{children}</View>
+        <View key={accent} style={[s.main, s.fill, s.noTabGap]}>{children}</View>
       </View>
     );
   }
@@ -70,6 +74,7 @@ export function Screen({
     <View style={s.screen}>
       {bar}
       <ScrollView
+        key={accent}
         style={s.screen}
         contentContainerStyle={s.main}
         keyboardShouldPersistTaps="handled"
@@ -286,7 +291,7 @@ export function Note({ children }: { children: React.ReactNode }) {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.bg },
   main: {
     padding: spacing.md,
@@ -410,4 +415,4 @@ const s = StyleSheet.create({
 
   note: { borderLeftWidth: 2, borderLeftColor: colors.borderBright, paddingLeft: 11 },
   noteT: { fontSize: 12.5, color: colors.textMuted, lineHeight: 21, fontFamily: fonts.body },
-});
+}));

@@ -13,7 +13,7 @@ import {
 import { distinctPrimaryMuscles, listExercises } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
 import { addExerciseToSession } from '@/db/workout-queries';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 export default function AddExerciseScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
@@ -188,7 +188,7 @@ function Chip({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   search: {
     backgroundColor: colors.surface,
@@ -246,4 +246,4 @@ const styles = StyleSheet.create({
   },
   emptyBtnText: { color: colors.onAccent, fontWeight: '800', fontSize: 13 },
   emptyHint: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 17 },
-});
+}));

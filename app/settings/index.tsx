@@ -41,9 +41,10 @@ import {
   type CalorieProfile,
   type Goal,
 } from '@/lib/body';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { HfModelPicker } from '@/components/HfModelPicker';
 import { Screen } from '@/components/ui';
+import { accentName } from '@/lib/accent';
 import { UpdateCard } from '@/components/UpdateCard';
 
 export default function SettingsScreen() {
@@ -224,6 +225,14 @@ export default function SettingsScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.aiTitle}>Privacy & health data</Text>
           <Text style={styles.muted}>What is stored, what leaves the device →</Text>
+        </View>
+      </Pressable>
+
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/theme')}>
+        <View style={[styles.themeDot, { backgroundColor: colors.accent }]} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Theme colour</Text>
+          <Text style={styles.muted}>{accentName(colors.accent)} · free, all of them →</Text>
         </View>
       </Pressable>
 
@@ -550,7 +559,8 @@ function MaintenanceNote({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
+  themeDot: { width: 22, height: 22, borderRadius: 11 },
   browseBtn: { paddingVertical: 10 },
   browseText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
@@ -699,4 +709,4 @@ const styles = StyleSheet.create({
   },
   clearKeyConfirm: { borderColor: colors.danger },
   clearKeyText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
-});
+}));

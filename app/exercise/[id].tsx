@@ -13,7 +13,7 @@ import { getExerciseById } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
 import { exerciseImageUrl, parseJsonArray } from '@/lib/exercise-images';
 import { isUserExercise } from '@/lib/exercise-sources';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -117,7 +117,7 @@ function Section({ title, body }: { title: string; body: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   image: {
@@ -147,4 +147,4 @@ const styles = StyleSheet.create({
   },
   stepText: { color: colors.text, flex: 1, lineHeight: 20 },
   muted: { color: colors.textMuted },
-});
+}));
