@@ -92,7 +92,7 @@ export default function AiFoodScreen() {
   };
 
   const noteFor = (it: AiFoodItem) =>
-    it.estimated ? 'AI estimate' : `Looked up: ${it.source}`;
+    it.estimated ? 'AI estimate' : 'Web search';
 
   const runDescribe = async (lookup: boolean) => {
     if (!text.trim() || busy) return;
@@ -203,7 +203,7 @@ export default function AiFoodScreen() {
         servings: ateNum(),
         mealType,
         loggedAt: mealTimestamp(mealType, mealDay),
-        notes: items.every((i) => !i.estimated) ? 'Looked up' : 'AI estimate',
+        notes: items.every((i) => !i.estimated) ? 'Web search' : 'AI estimate',
       });
       router.replace('/(tabs)/fuel');
     } catch (e) {
@@ -429,7 +429,7 @@ export default function AiFoodScreen() {
 
       {items ? (
         <>
-          <Label>{items.some((i) => !i.estimated) ? 'LOOKED UP — CHECK IT' : 'ESTIMATE — CHECK IT'}</Label>
+          <Label>{items.some((i) => !i.estimated) ? 'WEB SEARCH — CHECK IT' : 'ESTIMATE — CHECK IT'}</Label>
           <Note>{lookupSummary(web, providerLabel, items)}</Note>
           {note ? <Text style={s.modelNote}>{note}</Text> : null}
 
@@ -438,7 +438,7 @@ export default function AiFoodScreen() {
               <Text style={s.itemName}>{it.name}</Text>
               <Text style={s.itemPortion}>{it.portion}</Text>
               <Text style={[s.tag, !it.estimated && s.tagSourced]}>
-                {it.estimated ? 'ESTIMATE' : `SOURCE · ${it.source}`}
+                {it.estimated ? 'ESTIMATE' : 'WEB SEARCH'}
               </Text>
               <View style={s.row}>
                 {(
