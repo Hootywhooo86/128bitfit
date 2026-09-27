@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, like, lt, sql } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
+import { drinkFluid } from '@/lib/drink-fluid';
 import {
   foodLogs,
   foods,
@@ -47,7 +48,14 @@ export type DayFuelSummary = {
    * macro, so the total is a floor rather than a figure. The UI marks it.
    */
   partial: { protein: boolean; fat: boolean; carb: boolean };
+  /** Everything drunk: water logged on its own plus drinks with a stated volume. */
   waterMl: number;
+  /** Water logged on its own — the part the +/- buttons change. */
+  waterLoggedMl: number;
+  /** Fluid from drinks logged as food, worked out from their servings. */
+  drinkMl: number;
+  /** Drinks logged by weight or with no serving, so not counted. Their names. */
+  unmeasuredDrinks: string[];
   logs: FoodLogWithName[];
   byMeal: Record<MealType, FoodLogWithName[]>;
 };
@@ -234,8 +242,30 @@ export async function getDayFuelSummary(day: Date = new Date()): Promise<DayFuel
     if (byMeal[mt]) byMeal[mt].push(log);
     else byMeal.snack.push(log);
   }
-  const waterMl = await getWaterTotalForDay(day);
-  return { goals, totals, partial, waterMl, logs, byMeal };
+  let drinkMl = 0;
+  const unmeasuredDrinks: string[] = [];
+  for (const log of logs) {
+    const fluid = drinkFluid({
+      name: log.displayName,
+      servingSize: log.servingSize,
+      servingUnit: log.servingUnit,
+      servings: log.servings,
+    });
+    if (fluid.status === 'counted') drinkMl += fluid.ml;
+    else if (fluid.status === 'unmeasured') unmeasuredDrinks.push(log.displayName);
+  }
+  const waterLoggedMl = Math.max(0, await getWaterTotalForDay(day));
+  return {
+    goals,
+    totals,
+    partial,
+    waterMl: waterLoggedMl + drinkMl,
+    waterLoggedMl,
+    drinkMl,
+    unmeasuredDrinks,
+    logs,
+    byMeal,
+  };
 }
 
 export type LogFoodInput = {
@@ -257,6 +287,7 @@ export type LogFoodInput = {
 export async function insertFoodLog(input: LogFoodInput): Promise<string> {
   const id = newId('fl');
   const loggedAt = input.loggedAt ?? new Date();
+
   await db.insert(foodLogs).values({
     id,
     foodId: input.foodId ?? null,
@@ -295,6 +326,9 @@ export async function insertFoodLog(input: LogFoodInput): Promise<string> {
       // Already stored locally; a name we could not look up is not a lost meal.
     }
   })();
+
+  // Log fluid volume for drinks (e.g., water, coffee, juice, soda)
+
   return id;
 }
 

@@ -1,8 +1,9 @@
 import { and, asc, count, desc, eq, gte, lt, ne, sql, inArray } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
+import { getDefaultRestSeconds } from './rest-settings';
 import { isUserExercise } from '@/lib/exercise-sources';
-import { resolveSetSeed, type LastPerformance } from '@/lib/set-prefill';
+import { resolveSetSeed, seedForNewSet, type LastPerformance } from '@/lib/set-prefill';
 import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import {
   prFor,
@@ -29,6 +30,12 @@ import {
 
 export type SessionExerciseWithMeta = SessionExercise & {
   exerciseName: string;
+  primaryMuscles: string[];
+  equipment: string | null;
+  /** First library image path, for the reference panel. Null for custom exercises. */
+  image: string | null;
+  /** Heaviest completed working set in a finished session, with its unit. */
+  best: { weight: number; unit: string } | null;
   sets: WorkoutSet[];
   /** What was lifted the last time this exercise was completed, for the UI hint. */
   lastPerformance: LastPerformance | null;
@@ -150,6 +157,9 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       restSeconds: sessionExercises.restSeconds,
       notes: sessionExercises.notes,
       exerciseName: exercises.name,
+      primaryMuscles: exercises.primaryMuscles,
+      equipment: exercises.equipment,
+      images: exercises.images,
     })
     .from(sessionExercises)
     .innerJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
@@ -163,6 +173,39 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       .from(sets)
       .where(eq(sets.sessionExerciseId, se.id))
       .orderBy(asc(sets.setIndex));
+
+    // Best = heaviest working set actually finished. An abandoned session is
+    // full of pre-filled numbers nobody lifted, and a drop set is not a best.
+    const bestRow = await db
+      .select({ weight: sets.weight, unit: sets.weightUnit })
+      .from(sets)
+      .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+      .innerJoin(workoutSessions, eq(sessionExercises.sessionId, workoutSessions.id))
+      .where(
+        and(
+          eq(sessionExercises.exerciseId, se.exerciseId),
+          ne(workoutSessions.id, sessionId),
+          eq(workoutSessions.status, 'completed'),
+          eq(sets.completed, true),
+          eq(sets.isWarmup, false),
+          eq(sets.setType, 'normal'),
+          sql`${sets.weight} > 0`
+        )
+      )
+      .orderBy(desc(sets.weight))
+      .limit(1);
+    const best = bestRow[0]?.weight != null
+      ? { weight: bestRow[0].weight, unit: bestRow[0].unit ?? 'lb' }
+      : null;
+    const images = (() => {
+      try {
+        const v = JSON.parse(se.images ?? '[]');
+        return Array.isArray(v) ? v : [];
+      } catch {
+        return [];
+      }
+    })();
+
     exerciseList.push({
       id: se.id,
       sessionId: se.sessionId,
@@ -171,6 +214,10 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       restSeconds: se.restSeconds,
       notes: se.notes,
       exerciseName: se.exerciseName,
+      primaryMuscles: JSON.parse(se.primaryMuscles ?? '[]'),
+      equipment: se.equipment,
+      image: typeof images[0] === 'string' ? images[0] : null,
+      best,
       sets: setRows,
       lastPerformance: await getLastPerformance(se.exerciseId, sessionId),
     });
@@ -197,20 +244,22 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
  *
  * `excludeSessionId` keeps the session being built now out of its own history.
  *
- * NOTE for whoever wires up warm-up sets in the live session: `sets.isWarmup`
- * exists in the schema and nothing writes it yet, so this query cannot see the
- * difference today. The moment the live session starts setting it, a warm-up
- * will be in this list and set 1 will pre-fill with the empty bar. Decide then
- * whether warm-ups seed warm-ups or are excluded outright — do not let it be
- * settled by omission.
+ * Warm-ups, drop sets and rest-pause sets are excluded outright: the list is
+ * what working set N starts from, and an empty bar or a drop set's lighter
+ * weight in position 1 would pre-fill the wrong number. Warm-ups seed from the
+ * warm-up before them instead — see seedForNewSet.
  */
 export async function getLastPerformance(
   exerciseId: string,
   excludeSessionId?: string
 ): Promise<LastPerformance | null> {
+  // Working sets only. A warm-up is the empty bar and a drop set is the
+  // lighter tail of a set; neither is what set 1 should start from next week.
   const where = [
     eq(sessionExercises.exerciseId, exerciseId),
     eq(sets.completed, true),
+    eq(sets.isWarmup, false),
+    eq(sets.setType, 'normal'),
     eq(workoutSessions.status, 'completed'),
   ];
   if (excludeSessionId) where.push(ne(workoutSessions.id, excludeSessionId));
@@ -241,7 +290,12 @@ export async function getLastPerformance(
     })
     .from(sets)
     .where(
-      and(eq(sets.sessionExerciseId, found.sessionExerciseId), eq(sets.completed, true))
+      and(
+        eq(sets.sessionExerciseId, found.sessionExerciseId),
+        eq(sets.completed, true),
+        eq(sets.isWarmup, false),
+        eq(sets.setType, 'normal')
+      )
     )
     .orderBy(asc(sets.setIndex));
 
@@ -274,9 +328,10 @@ export async function startRoutineWorkout(routineId: string): Promise<string> {
   });
 
   const rex = await getRoutineExercises(routineId);
+  const fallbackRest = await getDefaultRestSeconds();
   for (const [i, re] of rex.entries()) {
     const seId = newId('se');
-    const rest = re.restSeconds ?? 60;
+    const rest = re.restSeconds ?? fallbackRest;
     await db.insert(sessionExercises).values({
       id: seId,
       sessionId: id,
@@ -319,7 +374,7 @@ export async function addExerciseToSession(
     .where(eq(sessionExercises.sessionId, sessionId));
   const position = existing[0]?.n ?? 0;
   const seId = newId('se');
-  const rest = opts?.restSeconds ?? 60;
+  const rest = opts?.restSeconds ?? (await getDefaultRestSeconds());
   await db.insert(sessionExercises).values({
     id: seId,
     sessionId,
@@ -350,19 +405,24 @@ export async function addExerciseToSession(
 
 export async function addSet(
   sessionExerciseId: string,
-  defaults?: { reps?: number | null; weight?: number | null; weightUnit?: string }
+  defaults?: {
+    reps?: number | null
+    weight?: number | null
+    weightUnit?: string
+    isWarmup?: boolean
+    setType?: 'normal' | 'drop' | 'rp'
+  }
 ): Promise<WorkoutSet> {
-  const existing = await db
+  const block = await db
     .select()
     .from(sets)
     .where(eq(sets.sessionExerciseId, sessionExerciseId))
-    .orderBy(desc(sets.setIndex))
-    .limit(1);
-  const previous = existing[0];
+    .orderBy(asc(sets.setIndex));
+  const previous = block[block.length - 1];
   const setIndex = previous ? previous.setIndex + 1 : 0;
 
-  // Carrying from the set just logged wins; otherwise reach back to the last
-  // session, which is what makes the first set of an exercise pre-filled too.
+  // Carrying from this session wins; otherwise reach back to the last one,
+  // which is what makes the first set of an exercise pre-filled too.
   const owner = await db
     .select({ exerciseId: sessionExercises.exerciseId, sessionId: sessionExercises.sessionId })
     .from(sessionExercises)
@@ -372,12 +432,12 @@ export async function addSet(
     ? await getLastPerformance(owner[0].exerciseId, owner[0].sessionId)
     : null;
 
-  const seed = resolveSetSeed({
+  const setType = defaults?.setType ?? 'normal';
+  const isWarmup = defaults?.isWarmup ?? false;
+  const seed = seedForNewSet({
+    kind: isWarmup ? 'warmup' : setType === 'normal' ? 'working' : setType,
+    block,
     last: lastPerformance,
-    index: setIndex,
-    carryFrom: previous
-      ? { reps: previous.reps, weight: previous.weight, weightUnit: previous.weightUnit }
-      : null,
   });
 
   const row: WorkoutSet = {
@@ -388,7 +448,8 @@ export async function addSet(
     weight: defaults?.weight ?? seed.weight,
     weightUnit: defaults?.weightUnit ?? seed.weightUnit,
     completed: false,
-    isWarmup: false,
+    isWarmup,
+    setType,
     rpe: null,
   };
   await db.insert(sets).values(row);
@@ -397,7 +458,7 @@ export async function addSet(
 
 export async function updateSet(
   setId: string,
-  patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed' | 'isWarmup' | 'rpe'>>
+  patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed' | 'isWarmup' | 'setType' | 'rpe'>>
 ): Promise<void> {
   await db.update(sets).set(patch).where(eq(sets.id, setId));
 }
@@ -420,6 +481,59 @@ export async function completeSet(
 
 export async function deleteSet(setId: string): Promise<void> {
   await db.delete(sets).where(eq(sets.id, setId));
+}
+
+/** Takes an exercise, and its sets, out of today's session. */
+export async function removeSessionExercise(sessionExerciseId: string): Promise<void> {
+  await db.delete(sets).where(eq(sets.sessionExerciseId, sessionExerciseId));
+  await db.delete(sessionExercises).where(eq(sessionExercises.id, sessionExerciseId));
+}
+
+export async function setSessionExerciseNote(sessionExerciseId: string, note: string): Promise<void> {
+  await db
+    .update(sessionExercises)
+    .set({ notes: note.trim() || null })
+    .where(eq(sessionExercises.id, sessionExerciseId));
+}
+
+/**
+ * Swaps an exercise in today's session for another — bench taken, shoulder
+ * complaining.
+ *
+ * Sets already ticked stay as they were logged. The rest are re-seeded from
+ * the new exercise's own history: the old lift's weights say nothing about
+ * the new one, and pre-filling them would put a number on the bar nobody
+ * chose.
+ */
+export async function swapSessionExercise(sessionExerciseId: string, exerciseId: string): Promise<void> {
+  const owner = await db
+    .select({ sessionId: sessionExercises.sessionId })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.id, sessionExerciseId))
+    .limit(1);
+  if (!owner[0]) throw new Error('That exercise is no longer in the workout.');
+  await db.update(sessionExercises).set({ exerciseId }).where(eq(sessionExercises.id, sessionExerciseId));
+
+  const last = await getLastPerformance(exerciseId, owner[0].sessionId);
+  const block = await db
+    .select()
+    .from(sets)
+    .where(eq(sets.sessionExerciseId, sessionExerciseId))
+    .orderBy(asc(sets.setIndex));
+  let working = 0;
+  for (const set of block) {
+    const isWorking = !set.isWarmup && set.setType === 'normal';
+    if (set.completed) {
+      if (isWorking) working++;
+      continue;
+    }
+    const seed = isWorking ? resolveSetSeed({ last, index: working }) : { reps: null, weight: null, weightUnit: set.weightUnit ?? 'lb' };
+    if (isWorking) working++;
+    await db
+      .update(sets)
+      .set({ reps: seed.reps ?? set.reps, weight: seed.weight, weightUnit: seed.weightUnit })
+      .where(eq(sets.id, set.id));
+  }
 }
 
 export async function setSessionStatus(sessionId: string, status: SessionStatus): Promise<void> {

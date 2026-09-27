@@ -13,8 +13,11 @@
  */
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { getRestPrefs } from '@/db/rest-settings';
+import { DEFAULT_REST_SOUND, REST_SOUNDS, restChannelFor, soundSetting, type RestSound } from './rest-sounds';
 
 export const REST_CHANNEL_ID = 'rest_timer';
+
 export const REST_CATEGORY_ID = 'rest_timer';
 export const REST_ACTION_ADD_15 = 'rest_add_15';
 export const REST_ACTION_SKIP = 'rest_skip';
@@ -48,17 +51,7 @@ export function notificationsSupported(): boolean {
 export async function ensureRestNotificationSetup(): Promise<void> {
   if (!notificationsSupported() || setupDone) return;
 
-  if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(REST_CHANNEL_ID, {
-      name: 'Rest timer',
-      description: 'Alerts when your rest between sets is over',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 150, 250],
-      enableVibrate: true,
-      sound: 'default',
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    });
-  }
+  if (Platform.OS === 'android') await ensureRestChannel('default', true);
 
   // Category IDs must not contain `:` or `-` (expo-notifications).
   await Notifications.setNotificationCategoryAsync(REST_CATEGORY_ID, [
@@ -78,6 +71,47 @@ export async function ensureRestNotificationSetup(): Promise<void> {
   ]);
 
   setupDone = true;
+}
+
+/** Creates the channel for this combination if it does not exist yet. Idempotent. */
+async function ensureRestChannel(sound: RestSound, vibrate: boolean): Promise<string> {
+  const id = restChannelFor(sound, vibrate);
+  if (Platform.OS !== 'android') return id;
+  const label = REST_SOUNDS.find((s) => s.id === sound)!.label;
+  await Notifications.setNotificationChannelAsync(id, {
+    name: `Rest timer · ${label}${vibrate ? '' : ' · no vibration'}`,
+    description: 'Alerts when your rest between sets is over',
+    importance: Notifications.AndroidImportance.HIGH,
+    vibrationPattern: vibrate ? [0, 250, 150, 250] : null,
+    enableVibrate: vibrate,
+    sound: soundSetting(sound),
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+  });
+  return id;
+}
+
+/**
+ * Plays the chosen alert in two seconds, through the same channel a real rest
+ * uses, so what the user hears in Settings is what they will hear at the gym.
+ */
+export async function testRestAlert(sound: RestSound, vibrate: boolean): Promise<string | null> {
+  if (!notificationsSupported()) return 'Alerts only work on a phone.';
+  if ((await requestRestNotificationPermission()) !== 'granted') {
+    return 'Notifications are off for 128BIT FIT, so there is nothing to play. Turn them on in system Settings.';
+  }
+  const channelId = await ensureRestChannel(sound, vibrate);
+  const s = soundSetting(sound);
+  await Notifications.scheduleNotificationAsync({
+    identifier: 'bitfit-rest-test',
+    content: {
+      title: 'Rest over',
+      body: 'This is what the end of a rest sounds like.',
+      sound: s ?? false,
+      ...(Platform.OS === 'android' ? (vibrate ? { vibrate: [0, 250, 150, 250] } : {}) : {}),
+    },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: 2, channelId },
+  });
+  return null;
 }
 
 export type PermissionOutcome = 'granted' | 'denied' | 'undetermined';
@@ -124,6 +158,16 @@ export async function scheduleRestEndNotification(
   if (!notificationsSupported()) return null;
   await ensureRestNotificationSetup();
 
+  const prefs = await getRestPrefs().catch(() => null);
+  if (prefs && !prefs.lockScreen) {
+    // The in-app countdown still runs; the user asked for no OS alert.
+    await cancelRestNotification();
+    return null;
+  }
+  const sound = prefs?.sound ?? DEFAULT_REST_SOUND;
+  const vibrate = prefs?.vibrate ?? true;
+  const channelId = await ensureRestChannel(sound, vibrate);
+
   const remainingMs = endsAt - Date.now();
   if (remainingMs < 500) {
     // Too soon to schedule; caller still has in-app path.
@@ -146,13 +190,13 @@ export async function scheduleRestEndNotification(
     content: {
       title: 'Rest over',
       body: 'Time for your next set.',
-      sound: 'default',
+      sound: soundSetting(sound) ?? false,
       categoryIdentifier: REST_CATEGORY_ID,
       data,
       ...(Platform.OS === 'android'
         ? {
             priority: Notifications.AndroidNotificationPriority.HIGH,
-            vibrate: [0, 250, 150, 250],
+            ...(vibrate ? { vibrate: [0, 250, 150, 250] } : {}),
             color: '#ffffff',
           }
         : {
@@ -162,7 +206,7 @@ export async function scheduleRestEndNotification(
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds,
-      channelId: REST_CHANNEL_ID,
+      channelId,
     },
   });
 

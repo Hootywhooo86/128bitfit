@@ -9,7 +9,7 @@ import {
 } from '@/db/workout-queries';
 import { useWorkoutEnergy } from '@/lib/health/use-workout-energy';
 import type { EnergyResult } from '@/lib/workout-energy';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 function formatDuration(ms: number): string {
   const sec = Math.floor(ms / 1000);
@@ -180,7 +180,7 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   hero: { color: colors.accent, fontSize: 28, fontWeight: '800' },
@@ -250,4 +250,4 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   btnText: { color: colors.chipActiveText, fontWeight: '800', textAlign: 'center', fontSize: 16 },
-});
+}));

@@ -21,7 +21,7 @@
  * round trips and a much slower failure — see shouldTryNextModel.
  */
 import { getAiRuntimeConfig } from '@/db/ai-settings';
-import { AiCoachError, coachChat, type ChatMessage } from './ai-coach';
+import { AiCoachError, coachChat, type ChatMessage, type WebSearchOutcome } from './ai-coach';
 import { buildHfVisionChain, fallbackChain, shouldTryNextModel, type ChainEntry } from './ai-fallback';
 import { listHfModels } from './hf-models';
 
@@ -32,6 +32,7 @@ export type VisionAttempt = {
   content: string;
   /** Models that were out of credit or too busy, in the order they were tried. */
   skipped: { model: string; reason: string }[];
+  web: WebSearchOutcome;
 };
 
 /**
@@ -64,7 +65,8 @@ export async function hfVisionChain(
  */
 export async function callWithRotation(
   messages: ChatMessage[],
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  opts: { webSearch?: boolean } = {}
 ): Promise<VisionAttempt> {
   const cfg = await getAiRuntimeConfig();
   if (!cfg.apiKey) throw new AiCoachError('No AI key set.', 401);
@@ -77,11 +79,12 @@ export async function callWithRotation(
       baseUrl: cfg.baseUrl,
       signal,
       messages,
+      webSearch: opts.webSearch,
     });
 
   if (cfg.provider !== 'huggingface') {
     const res = await single(cfg.model);
-    return { model: cfg.model, family: cfg.provider, content: res.content, skipped: [] };
+    return { model: cfg.model, family: cfg.provider, content: res.content, skipped: [], web: res.web };
   }
 
   const chain = await hfVisionChain(cfg.apiKey, cfg.model, signal);
@@ -91,7 +94,7 @@ export async function callWithRotation(
   for (const entry of chain) {
     try {
       const res = await single(entry.id);
-      return { model: entry.id, family: entry.family, content: res.content, skipped };
+      return { model: entry.id, family: entry.family, content: res.content, skipped, web: res.web };
     } catch (e) {
       last = e;
       // A cancelled request is the user's decision, not a model running out.

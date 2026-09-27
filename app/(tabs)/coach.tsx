@@ -5,7 +5,7 @@ import { getAiSettings } from '@/db/ai-settings';
 import { Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { countCompletedSessions } from '@/db/workout-queries';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 const CARDS = [
   {
@@ -98,7 +98,7 @@ export default function CoachScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   emptyCard: {
     backgroundColor: colors.surface,
@@ -144,4 +144,4 @@ const styles = StyleSheet.create({
   cardTitle: { color: colors.accent, fontSize: 17, fontWeight: '800' },
   blurb: { color: colors.textMuted, lineHeight: 20, fontSize: 14 },
   cta: { color: colors.text, fontWeight: '700', marginTop: 4 },
-});
+}));

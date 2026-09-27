@@ -7,7 +7,7 @@
  *
  * Does not invent fake replies — errors surface to the UI.
  */
-import { AI_TIMEOUT_MS, fetchWithTimeout } from './net';
+import { AI_TIMEOUT_MS, AI_WEB_TIMEOUT_MS, fetchWithTimeout } from './net';
 import { describeKeyProblem } from './api-key';
 
 export type AiProviderId =
@@ -165,12 +165,41 @@ export function providerSupportsVision(
   return support === 'yes' || support === 'unknown';
 }
 
+/**
+ * Providers that can search the web themselves, on the user's own key.
+ *
+ * Each uses its provider's built-in search, so there is still no server of
+ * ours in the path. Hugging Face and custom endpoints have no equivalent.
+ */
+export const WEB_SEARCH_PROVIDERS: AiProviderId[] = ['anthropic', 'gemini', 'openai', 'openrouter'];
+
+export function providerCanSearchWeb(id: AiProviderId): boolean {
+  return WEB_SEARCH_PROVIDERS.includes(id);
+}
+
+/** A page the provider reported using. Taken from the API response, never from the model's text. */
+export type WebSource = { url: string; title: string | null };
+
+/**
+ * What happened to web search on one call.
+ *
+ * `on` with no sources means search was available and the model did not use
+ * it — which is not the same as having looked something up.
+ */
+export type WebSearchOutcome =
+  | { status: 'off' }
+  | { status: 'unsupported' }
+  | { status: 'failed'; message: string }
+  | { status: 'on'; sources: WebSource[] };
+
 export type CoachChatRequest = {
   provider: AiProviderId;
   apiKey: string;
   model: string;
   baseUrl?: string | null;
   messages: ChatMessage[];
+  /** Let the provider search the web. Ignored where it cannot. */
+  webSearch?: boolean;
   /** Abort / timeout via AbortSignal */
   signal?: AbortSignal;
 };
@@ -179,7 +208,19 @@ export type CoachChatResult = {
   content: string;
   provider: AiProviderId;
   model: string;
+  web: WebSearchOutcome;
 };
+
+type Reply = { text: string; sources: WebSource[] };
+
+function dedupeSources(sources: WebSource[]): WebSource[] {
+  const seen = new Set<string>();
+  return sources.filter((s) => {
+    if (!s.url || seen.has(s.url)) return false;
+    seen.add(s.url);
+    return true;
+  });
+}
 
 export class AiCoachError extends Error {
   status?: number;
@@ -195,13 +236,17 @@ const SYSTEM_PROMPT = `You are 128BIT FIT Coach — a practical fitness and nutr
 Rules:
 - Give actionable, concise coaching grounded in the user's local context (macros, workouts, weight, goals).
 - You are NOT a doctor. Do not diagnose, prescribe, or give medical advice. Suggest seeing a qualified professional for health concerns.
+- If the user reports pain or an injury, train around it — swap or skip what aggravates it. Do not write rehab programmes. If it has lasted more than a couple of weeks or is getting worse, point them to a physio.
 - Be careful with fasting, extreme deficits, or disordered-eating patterns: discourage unsafe restriction, encourage balanced fueling, and suggest professional help if distress around food/body image appears.
 - Prefer progressive training advice (form, recovery, progressive overload) over ego lifts.
 - Keep replies focused and scannable (short paragraphs or bullets). Avoid marketing fluff.
 - If context is sparse, ask one clarifying question and still give a useful default tip.`;
 
-export function buildSystemPrompt(): string {
-  return SYSTEM_PROMPT;
+const WEB_RULE = `
+- You can search the web. Use it for facts you would otherwise guess: a branded or meal-kit product's nutrition, a restaurant dish, a published study. Name where a figure came from. If you could not find it, say the number is your estimate.`;
+
+export function buildSystemPrompt(webSearch = false): string {
+  return webSearch ? SYSTEM_PROMPT + WEB_RULE : SYSTEM_PROMPT;
 }
 
 function stripTrailingSlash(url: string): string {
@@ -233,10 +278,80 @@ async function readErrorBody(res: Response): Promise<string> {
 
 async function chatOpenAiCompatible(
   req: CoachChatRequest,
-  baseUrl: string
-): Promise<string> {
+  baseUrl: string,
+  web: boolean
+): Promise<Reply> {
   const url = `${stripTrailingSlash(baseUrl)}/chat/completions`;
+  const body: Record<string, unknown> = {
+    model: req.model,
+    messages: req.messages.map((m) =>
+      m.image
+        ? {
+            role: m.role,
+            content: [
+              { type: 'text', text: m.content },
+              {
+                type: 'image_url',
+                image_url: { url: `data:${m.image.mimeType};base64,${m.image.base64}` },
+              },
+            ],
+          }
+        : { role: m.role, content: m.content }
+    ),
+    temperature: 0.6,
+  };
+  // OpenRouter's web plugin works with any model it routes to.
+  if (web) body.plugins = [{ id: 'web' }];
+
   const res = await fetchWithTimeout(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${req.apiKey}`,
+    },
+    body: JSON.stringify(body),
+    signal: req.signal,
+  }, { timeoutMs: AI_TIMEOUT_MS, label: 'Coach reply' });
+  if (!res.ok) {
+    throw new AiCoachError(await readErrorBody(res), res.status);
+  }
+  const data = (await res.json()) as {
+    choices?: {
+      message?: {
+        content?: string;
+        annotations?: { type?: string; url_citation?: { url?: string; title?: string } }[];
+      };
+    }[];
+  };
+  const message = data.choices?.[0]?.message;
+  const content = message?.content?.trim();
+  if (!content) throw new AiCoachError('Empty response from provider');
+  const sources = (message?.annotations ?? [])
+    .filter((a) => a.type === 'url_citation' && a.url_citation?.url)
+    .map((a) => ({ url: a.url_citation!.url!, title: a.url_citation!.title ?? null }));
+  return { text: content, sources: dedupeSources(sources) };
+}
+
+/**
+ * OpenAI with search goes through the Responses API: chat completions only
+ * searches on the dedicated search-preview models, which almost nobody has
+ * selected.
+ */
+async function chatOpenAiResponses(req: CoachChatRequest, baseUrl: string): Promise<Reply> {
+  const instructions = req.messages.find((m) => m.role === 'system')?.content;
+  const input = req.messages
+    .filter((m) => m.role !== 'system')
+    .map((m) => ({
+      role: m.role,
+      content: m.image
+        ? [
+            { type: 'input_text', text: m.content },
+            { type: 'input_image', image_url: `data:${m.image.mimeType};base64,${m.image.base64}` },
+          ]
+        : m.content,
+    }));
+
+  const res = await fetchWithTimeout(`${stripTrailingSlash(baseUrl)}/responses`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -244,38 +359,48 @@ async function chatOpenAiCompatible(
     },
     body: JSON.stringify({
       model: req.model,
-      messages: req.messages.map((m) =>
-        m.image
-          ? {
-              role: m.role,
-              content: [
-                { type: 'text', text: m.content },
-                {
-                  type: 'image_url',
-                  image_url: { url: `data:${m.image.mimeType};base64,${m.image.base64}` },
-                },
-              ],
-            }
-          : { role: m.role, content: m.content }
-      ),
-      temperature: 0.6,
+      instructions,
+      input,
+      tools: [{ type: 'web_search' }],
     }),
     signal: req.signal,
-  }, { timeoutMs: AI_TIMEOUT_MS, label: 'Coach reply' });
+  }, { timeoutMs: AI_WEB_TIMEOUT_MS, label: 'Coach reply' });
   if (!res.ok) {
     throw new AiCoachError(await readErrorBody(res), res.status);
   }
   const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
+    output?: {
+      type?: string;
+      content?: {
+        type?: string;
+        text?: string;
+        annotations?: { type?: string; url?: string; title?: string }[];
+      }[];
+    }[];
   };
-  const content = data.choices?.[0]?.message?.content?.trim();
-  if (!content) throw new AiCoachError('Empty response from provider');
-  return content;
+  const parts = (data.output ?? [])
+    .filter((o) => o.type === 'message')
+    .flatMap((o) => o.content ?? [])
+    .filter((c) => c.type === 'output_text' && c.text);
+  const text = parts.map((c) => c.text).join('').trim();
+  if (!text) throw new AiCoachError('Empty response from OpenAI');
+  const sources = parts
+    .flatMap((c) => c.annotations ?? [])
+    .filter((a) => a.type === 'url_citation' && a.url)
+    .map((a) => ({ url: a.url!, title: a.title ?? null }));
+  return { text, sources: dedupeSources(sources) };
 }
 
-async function chatAnthropic(req: CoachChatRequest): Promise<string> {
+type AnthropicBlock = {
+  type: string;
+  text?: string;
+  citations?: { type?: string; url?: string; title?: string }[];
+  content?: { type?: string; url?: string; title?: string }[] | unknown;
+};
+
+async function chatAnthropic(req: CoachChatRequest, web: boolean): Promise<Reply> {
   const system = req.messages.find((m) => m.role === 'system')?.content ?? '';
-  const msgs = req.messages
+  const msgs: { role: 'user' | 'assistant'; content: unknown }[] = req.messages
     .filter((m) => m.role !== 'system')
     .map((m) => ({
       role: m.role as 'user' | 'assistant',
@@ -294,37 +419,60 @@ async function chatAnthropic(req: CoachChatRequest): Promise<string> {
         : m.content,
     }));
 
-  const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': req.apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: req.model,
-      max_tokens: 1024,
-      system,
-      messages: msgs,
-    }),
-    signal: req.signal,
-  }, { timeoutMs: AI_TIMEOUT_MS, label: 'Coach reply' });
-  if (!res.ok) {
-    throw new AiCoachError(await readErrorBody(res), res.status);
+  const blocks: AnthropicBlock[] = [];
+  // A long search can stop with `pause_turn`; the documented way on is to send
+  // the partial turn back. Bounded so a provider bug cannot loop forever.
+  for (let round = 0; round < 3; round++) {
+    const res = await fetchWithTimeout('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': req.apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model: req.model,
+        max_tokens: web ? 2048 : 1024,
+        system,
+        messages: msgs,
+        ...(web ? { tools: [{ type: 'web_search_20250305', name: 'web_search', max_uses: 5 }] } : {}),
+      }),
+      signal: req.signal,
+    }, { timeoutMs: web ? AI_WEB_TIMEOUT_MS : AI_TIMEOUT_MS, label: 'Coach reply' });
+    if (!res.ok) {
+      throw new AiCoachError(await readErrorBody(res), res.status);
+    }
+    const data = (await res.json()) as { content?: AnthropicBlock[]; stop_reason?: string };
+    const content = data.content ?? [];
+    blocks.push(...content);
+    if (data.stop_reason !== 'pause_turn') break;
+    msgs.push({ role: 'assistant', content });
   }
-  const data = (await res.json()) as {
-    content?: { type: string; text?: string }[];
-  };
-  const text = data.content
-    ?.filter((c) => c.type === 'text' && c.text)
+
+  // With search on, one answer arrives as several text blocks split at each
+  // citation. Joining them with anything would corrupt a JSON reply.
+  const text = blocks
+    .filter((c) => c.type === 'text' && c.text)
     .map((c) => c.text)
-    .join('\n')
+    .join(web ? '' : '\n')
     .trim();
   if (!text) throw new AiCoachError('Empty response from Anthropic');
-  return text;
+
+  const cited = blocks.flatMap((b) =>
+    (b.citations ?? [])
+      .filter((c) => c.url)
+      .map((c) => ({ url: c.url!, title: c.title ?? null }))
+  );
+  // What it read but did not cite still counts as having looked something up.
+  const read = blocks
+    .filter((b) => b.type === 'web_search_tool_result' && Array.isArray(b.content))
+    .flatMap((b) => b.content as { type?: string; url?: string; title?: string }[])
+    .filter((r) => r.type === 'web_search_result' && r.url)
+    .map((r) => ({ url: r.url!, title: r.title ?? null }));
+  return { text, sources: dedupeSources(cited.length > 0 ? cited : read) };
 }
 
-async function chatGemini(req: CoachChatRequest): Promise<string> {
+async function chatGemini(req: CoachChatRequest, web: boolean): Promise<Reply> {
   const system = req.messages.find((m) => m.role === 'system')?.content;
   const contents = req.messages
     .filter((m) => m.role !== 'system')
@@ -345,30 +493,80 @@ async function chatGemini(req: CoachChatRequest): Promise<string> {
 
   const body: Record<string, unknown> = {
     contents,
-    generationConfig: { temperature: 0.6, maxOutputTokens: 1024 },
+    generationConfig: { temperature: 0.6, maxOutputTokens: web ? 2048 : 1024 },
   };
   if (system) {
     body.systemInstruction = { parts: [{ text: system }] };
   }
+  if (web) body.tools = [{ google_search: {} }];
 
   const res = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal: req.signal,
-  }, { timeoutMs: AI_TIMEOUT_MS, label: 'Coach reply' });
+  }, { timeoutMs: web ? AI_WEB_TIMEOUT_MS : AI_TIMEOUT_MS, label: 'Coach reply' });
   if (!res.ok) {
     throw new AiCoachError(await readErrorBody(res), res.status);
   }
   const data = (await res.json()) as {
-    candidates?: { content?: { parts?: { text?: string }[] } }[];
+    candidates?: {
+      content?: { parts?: { text?: string }[] };
+      groundingMetadata?: { groundingChunks?: { web?: { uri?: string; title?: string } }[] };
+    }[];
   };
-  const text = data.candidates?.[0]?.content?.parts
+  const candidate = data.candidates?.[0];
+  const text = candidate?.content?.parts
     ?.map((p) => p.text ?? '')
     .join('')
     .trim();
   if (!text) throw new AiCoachError('Empty response from Gemini');
-  return text;
+  const sources = (candidate?.groundingMetadata?.groundingChunks ?? [])
+    .filter((c) => c.web?.uri)
+    .map((c) => ({ url: c.web!.uri!, title: c.web!.title ?? null }));
+  return { text, sources: dedupeSources(sources) };
+}
+
+async function chatOnce(req: CoachChatRequest, web: boolean): Promise<Reply> {
+  switch (req.provider) {
+    case 'anthropic':
+      return chatAnthropic(req, web);
+    case 'gemini':
+      return chatGemini(req, web);
+    case 'openai': {
+      const base = req.baseUrl?.trim() || getProviderMeta('openai').defaultBaseUrl!;
+      return web ? chatOpenAiResponses(req, base) : chatOpenAiCompatible(req, base, false);
+    }
+    case 'openrouter': {
+      const base =
+        req.baseUrl?.trim() || getProviderMeta('openrouter').defaultBaseUrl!;
+      return chatOpenAiCompatible(req, base, web);
+    }
+    case 'huggingface': {
+      const base =
+        req.baseUrl?.trim() || getProviderMeta('huggingface').defaultBaseUrl!;
+      return chatOpenAiCompatible(req, base, false);
+    }
+    case 'custom': {
+      const base = req.baseUrl?.trim();
+      if (!base) throw new AiCoachError('Custom provider needs a base URL');
+      return chatOpenAiCompatible(req, base, false);
+    }
+    default:
+      throw new AiCoachError(`Unknown provider: ${req.provider as string}`);
+  }
+}
+
+/**
+ * Whether a failed search call is worth repeating without search.
+ *
+ * A request the provider rejected — search not enabled on the account, a
+ * model that cannot use the tool — gets the same answer without it. A bad
+ * key, an exhausted quota or a dropped connection would fail again anyway, and
+ * retrying would only double the wait before the honest error.
+ */
+export function searchRejected(status: number | undefined): boolean {
+  return status === 400 || status === 403 || status === 404 || status === 422;
 }
 
 /** Single-shot coach completion (no fake responses). */
@@ -384,42 +582,39 @@ export async function coachChat(req: CoachChatRequest): Promise<CoachChatResult>
     throw new AiCoachError('No model name configured');
   }
 
-  let content: string;
-  switch (req.provider) {
-    case 'anthropic':
-      content = await chatAnthropic(req);
-      break;
-    case 'gemini':
-      content = await chatGemini(req);
-      break;
-    case 'openai': {
-      const base = req.baseUrl?.trim() || getProviderMeta('openai').defaultBaseUrl!;
-      content = await chatOpenAiCompatible(req, base);
-      break;
-    }
-    case 'openrouter': {
-      const base =
-        req.baseUrl?.trim() || getProviderMeta('openrouter').defaultBaseUrl!;
-      content = await chatOpenAiCompatible(req, base);
-      break;
-    }
-    case 'huggingface': {
-      const base =
-        req.baseUrl?.trim() || getProviderMeta('huggingface').defaultBaseUrl!;
-      content = await chatOpenAiCompatible(req, base);
-      break;
-    }
-    case 'custom': {
-      const base = req.baseUrl?.trim();
-      if (!base) throw new AiCoachError('Custom provider needs a base URL');
-      content = await chatOpenAiCompatible(req, base);
-      break;
-    }
-    default:
-      throw new AiCoachError(`Unknown provider: ${req.provider as string}`);
+  const done = (reply: Reply, web: WebSearchOutcome): CoachChatResult => ({
+    content: reply.text,
+    provider: req.provider,
+    model: req.model,
+    web,
+  });
+
+  if (!req.webSearch) return done(await chatOnce(req, false), { status: 'off' });
+  if (!providerCanSearchWeb(req.provider)) {
+    return done(await chatOnce(req, false), { status: 'unsupported' });
   }
 
-  return { content, provider: req.provider, model: req.model };
+  try {
+    const reply = await chatOnce(req, true);
+    return done(reply, { status: 'on', sources: reply.sources });
+  } catch (e) {
+    if (req.signal?.aborted) throw e;
+    const status = e instanceof AiCoachError ? e.status : undefined;
+    if (!searchRejected(status)) throw e;
+    // Answer anyway, and say plainly that nothing was looked up.
+    const message = e instanceof Error ? e.message : String(e);
+    return done(await chatOnce(req, false), { status: 'failed', message });
+  }
+}
+
+/**
+ * A coach reply with the pages the provider reported reading, appended as
+ * plain text so they survive in the saved thread and in an export.
+ */
+export function withSources(content: string, web: WebSearchOutcome): string {
+  if (web.status !== 'on' || web.sources.length === 0) return content;
+  const lines = web.sources.slice(0, 5).map((s) => `• ${s.title ? `${s.title} — ` : ''}${s.url}`);
+  return `${content}\n\nSources:\n${lines.join('\n')}`;
 }
 
 export function defaultUserPromptForMode(

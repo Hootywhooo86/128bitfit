@@ -23,10 +23,10 @@ vi.mock('./index', () => ({ health: { getAvailability, getGrants, readDays } }))
 const { __resetTodayHealth, getTodayHealth, refreshTodayHealth, subscribeTodayHealth } =
   await import('./today-store');
 
-const connected = (steps: number | null) => {
+const connected = (steps: number | null, activeCalories: number | null = null) => {
   getAvailability.mockResolvedValue('available');
   getGrants.mockResolvedValue({ read: ['steps'], write: [] });
-  readDays.mockResolvedValue([{ date: '2026-09-24', steps }]);
+  readDays.mockResolvedValue([{ date: '2026-09-24', steps, activeCalories }]);
 };
 
 beforeEach(() => {
@@ -47,7 +47,7 @@ describe('the two places that show steps', () => {
     connected(8412);
     await refreshTodayHealth();
 
-    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 8412 });
+    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 8412, activeCalories: null });
     expect(home).toHaveBeenCalled();
     expect(card).toHaveBeenCalled();
   });
@@ -59,7 +59,7 @@ describe('the two places that show steps', () => {
 
     const late = vi.fn();
     subscribeTodayHealth(late);
-    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 300 });
+    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 300, activeCalories: null });
   });
 
   it('shares one read between callers that ask at the same moment', async () => {
@@ -73,7 +73,7 @@ describe('the two places that show steps', () => {
     await refreshTodayHealth();
     connected(900);
     await refreshTodayHealth();
-    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 900 });
+    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 900, activeCalories: null });
     expect(readDays).toHaveBeenCalledTimes(2);
   });
 });
@@ -86,7 +86,7 @@ describe('coming back to the app', () => {
 
     connected(4000);
     appStateListener?.('active');
-    await vi.waitFor(() => expect(getTodayHealth()).toEqual({ status: 'ready', steps: 4000 }));
+    await vi.waitFor(() => expect(getTodayHealth()).toEqual({ status: 'ready', steps: 4000, activeCalories: null }));
   });
 
   it('picks up a permission granted in the Health Connect app, which means leaving this one', async () => {
@@ -99,7 +99,7 @@ describe('coming back to the app', () => {
     connected(0);
     appStateListener?.('active');
     // 0 is a real reading, not a dash.
-    await vi.waitFor(() => expect(getTodayHealth()).toEqual({ status: 'ready', steps: 0 }));
+    await vi.waitFor(() => expect(getTodayHealth()).toEqual({ status: 'ready', steps: 0, activeCalories: null }));
   });
 
   it('ignores backgrounding, which cannot change the reading', async () => {
@@ -148,7 +148,7 @@ describe('when it cannot read', () => {
     getGrants.mockResolvedValue({ read: ['steps'], write: [] });
     readDays.mockResolvedValue([]);
     await refreshTodayHealth();
-    expect(getTodayHealth()).toEqual({ status: 'ready', steps: null });
+    expect(getTodayHealth()).toEqual({ status: 'ready', steps: null, activeCalories: null });
   });
 
   it('recovers on the next refresh after a failure', async () => {
@@ -158,7 +158,7 @@ describe('when it cannot read', () => {
 
     connected(77);
     await refreshTodayHealth();
-    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 77 });
+    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 77, activeCalories: null });
   });
 });
 
@@ -193,7 +193,7 @@ describe('a read that fails after permission was granted', () => {
 
     await refreshTodayHealth();
     // 'denied' here would send the user to fix a permission that is already on.
-    expect(getTodayHealth()).toEqual({ status: 'ready', steps: null });
+    expect(getTodayHealth()).toEqual({ status: 'ready', steps: null, activeCalories: null });
   });
 
   it('recovers the next time the read works', async () => {
@@ -204,7 +204,7 @@ describe('a read that fails after permission was granted', () => {
 
     connected(2200);
     await refreshTodayHealth();
-    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 2200 });
+    expect(getTodayHealth()).toEqual({ status: 'ready', steps: 2200, activeCalories: null });
   });
 });
 
@@ -220,7 +220,7 @@ describe('keeping the number fresh while the screen is open', () => {
       connected(250);
       await vi.advanceTimersByTimeAsync(60_000);
       expect(readDays).toHaveBeenCalledTimes(2);
-      expect(getTodayHealth()).toEqual({ status: 'ready', steps: 250 });
+      expect(getTodayHealth()).toEqual({ status: 'ready', steps: 250, activeCalories: null });
 
       await vi.advanceTimersByTimeAsync(60_000);
       expect(readDays).toHaveBeenCalledTimes(3);

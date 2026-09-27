@@ -13,7 +13,7 @@ import {
 import { distinctEquipment, distinctPrimaryMuscles, listExercises } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
 import { parseJsonArray } from '@/lib/exercise-images';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 export default function ExerciseLibraryScreen() {
   const [search, setSearch] = useState('');
@@ -139,7 +139,7 @@ function Chip({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   addBtn: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -190,4 +190,4 @@ const styles = StyleSheet.create({
   rowMeta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   chevron: { color: colors.accent, fontSize: 22, marginLeft: 8 },
   empty: { color: colors.textMuted, textAlign: 'center', marginTop: 40 },
-});
+}));

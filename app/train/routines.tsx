@@ -8,7 +8,7 @@ import {
   listRoutinesWithDetail,
   type RoutineListItem,
 } from '@/db/workout-queries';
-import { colors, fonts, spacing } from '@/lib/theme';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * The routines you have, and the only place they can be deleted.
@@ -142,7 +142,7 @@ export default function RoutinesScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 80, alignItems: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   name: { color: colors.text, fontSize: 15, fontFamily: fonts.bodySemi },
@@ -154,4 +154,4 @@ const s = StyleSheet.create({
   delT: { color: colors.danger, fontSize: 12.5, fontFamily: fonts.bodySemi },
   back: { marginTop: spacing.lg, alignItems: 'center' },
   backT: { color: colors.accent, fontSize: 12.5, fontFamily: fonts.bodySemi },
-});
+}));

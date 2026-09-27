@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { formatRestClock, useRestTimer } from '@/lib/rest-timer';
 
 export function RestTimerBar() {
@@ -33,7 +33,7 @@ export function RestTimerBar() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -60,4 +60,4 @@ const styles = StyleSheet.create({
   },
   skip: { borderColor: colors.accent },
   btnText: { color: colors.text, fontWeight: '700' },
-});
+}));

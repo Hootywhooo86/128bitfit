@@ -4,29 +4,34 @@ import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { DarkTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View } from 'react-native';
 import { OnboardingGate } from '@/components/OnboardingGate';
 import { DatabaseProvider } from '@/db/DatabaseProvider';
+import { useAccent } from '@/lib/accent';
 import { RestTimerProvider } from '@/lib/rest-timer';
 import { colors, fonts } from '@/lib/theme';
 
-const navTheme = {
-  ...DarkTheme,
-  colors: {
-    ...DarkTheme.colors,
-    background: colors.bg,
-    card: colors.surface,
-    text: colors.text,
-    border: colors.border,
-    primary: colors.accent,
-  },
-};
 
 export default function RootLayout() {
   // Silkscreen is the pixel face for labels and headers; Inter is body text.
   // Holding the first frame until they load avoids a flash of the system font
   // reflowing every label in the app.
+  const accent = useAccent();
+  const navTheme = useMemo(
+    () => ({
+      ...DarkTheme,
+      colors: {
+        ...DarkTheme.colors,
+        background: colors.bg,
+        card: colors.surface,
+        text: colors.text,
+        border: colors.border,
+        primary: accent,
+      },
+    }),
+    [accent]
+  );
   const [fontsReady] = useFonts({
     Silkscreen_400Regular,
     Silkscreen_700Bold,

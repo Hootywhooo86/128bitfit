@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
+import { REST_DEFAULT_SECONDS, getDefaultRestSeconds } from '@/db/rest-settings';
 import { distinctPrimaryMuscles, getExerciseById, listExercises } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
 import {
@@ -24,11 +25,10 @@ import {
   type RoutineDraftExercise,
 } from '@/db/workout-queries';
 import { clearNewExercise, takeNewExercise } from '@/lib/exercise-handoff';
-import { colors, fonts, spacing } from '@/lib/theme';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 const DEFAULT_SETS = 3;
 const DEFAULT_REPS = 10;
-const DEFAULT_REST = 90;
 
 type Row = RoutineDraftExercise & { name: string };
 
@@ -54,6 +54,11 @@ export default function BuildRoutineScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [defaultRest, setDefaultRest] = useState(REST_DEFAULT_SECONDS);
+
+  useEffect(() => {
+    void getDefaultRestSeconds().then(setDefaultRest).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!ready) return;
@@ -93,7 +98,7 @@ export default function BuildRoutineScreen() {
         name: exercise.name,
         targetSets: DEFAULT_SETS,
         targetReps: DEFAULT_REPS,
-        restSeconds: DEFAULT_REST,
+        restSeconds: defaultRest,
       },
     ]);
   };
@@ -425,7 +430,7 @@ function Chip({
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 80, alignItems: 'center' },
   input: {
     backgroundColor: colors.surface,
@@ -519,4 +524,4 @@ const s = StyleSheet.create({
   pickName: { color: colors.text, fontSize: 14.5, fontFamily: fonts.body },
   pickMeta: { color: colors.textDim, fontSize: 11.5, marginTop: 3, fontFamily: fonts.body },
   pickEmpty: { color: colors.textDim, fontSize: 12.5, textAlign: 'center', marginTop: 40 },
-});
+}));

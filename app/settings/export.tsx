@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import { runExport, type ExportResult } from '@/lib/export';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 
 function formatSize(bytes: number | null): string {
@@ -57,9 +57,10 @@ export default function ExportScreen() {
       <Stack.Screen options={{ title: 'Export data' }} />
 
       <Text style={styles.muted}>
-        Everything you have logged: workouts, sets, food, water, weight, settings and coach
-        threads. JSON is the complete, re-importable copy; the CSVs are one table each for
-        spreadsheets.
+        Everything you have logged: workouts, sets, food, water, weight, injury log, settings and
+        coach threads. JSON is the complete, re-importable copy; the CSVs are one table each for
+        spreadsheets. Progress photos are listed with where each file is on the phone; the
+        pictures themselves are not copied into the export.
       </Text>
       <Text style={styles.muted}>
         Bundled exercise and food reference data is left out — it ships with the app and is not
@@ -101,7 +102,7 @@ export default function ExportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   muted: { color: colors.textMuted, fontSize: 13, marginBottom: spacing.sm, lineHeight: 19 },
   section: {
@@ -132,4 +133,4 @@ const styles = StyleSheet.create({
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   fileName: { color: colors.text, fontWeight: '700', fontSize: 14 },
   link: { color: colors.accent, fontWeight: '700', fontSize: 13 },
-});
+}));

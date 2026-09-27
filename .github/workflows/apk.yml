@@ -18,6 +18,10 @@ jobs:
   apk:
     name: build and release
     runs-on: ubuntu-latest
+    # Inlined into the JS bundle, so the installed app knows which release it
+    # is and Settings -> Check for updates can compare it with the newest one.
+    env:
+      EXPO_PUBLIC_RELEASE_TAG: ${{ inputs.tag }}
     steps:
       - uses: actions/checkout@v4
 

@@ -1,9 +1,10 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Pressable,
   StyleSheet,
   Text,
@@ -16,21 +17,26 @@ import { insertCustomFood } from '@/db/barcode-queries';
 import { describeIngredients, fallbackRecipeName, recipeTotals } from '@/lib/recipe';
 import type { MealType } from '@/db/schema';
 import { MAX_RECIPE_PHOTOS, estimateFood, type AiPhoto } from '@/lib/ai-food-client';
+import { getAiSettings } from '@/db/ai-settings';
+import { getProviderMeta, providerCanSearchWeb, type WebSearchOutcome } from '@/lib/ai-coach';
 import { totalsOf, type AiFoodItem } from '@/lib/ai-food';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
 import { MealSlot } from '@/components/MealSlot';
 import { mealTimestamp, type MealDay } from '@/lib/meal-time';
 import { parseDayKey } from '@/lib/fuel-day';
-import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * Log a meal by describing it, or by photographing it.
  *
  * Both routes end at the same editable list. Nothing is saved until the user
- * has looked at the numbers, because a model estimating "some cottage cheese"
- * or a portion size from a photo is guessing — CLAUDE.md forbids presenting
- * that as a measurement, so the screen says "estimate" and lets every figure
- * be corrected.
+ * has looked at the numbers.
+ *
+ * Where the provider can search the web, a named product — a HelloFresh
+ * recipe, a chain's burrito — is looked up rather than guessed, and the
+ * screen shows which pages the provider reported reading. Anything without a
+ * source is labelled an estimate, because CLAUDE.md forbids presenting a
+ * guess as a measurement.
  */
 export default function AiFoodScreen() {
   const router = useRouter();
@@ -49,6 +55,13 @@ export default function AiFoodScreen() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [items, setItems] = useState<AiFoodItem[] | null>(null);
+  const [web, setWeb] = useState<WebSearchOutcome | null>(null);
+  const [providerLabel, setProviderLabel] = useState('');
+  /** Whether the provider can search the web at all. */
+  const [canSearch, setCanSearch] = useState(false);
+  const [providerName, setProviderName] = useState('');
+  /** Which Describe button is running, for its label. */
+  const [running, setRunning] = useState<'estimate' | 'lookup' | null>(null);
   const [mealDay, setMealDay] = useState<MealDay>(() => parseDayKey(params.day) ?? 'today');
   const [mealType, setMealType] = useState<MealType>(
     defaultMealTypeForHour(new Date().getHours())
@@ -56,26 +69,41 @@ export default function AiFoodScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const camera = useRef<CameraView>(null);
 
+  useEffect(() => {
+    void getAiSettings().then((a) => {
+      setCanSearch(providerCanSearchWeb(a.provider));
+      setProviderName(getProviderMeta(a.provider).label);
+    });
+  }, []);
+
   const handle = (out: Awaited<ReturnType<typeof estimateFood>>) => {
     if (out.status === 'ok') {
       setItems(out.items);
       setNote(out.note);
       setMealType(out.mealType);
+      setWeb(out.web);
+      setProviderLabel(out.providerLabel);
       setError(null);
       return;
     }
     setItems(null);
+    setWeb(null);
     setError(out.message);
   };
 
-  const runDescribe = async () => {
+  const noteFor = (it: AiFoodItem) =>
+    it.estimated ? 'AI estimate' : 'Web search';
+
+  const runDescribe = async (lookup: boolean) => {
     if (!text.trim() || busy) return;
     setBusy(true);
+    setRunning(lookup ? 'lookup' : 'estimate');
     setError(null);
     try {
-      handle(await estimateFood({ kind: 'describe', text }));
+      handle(await estimateFood({ kind: 'describe', text }, undefined, { webSearch: lookup }));
     } finally {
       setBusy(false);
+      setRunning(null);
     }
   };
 
@@ -175,7 +203,7 @@ export default function AiFoodScreen() {
         servings: ateNum(),
         mealType,
         loggedAt: mealTimestamp(mealType, mealDay),
-        notes: 'AI estimate',
+        notes: items.every((i) => !i.estimated) ? 'Web search' : 'AI estimate',
       });
       router.replace('/(tabs)/fuel');
     } catch (e) {
@@ -203,7 +231,7 @@ export default function AiFoodScreen() {
           protein: it.protein,
           fat: it.fat,
           carb: it.carb,
-          notes: 'AI estimate',
+          notes: noteFor(it),
         });
       }
       router.replace('/(tabs)/fuel');
@@ -240,6 +268,8 @@ export default function AiFoodScreen() {
         <Card>
           <Text style={s.help}>
             Write what you ate. Quantities help: “3 eggs, 2 slices of toast, 50 g cottage cheese”.
+            For a brand, meal kit or restaurant dish — “HelloFresh cheese tortellini with sun-dried
+            tomato pesto” — use Look up online to get its published numbers.
           </Text>
           <TextInput
             style={s.input}
@@ -250,13 +280,27 @@ export default function AiFoodScreen() {
             multiline
             editable={!busy}
           />
-          <Pressable
-            style={[s.primary, (busy || !text.trim()) && { opacity: 0.5 }]}
-            onPress={() => void runDescribe()}
-            disabled={busy || !text.trim()}
-          >
-            <Text style={s.primaryT}>{busy ? 'ESTIMATING…' : 'ESTIMATE'}</Text>
-          </Pressable>
+          <View style={s.row}>
+            <Pressable
+              style={[s.secondary, s.half, (busy || !text.trim()) && { opacity: 0.5 }]}
+              onPress={() => void runDescribe(false)}
+              disabled={busy || !text.trim()}
+            >
+              <Text style={s.secondaryT}>{running === 'estimate' ? 'Estimating…' : 'AI estimate'}</Text>
+            </Pressable>
+            <Pressable
+              style={[s.primary, s.half, (busy || !text.trim() || !canSearch) && { opacity: 0.5 }]}
+              onPress={() => void runDescribe(true)}
+              disabled={busy || !text.trim() || !canSearch}
+            >
+              <Text style={s.primaryT}>{running === 'lookup' ? 'LOOKING UP…' : 'LOOK UP ONLINE'}</Text>
+            </Pressable>
+          </View>
+          <Text style={s.modelNote}>
+            {canSearch
+              ? 'Estimate is quick and uses no web search. Look up online searches first and shows where the numbers came from — it can cost a little more on your key.'
+              : `${providerName || 'Your AI provider'} cannot search the web, so only Estimate is available. Anthropic, Google Gemini, OpenAI and OpenRouter can look things up.`}
+          </Text>
         </Card>
       ) : mode === 'recipe' ? null : !permission ? (
         <View style={s.center}>
@@ -385,17 +429,17 @@ export default function AiFoodScreen() {
 
       {items ? (
         <>
-          <Label>ESTIMATE — CHECK IT</Label>
-          <Note>
-            These are a model&apos;s estimates, not measurements. Portion sizes especially. Correct
-            anything that looks wrong before saving.
-          </Note>
+          <Label>{items.some((i) => !i.estimated) ? 'WEB SEARCH — CHECK IT' : 'ESTIMATE — CHECK IT'}</Label>
+          <Note>{lookupSummary(web, providerLabel, items)}</Note>
           {note ? <Text style={s.modelNote}>{note}</Text> : null}
 
           {items.map((it, i) => (
             <Card key={`${it.name}-${i}`}>
               <Text style={s.itemName}>{it.name}</Text>
               <Text style={s.itemPortion}>{it.portion}</Text>
+              <Text style={[s.tag, !it.estimated && s.tagSourced]}>
+                {it.estimated ? 'ESTIMATE' : 'WEB SEARCH'}
+              </Text>
               <View style={s.row}>
                 {(
                   [
@@ -433,6 +477,24 @@ export default function AiFoodScreen() {
               </Pressable>
             </Card>
           ))}
+
+          {web?.status === 'on' && web.sources.length > 0 ? (
+            <>
+              <Label>PAGES READ</Label>
+              <Card>
+                {web.sources.slice(0, 6).map((src) => (
+                  <Pressable key={src.url} onPress={() => void Linking.openURL(src.url)} style={s.srcRow}>
+                    <Text style={s.srcT} numberOfLines={1}>
+                      {src.title || src.url}
+                    </Text>
+                    <Text style={s.srcU} numberOfLines={1}>
+                      {hostOf(src.url)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </Card>
+            </>
+          ) : null}
 
           {totals ? (
             <>
@@ -505,7 +567,37 @@ export default function AiFoodScreen() {
   );
 }
 
-const s = StyleSheet.create({
+/** One honest sentence about where these numbers came from. */
+function lookupSummary(
+  web: WebSearchOutcome | null,
+  provider: string,
+  items: AiFoodItem[]
+): string {
+  const check = 'Check the portion before saving — every figure can be edited.';
+  const sourced = items.filter((i) => !i.estimated).length;
+  if (web?.status === 'on' && sourced > 0) {
+    return sourced === items.length
+      ? `Figures from the published nutrition the model found online. ${check}`
+      : `${sourced} of ${items.length} found online; the rest are the model's estimates. ${check}`;
+  }
+  if (web?.status === 'on') {
+    return `The model could search the web but found no published figures, so these are its estimates. ${check}`;
+  }
+  if (web?.status === 'failed') {
+    return `The web search did not run (${provider}: ${web.message}), so these are the model's estimates. ${check}`;
+  }
+  if (web?.status === 'unsupported') {
+    return `${provider} cannot search the web, so these are the model's estimates, not measurements. ${check}`;
+  }
+  return `These are the model's estimates, not measurements — nothing was looked up online. ${check}`;
+}
+
+function hostOf(url: string): string {
+  const m = url.match(/^https?:\/\/([^/]+)/i);
+  return m ? m[1].replace(/^www\./, '') : url;
+}
+
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 60, alignItems: 'center' },
   seg: { flexDirection: 'row', gap: 4, marginBottom: 12 },
   segBtn: {
@@ -556,8 +648,14 @@ const s = StyleSheet.create({
   err: { color: colors.danger, fontSize: 13, lineHeight: 19, fontFamily: fonts.body },
   modelNote: { color: colors.textDim, fontSize: 12, lineHeight: 18, marginBottom: 10, fontFamily: fonts.body },
   itemName: { color: colors.text, fontSize: 15, fontFamily: fonts.bodySemi },
-  itemPortion: { color: colors.textDim, fontSize: 12, marginTop: 3, marginBottom: 10, fontFamily: fonts.body },
+  itemPortion: { color: colors.textDim, fontSize: 12, marginTop: 3, marginBottom: 6, fontFamily: fonts.body },
+  tag: { fontFamily: fonts.pixel, fontSize: 7, letterSpacing: 1, color: colors.textDim, marginBottom: 10 },
+  tagSourced: { color: colors.accent },
+  srcRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
+  srcT: { color: colors.text, fontSize: 13, fontFamily: fonts.bodyMedium },
+  srcU: { color: colors.accent, fontSize: 11.5, marginTop: 2, fontFamily: fonts.body },
   row: { flexDirection: 'row', gap: 6 },
+  half: { flex: 1, marginTop: 12, marginBottom: 10 },
   count: { color: colors.textDim, fontSize: 12, textAlign: 'center', marginBottom: 8, fontFamily: fonts.body },
   input2: {
     backgroundColor: colors.surfaceAlt,
@@ -600,4 +698,4 @@ const s = StyleSheet.create({
   mealOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   mealT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textMuted, letterSpacing: 0.5 },
   mealTOn: { color: colors.onAccent },
-});
+}));

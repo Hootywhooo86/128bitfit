@@ -25,7 +25,7 @@ import {
   type AppSettings,
   type WeightUnit,
 } from '@/db/settings-queries';
-import { getProviderMeta, type AiProviderId } from '@/lib/ai-coach';
+import { getProviderMeta, providerCanSearchWeb, type AiProviderId } from '@/lib/ai-coach';
 import { explainFloor } from '@/lib/calorie-floor';
 import { HF_VISION_FAMILIES } from '@/lib/ai-fallback';
 import { AiKeyStoreError } from '@/lib/ai-secure';
@@ -41,9 +41,11 @@ import {
   type CalorieProfile,
   type Goal,
 } from '@/lib/body';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { HfModelPicker } from '@/components/HfModelPicker';
 import { Screen } from '@/components/ui';
+import { accentName } from '@/lib/accent';
+import { UpdateCard } from '@/components/UpdateCard';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -68,6 +70,7 @@ export default function SettingsScreen() {
   const [aiBaseUrl, setAiBaseUrl] = useState('');
   const [aiKeyDraft, setAiKeyDraft] = useState('');
   const [aiHasKey, setAiHasKey] = useState(false);
+  const [aiWebSearch, setAiWebSearch] = useState(true);
   const [clearKeyConfirm, setClearKeyConfirm] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -88,6 +91,7 @@ export default function SettingsScreen() {
     setAiModel(s.model);
     setAiBaseUrl(s.baseUrl);
     setAiHasKey(s.hasKey);
+    setAiWebSearch(s.webSearch);
     setAiKeyDraft('');
     setClearKeyConfirm(false);
   };
@@ -155,6 +159,7 @@ export default function SettingsScreen() {
         model: aiModel,
         baseUrl: aiBaseUrl,
         modelVision: aiModelVision,
+        webSearch: aiWebSearch,
       };
       if (aiKeyDraft.trim()) {
         aiPatch.apiKey = aiKeyDraft;
@@ -220,6 +225,14 @@ export default function SettingsScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.aiTitle}>Privacy & health data</Text>
           <Text style={styles.muted}>What is stored, what leaves the device →</Text>
+        </View>
+      </Pressable>
+
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/theme')}>
+        <View style={[styles.themeDot, { backgroundColor: colors.accent }]} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Theme colour</Text>
+          <Text style={styles.muted}>{accentName(colors.accent)} · free, all of them →</Text>
         </View>
       </Pressable>
 
@@ -375,6 +388,25 @@ export default function SettingsScreen() {
         </View>
         <Text style={styles.hint}>{providerMeta.hint}</Text>
 
+        <Pressable
+          style={[styles.toggleRow, { marginTop: spacing.md }]}
+          onPress={() => setAiWebSearch((v) => !v)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: aiWebSearch }}
+        >
+          <View style={{ flex: 1 }}>
+            <Text style={styles.toggleTitle}>Look things up online</Text>
+            <Text style={[styles.muted, { marginBottom: 0 }]}>
+              {providerCanSearchWeb(aiProvider)
+                ? `Lets the coach, meal photos and recipe links search the web for real figures instead of guessing. Describing a meal has its own Estimate and Look up online buttons either way. Searches can cost extra on your key.`
+                : `${providerMeta.label} cannot search the web, so food figures stay estimates. Anthropic, Google Gemini, OpenAI and OpenRouter can.`}
+            </Text>
+          </View>
+          <View style={[styles.switch, aiWebSearch && styles.switchOn]}>
+            <View style={[styles.knob, aiWebSearch && styles.knobOn]} />
+          </View>
+        </Pressable>
+
         <Text style={styles.label}>Model</Text>
         <TextInput
           style={styles.input}
@@ -463,6 +495,7 @@ export default function SettingsScreen() {
         <Text style={styles.saveText}>{saving ? 'Saving…' : savedFlash ? 'Saved' : 'Save'}</Text>
       </Pressable>
 
+      <UpdateCard />
 
       <View style={styles.aiCard}>
         <Text style={styles.aiTitle}>About / data licenses</Text>
@@ -526,7 +559,8 @@ function MaintenanceNote({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
+  themeDot: { width: 22, height: 22, borderRadius: 11 },
   browseBtn: { paddingVertical: 10 },
   browseText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
@@ -675,4 +709,4 @@ const styles = StyleSheet.create({
   },
   clearKeyConfirm: { borderColor: colors.danger },
   clearKeyText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
-});
+}));

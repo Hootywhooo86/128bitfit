@@ -10,6 +10,8 @@
  * - `off_food_cache` — a reconstructible cache of Open Food Facts lookups.
  *   Third-party ODbL content rather than anything the user wrote.
  * - `meta` — internal import/version bookkeeping.
+ * - Progress photo images — the rows are exported, with each file's path on
+ *   the phone; the pictures themselves stay where they are.
  *
  * API keys are never touched: they live in expo-secure-store, not in SQLite,
  * and nothing here reads them.
@@ -22,6 +24,8 @@ import {
   exercises,
   foodLogs,
   foods,
+  injuries,
+  progressPhotos,
   routineExercises,
   routines,
   sessionExercises,
@@ -103,6 +107,7 @@ export async function collectExport(): Promise<ExportTable[]> {
       weight_unit: sets.weightUnit,
       completed: sets.completed,
       is_warmup: sets.isWarmup,
+      set_type: sets.setType,
       rpe: sets.rpe,
     })
     .from(sets)
@@ -145,6 +150,8 @@ export async function collectExport(): Promise<ExportTable[]> {
     .select()
     .from(coachMessages)
     .orderBy(asc(coachMessages.createdAt));
+  const injuryRows = await db.select().from(injuries).orderBy(asc(injuries.startedAt));
+  const photoRows = await db.select().from(progressPhotos).orderBy(asc(progressPhotos.takenAt));
 
   return [
     {
@@ -205,6 +212,7 @@ export async function collectExport(): Promise<ExportTable[]> {
         'weight_unit',
         'completed',
         'is_warmup',
+        'set_type',
         'rpe',
       ],
       rows: setRows,
@@ -274,6 +282,24 @@ export async function collectExport(): Promise<ExportTable[]> {
         content: r.content,
         created_at: r.createdAt,
       })),
+    },
+    {
+      name: 'injuries',
+      columns: ['id', 'area', 'severity', 'notes', 'avoid', 'started_at', 'resolved_at'],
+      rows: injuryRows.map((r) => ({
+        id: r.id,
+        area: r.area,
+        severity: r.severity,
+        notes: r.notes,
+        avoid: r.avoid,
+        started_at: r.startedAt,
+        resolved_at: r.resolvedAt,
+      })),
+    },
+    {
+      name: 'progress_photos',
+      columns: ['id', 'pose', 'taken_at', 'file'],
+      rows: photoRows.map((r) => ({ id: r.id, pose: r.pose, taken_at: r.takenAt, file: r.uri })),
     },
   ];
 }

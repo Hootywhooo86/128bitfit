@@ -2,6 +2,7 @@ import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-rou
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   ScrollView,
@@ -12,11 +13,12 @@ import {
 } from 'react-native';
 import { distinctPrimaryMuscles, listExercises } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
-import { addExerciseToSession } from '@/db/workout-queries';
-import { colors, spacing } from '@/lib/theme';
+import { addExerciseToSession, swapSessionExercise } from '@/db/workout-queries';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 export default function AddExerciseScreen() {
-  const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
+  // `swap` is a session exercise to replace rather than add alongside.
+  const { sessionId, swap } = useLocalSearchParams<{ sessionId: string; swap?: string }>();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [muscle, setMuscle] = useState<string | null>(null);
@@ -58,8 +60,11 @@ export default function AddExerciseScreen() {
     if (!sid || adding) return;
     setAdding(exercise.id);
     try {
-      await addExerciseToSession(sid, exercise.id, { targetSets: 3, targetReps: 10 });
+      if (swap) await swapSessionExercise(swap, exercise.id);
+      else await addExerciseToSession(sid, exercise.id, { targetSets: 3, targetReps: 10 });
       router.back();
+    } catch (e) {
+      Alert.alert(swap ? 'Could not swap it' : 'Could not add it', e instanceof Error ? e.message : String(e));
     } finally {
       setAdding(null);
     }
@@ -67,7 +72,7 @@ export default function AddExerciseScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Add exercise' }} />
+      <Stack.Screen options={{ title: swap ? 'Swap exercise' : 'Add exercise' }} />
       <View style={styles.container}>
         <TextInput
           style={styles.search}
@@ -188,7 +193,7 @@ function Chip({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   search: {
     backgroundColor: colors.surface,
@@ -246,4 +251,4 @@ const styles = StyleSheet.create({
   },
   emptyBtnText: { color: colors.onAccent, fontWeight: '800', fontSize: 13 },
   emptyHint: { color: colors.textDim, fontSize: 12, textAlign: 'center', lineHeight: 17 },
-});
+}));

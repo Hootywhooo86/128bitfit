@@ -18,7 +18,7 @@ import {
 } from '@/db/food-queries';
 import { MEAL_TYPES, type Food, type FoodLog, type MealType } from '@/db/schema';
 import { formatGrams, formatKcal, formatOptionalGrams, nutrientsForServings, nutrientsPerServing } from '@/lib/nutrition';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -218,7 +218,7 @@ export default function EditFoodLogScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.md },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   title: { color: colors.text, fontSize: 22, fontWeight: '800' },
@@ -297,4 +297,4 @@ const styles = StyleSheet.create({
     borderColor: colors.danger,
   },
   removeBtnText: { color: colors.danger, fontWeight: '700' },
-});
+}));

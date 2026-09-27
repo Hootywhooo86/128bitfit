@@ -21,7 +21,7 @@ import { getExerciseById } from '@/db/queries';
 import { stageNewExercise } from '@/lib/exercise-handoff';
 import { identifyEquipment } from '@/lib/ai-exercise-client';
 import { MUSCLE_GROUPS, MUSCLE_LABELS, type MuscleGroup } from '@/lib/muscle-load';
-import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * Add an exercise, optionally by photographing the machine.
@@ -342,7 +342,7 @@ export default function NewExerciseScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 40, alignItems: 'center' },
   cam: { height: 320, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 10 },
   help: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 8, fontFamily: fonts.body },
@@ -392,4 +392,4 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryT: { color: colors.text, fontSize: 13, fontFamily: fonts.bodySemi },
-});
+}));

@@ -13,7 +13,7 @@ import {
   type NutrientLevel,
 } from '@/lib/micronutrients';
 import { describeFuelDay, parseDayKey } from '@/lib/fuel-day';
-import { colors, fonts, muscleHeat, spacing } from '@/lib/theme';
+import { colors, fonts, muscleHeat, spacing, themedStyles } from '@/lib/theme';
 
 type Window = 'day' | 'week' | 'month';
 /**
@@ -173,14 +173,14 @@ const levelText: Record<NutrientLevel, { color: string }> = {
   high: { color: muscleHeat.medium },
 };
 
-const levelFill: Record<NutrientLevel, { backgroundColor: string }> = {
+const levelFill = themedStyles((): Record<NutrientLevel, { backgroundColor: string }> => ({
   unknown: { backgroundColor: colors.border },
   low: { backgroundColor: muscleHeat.light },
   ok: { backgroundColor: colors.accent },
   high: { backgroundColor: muscleHeat.medium },
-};
+}));
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 60, alignItems: 'center' },
   seg: { flexDirection: 'row', gap: 6, marginBottom: spacing.sm },
   segBtn: {
@@ -202,4 +202,4 @@ const s = StyleSheet.create({
   rowPct: { color: colors.textDim, fontFamily: fonts.body },
   track: { height: 6, backgroundColor: colors.track, borderRadius: 3, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 3 },
-});
+}));

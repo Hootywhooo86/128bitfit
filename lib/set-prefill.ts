@@ -72,6 +72,55 @@ export function resolveSetSeed(opts: {
   return { reps, weight, weightUnit };
 }
 
+export type SetKind = 'working' | 'warmup' | 'drop' | 'rp';
+
+/** A set already in today's block for this exercise, in set order. */
+export type BlockSet = PrefillSet & { isWarmup: boolean; setType: 'normal' | 'drop' | 'rp' };
+
+const isWorking = (s: BlockSet) => !s.isWarmup && s.setType === 'normal';
+
+/**
+ * What a set added mid-session starts with.
+ *
+ * Warm-ups, drop sets and rest-pause sets are different lifts from the working
+ * sets and must not be mistaken for them in either direction:
+ *
+ * - A working set counts only working sets for its position, so two warm-ups
+ *   before set 1 do not make it pre-fill from last week's third set, and it
+ *   carries only from the previous working set, never a warm-up's empty bar.
+ * - A warm-up carries from the warm-up before it, or starts blank. Last week's
+ *   warm-ups are not recorded as history (see getLastPerformance), and a
+ *   working weight on a warm-up row would be the wrong number to confirm.
+ * - A drop or rest-pause set follows the set just done, so it starts from that
+ *   set's numbers for the user to step down from.
+ */
+export function seedForNewSet(opts: {
+  kind: SetKind;
+  block: BlockSet[];
+  last: LastPerformance | null;
+}): { reps: number | null; weight: number | null; weightUnit: string } {
+  const { kind, block, last } = opts;
+  const lastOf = (pick: (s: BlockSet) => boolean) => [...block].reverse().find(pick) ?? null;
+  const unit = (from: PrefillSet | null) =>
+    from?.weightUnit ?? lastOf(isWorking)?.weightUnit ?? last?.sets[0]?.weightUnit ?? DEFAULT_WEIGHT_UNIT;
+
+  if (kind === 'warmup') {
+    const prev = lastOf((s) => s.isWarmup);
+    return { reps: prev?.reps ?? null, weight: prev?.weight ?? null, weightUnit: unit(prev) };
+  }
+
+  if (kind === 'drop' || kind === 'rp') {
+    const prev = lastOf((s) => !s.isWarmup);
+    if (prev) return { reps: prev.reps, weight: prev.weight, weightUnit: unit(prev) };
+  }
+
+  return resolveSetSeed({
+    last,
+    index: block.filter(isWorking).length,
+    carryFrom: lastOf(isWorking),
+  });
+}
+
 /** "135 × 8" for the hint under an input, or null when there is nothing to show. */
 export function describePrefill(set: PrefillSet | null): string | null {
   if (!set) return null;

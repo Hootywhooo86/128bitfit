@@ -199,3 +199,18 @@ describe('a night with no reading', () => {
     expect(r.status).toBe('scored');
   });
 });
+
+describe('the legend bands', () => {
+  it('cover 0–100 with no gaps or overlaps, and agree with the grade', async () => {
+    const { READINESS_BANDS, gradeFromScore } = await import('./readiness');
+    expect(READINESS_BANDS[0].min).toBe(0);
+    expect(READINESS_BANDS[READINESS_BANDS.length - 1].max).toBe(100);
+    for (let i = 1; i < READINESS_BANDS.length; i++) {
+      expect(READINESS_BANDS[i].min).toBe(READINESS_BANDS[i - 1].max + 1);
+    }
+    for (const b of READINESS_BANDS) {
+      expect(gradeFromScore(b.min)).toBe(b.grade);
+      expect(gradeFromScore(b.max)).toBe(b.grade);
+    }
+  });
+});

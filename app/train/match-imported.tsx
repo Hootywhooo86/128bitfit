@@ -20,7 +20,7 @@ import {
   mergeExerciseInto,
   type UntaggedExercise,
 } from '@/db/workout-queries';
-import { colors, fonts, spacing } from '@/lib/theme';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * Say what an imported exercise actually was, so the muscle map can colour it.
@@ -217,7 +217,7 @@ function PickExercise({
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 80, alignItems: 'center' },
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   name: { color: colors.text, fontSize: 15, fontFamily: fonts.bodySemi },
@@ -261,4 +261,4 @@ const s = StyleSheet.create({
   pickName: { color: colors.text, fontSize: 14.5, fontFamily: fonts.body },
   pickMeta: { color: colors.textDim, fontSize: 11.5, marginTop: 3, fontFamily: fonts.body },
   empty: { color: colors.textDim, fontSize: 12.5, textAlign: 'center', marginTop: 40 },
-});
+}));

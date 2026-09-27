@@ -7,7 +7,7 @@ import { MuscleMap } from '@/components/MuscleMap';
 import { useDb } from '@/db/DatabaseProvider';
 import { getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';
 import { MUSCLE_LABELS, emptyTally, loadLevel, neglectedMuscles, rankMuscles, type MuscleTally, emptyRoles, type MuscleRoles } from '@/lib/muscle-load';
-import { colors, muscleHeat, spacing } from '@/lib/theme';
+import { colors, muscleHeat, spacing, themedStyles } from '@/lib/theme';
 
 const PERIODS = [7, 30, 90] as const;
 
@@ -110,7 +110,7 @@ export default function ProgressScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   center: { paddingVertical: spacing.xl, alignItems: 'center' },
   tabs: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
@@ -146,4 +146,4 @@ const styles = StyleSheet.create({
   rowSets: { color: colors.accent, fontWeight: '800', fontSize: 13 },
   hint: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   footnote: { color: colors.textMuted, fontSize: 11, lineHeight: 17, marginTop: spacing.md },
-});
+}));

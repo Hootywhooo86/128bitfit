@@ -1,10 +1,10 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 /**
- * Camera sheet for photographing a food.
+ * Camera sheet for taking a photo that stays on the phone.
  *
  * A modal rather than a route on purpose: handing a photo back from a pushed
  * screen means either setting params on a screen that is mid-transition or
@@ -17,10 +17,17 @@ export function PhotoCapture({
   visible,
   onCapture,
   onCancel,
+  subject = 'a food',
+  hint = 'A picture of the packet makes a custom food easy to recognise in the list later.',
+  facing = 'back',
 }: {
   visible: boolean;
   onCapture: (uri: string) => void;
   onCancel: () => void;
+  /** Finishes "Photographing … needs the camera." */
+  subject?: string;
+  hint?: string;
+  facing?: 'back' | 'front';
 }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [busy, setBusy] = useState(false);
@@ -56,7 +63,7 @@ export function PhotoCapture({
           <View style={styles.pad}>
             <Text style={styles.title}>Camera permission</Text>
             <Text style={styles.muted}>
-              Photographing a food needs the camera. The picture stays on this phone and is not
+              Photographing {subject} needs the camera. The picture stays on this phone and is not
               uploaded anywhere.
             </Text>
             <Pressable style={styles.primaryBtn} onPress={() => void requestPermission()}>
@@ -69,12 +76,10 @@ export function PhotoCapture({
         ) : (
           <>
             <View style={styles.cameraWrap}>
-              <CameraView ref={camera} style={StyleSheet.absoluteFill} facing="back" />
+              <CameraView ref={camera} style={StyleSheet.absoluteFill} facing={facing} />
             </View>
             <View style={styles.pad}>
-              <Text style={styles.muted}>
-                A picture of the packet makes a custom food easy to recognise in the list later.
-              </Text>
+              <Text style={styles.muted}>{hint}</Text>
               <Pressable
                 style={[styles.primaryBtn, busy && { opacity: 0.5 }]}
                 onPress={() => void capture()}
@@ -94,7 +99,7 @@ export function PhotoCapture({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   pad: { padding: spacing.lg, gap: spacing.sm },
@@ -118,4 +123,4 @@ const styles = StyleSheet.create({
   },
   secondaryBtnText: { color: colors.text, fontWeight: '700' },
   error: { color: colors.danger, lineHeight: 20 },
-});
+}));

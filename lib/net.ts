@@ -31,6 +31,9 @@ export const LOOKUP_TIMEOUT_MS = 8_000;
 /** A model reply. Long, because a slow answer is still a useful answer. */
 export const AI_TIMEOUT_MS = 60_000;
 
+/** A model reply that searches the web first — several fetches before it starts writing. */
+export const AI_WEB_TIMEOUT_MS = 120_000;
+
 export type WithTimeoutOptions = {
   timeoutMs?: number;
   /** An outer signal — a cancel button, or unmount. Composes with the deadline. */

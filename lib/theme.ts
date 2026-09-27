@@ -6,7 +6,11 @@
  * there disagree, the prototype is right.
  *
  * Monochrome. Colour only ever means data — see `muscleHeat` and `muscleRole`.
+ * The one exception is the accent, which the user picks (lib/accent.ts) and
+ * which is read live through the getters below.
  */
+import { accentVersion, currentAccent, currentOnAccent } from './accent';
+
 export const colors = {
   bg: '#000000',
   /** --card */
@@ -25,11 +29,21 @@ export const colors = {
   textMuted: '#8c8c8c',
   /** --dim: labels, captions, anything secondary to muted */
   textDim: '#575757',
-  accent: '#ffffff',
-  onAccent: '#000000',
+  /** User-selectable. Buttons, highlights, active tabs, progress fills, links — never data. */
+  get accent(): string {
+    return currentAccent();
+  },
+  /** Text drawn on the accent: black or white, whichever reads. */
+  get onAccent(): string {
+    return currentOnAccent();
+  },
   chip: '#171717',
-  chipActive: '#ffffff',
-  chipActiveText: '#000000',
+  get chipActive(): string {
+    return currentAccent();
+  },
+  get chipActiveText(): string {
+    return currentOnAccent();
+  },
   /** Over target. The prototype's --warn. */
   danger: '#ff4d6d',
 };
@@ -91,3 +105,32 @@ export const radius = {
  * like a stretched phone app.
  */
 export const CONTENT_MAX_WIDTH = 640;
+
+/**
+ * Styles that read the accent, rebuilt when it changes.
+ *
+ * `StyleSheet.create` runs once, when a file is first loaded, so a style
+ * written as `{ backgroundColor: colors.accent }` would keep whatever the
+ * accent was at launch. Wrapping the factory defers it to first use and
+ * rebuilds it on the first use after the accent changes.
+ */
+export function themedStyles<T extends object>(factory: () => T): T {
+  let built: T | null = null;
+  let builtFor = -1;
+  const current = (): T => {
+    if (!built || builtFor !== accentVersion()) {
+      built = factory();
+      builtFor = accentVersion();
+    }
+    return built;
+  };
+  return new Proxy({} as T, {
+    get: (_t, key) => current()[key as keyof T],
+    has: (_t, key) => key in current(),
+    ownKeys: () => Reflect.ownKeys(current()),
+    getOwnPropertyDescriptor: (_t, key) => {
+      const d = Object.getOwnPropertyDescriptor(current(), key);
+      return d ? { ...d, configurable: true } : undefined;
+    },
+  });
+}

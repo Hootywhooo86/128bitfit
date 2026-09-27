@@ -72,6 +72,10 @@ white.save(f'{OUT}/android-icon-monochrome.png')
 placed(512, 0.70).save(f'{OUT}/splash-icon.png')
 placed(196, 0.80, BG).convert('RGB').save(f'{OUT}/favicon.png')
 
+# Top bar: drawn at 16dp, so 48px covers a 3x screen. Decoding the 1408px
+# original on every screen to show it that small wasted a few MB each time.
+placed(48, 1.0).save('assets/brand/logo-topbar.png')
+
 for name in ('icon', 'android-icon-foreground', 'android-icon-background',
              'android-icon-monochrome', 'splash-icon', 'favicon'):
     im = Image.open(f'{OUT}/{name}.png')

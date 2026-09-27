@@ -6,7 +6,7 @@ import { useDb } from '@/db/DatabaseProvider';
 import { getRoutinePreview, type RoutinePreview } from '@/db/start-queries';
 import { getInProgressSession, startRoutineWorkout } from '@/db/workout-queries';
 import { routineSummary } from '@/lib/routine-summary';
-import { colors, fonts, spacing } from '@/lib/theme';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * See the whole routine before committing to it.
@@ -124,7 +124,7 @@ export default function RoutinePreviewScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 80, alignItems: 'center' },
   title: { color: colors.text, fontSize: 22, fontFamily: fonts.bodySemi },
   sub: { color: colors.textMuted, fontSize: 13, marginTop: 4, fontFamily: fonts.body },
@@ -139,4 +139,4 @@ const s = StyleSheet.create({
     marginTop: spacing.md,
   },
   startT: { fontFamily: fonts.pixel, fontSize: 11, color: colors.onAccent, letterSpacing: 1 },
-});
+}));

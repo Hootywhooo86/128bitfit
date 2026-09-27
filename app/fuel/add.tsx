@@ -32,7 +32,7 @@ import {
   parseNutrients,
 } from '@/lib/nutrition';
 import { OFF_LICENSE_NOTE } from '@/lib/open-food-facts';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 
 type RecentItem = {
@@ -306,7 +306,7 @@ export default function AddFoodScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   search: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -403,4 +403,4 @@ const styles = StyleSheet.create({
   },
   saveBtnDisabled: { opacity: 0.5 },
   saveBtnText: { color: colors.chipActiveText, fontWeight: '800', fontSize: 16 },
-});
+}));

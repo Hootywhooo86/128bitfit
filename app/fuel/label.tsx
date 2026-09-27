@@ -6,7 +6,7 @@ import { describeReading, parseNutritionLabel, type LabelField } from '@/lib/nut
 import { ocrAvailable, readTextFromImage } from '@/lib/ocr';
 import { guessProductName } from '@/lib/package-label';
 import { Screen } from '@/components/ui';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 const FIELD_LABELS: Record<LabelField, string> = {
   calories: 'Calories',
@@ -269,7 +269,7 @@ export default function ScanLabelScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   pad: { padding: spacing.lg, gap: spacing.sm },
@@ -336,4 +336,4 @@ const styles = StyleSheet.create({
   secondaryBtnText: { color: colors.text, fontWeight: '700' },
   error: { color: colors.danger, marginTop: 4, lineHeight: 20 },
   hint: { color: colors.textMuted, fontSize: 12, lineHeight: 18 },
-});
+}));

@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -15,20 +16,26 @@ import {
   addSet,
   completeSession,
   completeSet,
+  deleteSet,
   discardSession,
   loadActiveWorkout,
+  removeSessionExercise,
+  setSessionExerciseNote,
   updateSet,
   type ActiveWorkout,
   type SessionExerciseWithMeta,
 } from '@/db/workout-queries';
 import type { WorkoutSet } from '@/db/schema';
-import { getAppSettings } from '@/db/settings-queries';
+import { getAppSettings, type WeightUnit } from '@/db/settings-queries';
+import { exerciseImageUrl } from '@/lib/exercise-images';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
 import { describeLastPerformance } from '@/lib/set-prefill';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { formatElapsed, sessionStats } from '@/lib/session-stats';
+
+type SetPatch = Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed'>>;
 
 export default function ActiveWorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,88 +43,63 @@ export default function ActiveWorkoutScreen() {
   const timer = useRestTimer();
   const [workout, setWorkout] = useState<ActiveWorkout | null>(null);
   const [loading, setLoading] = useState(true);
-  const [elapsedMs, setElapsedMs] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   const [keepAwake, setKeepAwake] = useState(false);
+  const [units, setUnits] = useState<WeightUnit>('lb');
+  const [currentExerciseId, setCurrentExerciseId] = useState<string | null>(null);
 
   const sessionId = id ? decodeURIComponent(id) : '';
 
-  // Hold the screen only while this session is genuinely running. Starts false
-  // so the setting is read before anything is locked, and drops the moment the
-  // session stops being in progress — finishing and discarding both go through
-  // that state, so neither has to remember to release it.
   useSessionAwake(shouldKeepAwake(keepAwake, workout?.session.status));
 
   useEffect(() => {
     let alive = true;
-    getAppSettings()
+    void getAppSettings()
       .then((settings) => {
-        if (alive) setKeepAwake(settings.keepAwake);
+        if (!alive) return;
+        setKeepAwake(settings.keepAwake);
+        setUnits(settings.units);
       })
-      // A setting we could not read is not a reason to hold someone's screen on.
-      .catch(() => {});
+      .catch(() => undefined);
     return () => {
       alive = false;
     };
   }, []);
 
   const refresh = useCallback(async () => {
-    if (!sessionId) return;
-    const data = await loadActiveWorkout(sessionId);
-    setWorkout(data);
-    setLoading(false);
+    const w = await loadActiveWorkout(sessionId);
+    setWorkout(w);
+    if (!w) return;
+    // Keep the user's choice of current exercise across reloads; only pick one
+    // when there is none yet, or when the chosen one was removed or swapped out.
+    setCurrentExerciseId((prev) => {
+      if (prev && w.exercises.some((ex) => ex.id === prev)) return prev;
+      const firstOpen = w.exercises.find((ex) => ex.sets.some((s) => !s.completed));
+      return firstOpen?.id ?? w.exercises[0]?.id ?? null;
+    });
   }, [sessionId]);
 
   useFocusEffect(
     useCallback(() => {
-      void refresh();
+      setLoading(true);
+      refresh().finally(() => setLoading(false));
     }, [refresh])
   );
 
   useEffect(() => {
-    if (!workout?.session.startedAt) return;
-    const started = new Date(workout.session.startedAt).getTime();
-    const tick = () => setElapsedMs(Date.now() - started);
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [workout?.session.startedAt]);
-
-  // Flattened across every exercise: the header counts the session, not a block.
-  const stats = sessionStats(
-    (workout?.exercises ?? []).flatMap((se) =>
-      se.sets.map((st) => ({
-        completed: st.completed,
-        reps: st.reps,
-        weight: st.weight,
-        isWarmup: st.isWarmup,
-      }))
-    )
-  );
-
-  const onAddSet = async (se: SessionExerciseWithMeta) => {
-    await addSet(se.id);
-    await refresh();
-  };
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
   const onMarkComplete = async (
     se: SessionExerciseWithMeta,
     set: WorkoutSet,
-    values?: { reps?: number | null; weight?: number | null }
+    values: { reps: number | null; weight: number | null }
   ) => {
-    await completeSet(set.id, {
-      reps: values?.reps !== undefined ? values.reps : set.reps,
-      weight: values?.weight !== undefined ? values.weight : set.weight,
-    });
+    await completeSet(set.id, values);
+    if (values.weight != null) await updateSet(set.id, { weightUnit: units });
     const rest = se.restSeconds ?? DEFAULT_REST_SECONDS;
     timer.start(rest, se.id, sessionId);
-    await refresh();
-  };
-
-  const patchSet = async (
-    setId: string,
-    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed'>>
-  ) => {
-    await updateSet(setId, patch);
     await refresh();
   };
 
@@ -150,7 +132,17 @@ export default function ActiveWorkoutScreen() {
     ]);
   };
 
-  if (loading) {
+  /** Runs a write, then reloads; a failure is said, not swallowed. */
+  const act = async (work: () => Promise<unknown>) => {
+    try {
+      await work();
+    } catch (e) {
+      Alert.alert('That did not save', e instanceof Error ? e.message : String(e));
+    }
+    await refresh();
+  };
+
+  if (loading && !workout) {
     return (
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} />
@@ -169,6 +161,10 @@ export default function ActiveWorkoutScreen() {
     );
   }
 
+  const allSets = workout.exercises.flatMap((ex) => ex.sets);
+  const stats = sessionStats(allSets);
+  const elapsedMs = workout.session.startedAt ? now - workout.session.startedAt.getTime() : 0;
+
   return (
     <>
       <Stack.Screen
@@ -182,11 +178,6 @@ export default function ActiveWorkoutScreen() {
         }}
       />
       <View style={styles.container}>
-        {/*
-          The three numbers you glance at between sets. Elapsed used to be a
-          few small characters in the navigation title, which is the one of
-          the three you actually look at mid-session.
-        */}
         <View style={styles.stats}>
           <View style={styles.stat}>
             <Text style={styles.statV}>
@@ -199,7 +190,7 @@ export default function ActiveWorkoutScreen() {
               {stats.volume.toLocaleString()}
               {stats.volumePartial ? '+' : ''}
             </Text>
-            <Text style={styles.statL}>LB VOLUME</Text>
+            <Text style={styles.statL}>{units.toUpperCase()} VOLUME</Text>
           </View>
           <View style={styles.stat}>
             <Text style={styles.statV}>{formatElapsed(elapsedMs)}</Text>
@@ -207,19 +198,68 @@ export default function ActiveWorkoutScreen() {
           </View>
         </View>
         <RestTimerBar />
-        <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+        <ScrollView contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
           {workout.exercises.length === 0 ? (
             <Text style={styles.empty}>
               No exercises yet. Add one from the library to start logging sets.
             </Text>
           ) : (
-            workout.exercises.map((se) => (
-              <ExerciseBlock
+            workout.exercises.map((se, idx) => (
+              <ExerciseCard
                 key={se.id}
                 se={se}
-                onAddSet={() => onAddSet(se)}
-                onComplete={(set, values) => onMarkComplete(se, set, values)}
-                onPatch={patchSet}
+                index={idx}
+                total={workout.exercises.length}
+                units={units}
+                isCurrent={se.id === currentExerciseId}
+                onSetCurrent={() => setCurrentExerciseId(se.id)}
+                onHow={() => router.push({ pathname: '/exercise/[id]', params: { id: se.exerciseId } })}
+                onSwap={() =>
+                  router.push({ pathname: '/train/add-exercise', params: { sessionId, swap: se.id } })
+                }
+                onOptions={() =>
+                  Alert.alert(se.exerciseName, undefined, [
+                    {
+                      text: 'Remove from workout',
+                      style: 'destructive',
+                      onPress: () =>
+                        Alert.alert(
+                          'Remove this exercise?',
+                          se.sets.some((s) => s.completed)
+                            ? 'Its logged sets are deleted with it.'
+                            : 'It has no logged sets.',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            { text: 'Remove', style: 'destructive', onPress: () => void act(() => removeSessionExercise(se.id)) },
+                          ]
+                        ),
+                    },
+                    { text: 'Cancel', style: 'cancel' },
+                  ])
+                }
+                onSaveNote={(note) => void act(() => setSessionExerciseNote(se.id, note))}
+                onAddSet={() => void act(() => addSet(se.id))}
+                onAddWarmupSet={() => void act(() => addSet(se.id, { isWarmup: true }))}
+                onAddDropSet={() => void act(() => addSet(se.id, { setType: 'drop' }))}
+                onAddRestPause={() => void act(() => addSet(se.id, { setType: 'rp' }))}
+                onRemoveLastSet={() => {
+                  const last = se.sets[se.sets.length - 1];
+                  if (!last) return;
+                  if (!last.completed) return void act(() => deleteSet(last.id));
+                  Alert.alert('Remove the last set?', 'It is already logged — removing it deletes it.', [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Remove', style: 'destructive', onPress: () => void act(() => deleteSet(last.id)) },
+                  ]);
+                }}
+                onComplete={(set, values) => void onMarkComplete(se, set, values)}
+                onUncomplete={(set) => void act(() => updateSet(set.id, { completed: false }))}
+                onSave={(setId, patch) => {
+                  // Written straight through without a reload, so stepping a
+                  // weight never waits on the whole workout being re-read.
+                  void updateSet(setId, patch).catch((e) =>
+                    Alert.alert('That did not save', e instanceof Error ? e.message : String(e))
+                  );
+                }}
               />
             ))
           )}
@@ -243,225 +283,689 @@ export default function ActiveWorkoutScreen() {
   );
 }
 
-function ExerciseBlock({
+function ExerciseCard({
   se,
+  index,
+  total,
+  units,
+  isCurrent,
+  onSetCurrent,
+  onHow,
+  onSwap,
+  onOptions,
+  onSaveNote,
   onAddSet,
+  onAddWarmupSet,
+  onAddDropSet,
+  onAddRestPause,
+  onRemoveLastSet,
   onComplete,
-  onPatch,
+  onUncomplete,
+  onSave,
 }: {
   se: SessionExerciseWithMeta;
+  index: number;
+  total: number;
+  units: WeightUnit;
+  isCurrent: boolean;
+  onSetCurrent: () => void;
+  onHow: () => void;
+  onSwap: () => void;
+  onOptions: () => void;
+  onSaveNote: (note: string) => void;
   onAddSet: () => void;
-  onComplete: (
-    set: WorkoutSet,
-    values?: { reps?: number | null; weight?: number | null }
-  ) => void;
-  onPatch: (
-    setId: string,
-    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed'>>
-  ) => void;
+  onAddWarmupSet: () => void;
+  onAddDropSet: () => void;
+  onAddRestPause: () => void;
+  onRemoveLastSet: () => void;
+  onComplete: (set: WorkoutSet, values: { reps: number | null; weight: number | null }) => void;
+  onUncomplete: (set: WorkoutSet) => void;
+  onSave: (setId: string, patch: SetPatch) => void;
 }) {
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [note, setNote] = useState(se.notes ?? '');
+  const [imageFailed, setImageFailed] = useState(false);
+  const completedSets = se.sets.filter((s) => s.completed).length;
+  const totalSets = se.sets.length;
+  const allDone = completedSets === totalSets && totalSets > 0;
+  const stateChip = allDone ? 'DONE' : isCurrent ? 'CURRENT' : `${completedSets}/${totalSets}`;
   const lastLine = describeLastPerformance(se.lastPerformance);
-  return (
-    <View style={styles.card}>
-      <Text style={styles.exName}>{se.exerciseName}</Text>
-      <Text style={styles.exMeta}>Rest {se.restSeconds ?? 60}s</Text>
-      {lastLine ? (
-        // Says where the pre-filled numbers came from, so they read as last
-        // week's rather than as something already logged today.
-        <Text style={styles.exLast}>Last: {lastLine}</Text>
-      ) : (
-        <Text style={styles.exLast}>First time — no previous sets</Text>
-      )}
+  const lastDate = se.lastPerformance?.performedAt
+    ? new Date(se.lastPerformance.performedAt).toLocaleDateString([], { day: 'numeric', month: 'short' })
+    : null;
+  const primaryMuscle = se.primaryMuscles?.[0] ?? '';
+  const initials = se.exerciseName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase();
+  const imageUrl = imageFailed ? null : exerciseImageUrl(se.image);
+  const caption = [primaryMuscle.toUpperCase(), se.equipment?.toUpperCase()].filter(Boolean).join(' · ');
 
-      <View style={styles.setHeader}>
-        <Text style={[styles.col, styles.colSet]}>Set</Text>
-        <Text style={[styles.col, styles.colNum]}>lbs</Text>
-        <Text style={[styles.col, styles.colNum]}>Reps</Text>
-        <Text style={[styles.col, styles.colDone]}> </Text>
+  return (
+    <View style={[styles.card, isCurrent && styles.cardCurrent]}>
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardCounter}>
+          EXERCISE {index + 1} / {total}
+        </Text>
+        <Text style={[styles.stateChip, (isCurrent || allDone) && styles.stateChipCurrent]}>{stateChip}</Text>
       </View>
 
-      {se.sets.map((set) => (
-        <SetRow key={set.id} set={set} onComplete={(values) => onComplete(set, values)} onPatch={onPatch} />
-      ))}
+      <View style={styles.exTile}>
+        <View style={styles.exThumb}>
+          <Text style={styles.exThumbText}>{initials}</Text>
+        </View>
+        <Text style={styles.exName}>{se.exerciseName}</Text>
+      </View>
 
-      <Pressable style={styles.addSetBtn} onPress={onAddSet}>
-        <Text style={styles.addSetText}>+ Add set</Text>
-      </Pressable>
+      <View style={styles.chipRow}>
+        {primaryMuscle ? <Text style={styles.chip}>{primaryMuscle.toUpperCase()}</Text> : null}
+        {se.equipment ? <Text style={styles.chip}>{se.equipment.toUpperCase()}</Text> : null}
+        {se.best ? (
+          <Text style={styles.chip}>
+            Best {se.best.weight} {se.best.unit}
+          </Text>
+        ) : null}
+      </View>
+
+      <View style={styles.buttonRow}>
+        <Pressable style={styles.outlineBtn} onPress={onSwap}>
+          <Text style={styles.outlineBtnText}>⇄ Swap</Text>
+        </Pressable>
+        <Pressable style={styles.outlineBtn} onPress={onHow}>
+          <Text style={styles.outlineBtnText}>? How</Text>
+        </Pressable>
+        <Pressable style={styles.outlineBtn} onPress={onOptions}>
+          <Text style={styles.outlineBtnText}>⚙ Options</Text>
+        </Pressable>
+        {isCurrent ? (
+          <View style={styles.accentBtn}>
+            <Text style={styles.accentBtnText}>● Current</Text>
+          </View>
+        ) : (
+          <Pressable style={styles.outlineBtn} onPress={onSetCurrent}>
+            <Text style={styles.outlineBtnText}>Set current</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* The library's own picture of the movement, on the exercise in hand. */}
+      {isCurrent ? (
+        <Pressable style={styles.photoPanel} onPress={onHow}>
+          {imageUrl ? (
+            <Image
+              source={{ uri: imageUrl }}
+              style={styles.photoImage}
+              resizeMode="contain"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <View style={styles.photoPlaceholder}>
+              <Text style={styles.photoInitials}>{initials}</Text>
+            </View>
+          )}
+          {caption ? <Text style={styles.photoCaption}>{caption}</Text> : null}
+          <Text style={styles.photoHint}>Tap for how to do it</Text>
+        </Pressable>
+      ) : null}
+
+      <Text style={styles.lastLine}>
+        {lastLine ? `Last time${lastDate ? ` (${lastDate})` : ''}: ${lastLine}` : 'First time — no previous sets'}
+      </Text>
+
+      {se.notes && !noteOpen ? (
+        <Pressable onPress={() => setNoteOpen(true)}>
+          <Text style={styles.noteText}>✎ {se.notes}</Text>
+        </Pressable>
+      ) : null}
+      {noteOpen ? (
+        <TextInput
+          style={styles.noteInput}
+          value={note}
+          onChangeText={setNote}
+          placeholder="Seat height 4, pause at the bottom…"
+          placeholderTextColor={colors.textDim}
+          autoFocus
+          multiline
+          onBlur={() => {
+            setNoteOpen(false);
+            if (note.trim() !== (se.notes ?? '')) onSaveNote(note);
+          }}
+        />
+      ) : null}
+
+      <View style={styles.setHeader}>
+        <Text style={[styles.col, styles.colSet]}>SET</Text>
+        <Text style={[styles.col, styles.colNum]}>WEIGHT ({units.toUpperCase()})</Text>
+        <Text style={[styles.col, styles.colNum]}>REPS</Text>
+        <Text style={[styles.col, styles.colDone]} />
+      </View>
+
+      {se.sets.map((set, setIdx) => {
+        const workingBefore = se.sets
+          .slice(0, setIdx)
+          .filter((s) => !s.isWarmup && s.setType === 'normal').length;
+        const label = set.isWarmup
+          ? 'W'
+          : set.setType === 'drop'
+            ? 'D'
+            : set.setType === 'rp'
+              ? 'RP'
+              : String(workingBefore + 1);
+        return (
+          <SetRow
+            key={set.id}
+            set={set}
+            label={label}
+            step={units === 'kg' ? 2.5 : 5}
+            units={units}
+            onComplete={(values) => onComplete(set, values)}
+            onUncomplete={() => onUncomplete(set)}
+            onSave={onSave}
+          />
+        );
+      })}
+
+      <View style={styles.actionGrid}>
+        <Pressable style={styles.dashedBtn} onPress={() => setNoteOpen(true)}>
+          <Text style={styles.dashedBtnText}>{se.notes ? '✎ Edit note' : '+ Note'}</Text>
+        </Pressable>
+        <Pressable style={styles.dashedBtn} onPress={onAddWarmupSet}>
+          <Text style={styles.dashedBtnText}>+ Warm-up set</Text>
+        </Pressable>
+        <Pressable style={styles.dashedBtn} onPress={onAddSet}>
+          <Text style={styles.dashedBtnText}>+ Add set</Text>
+        </Pressable>
+        <Pressable style={styles.dashedBtn} onPress={onAddDropSet}>
+          <Text style={styles.dashedBtnText}>+ Drop set</Text>
+        </Pressable>
+        <Pressable style={styles.dashedBtn} onPress={onAddRestPause}>
+          <Text style={styles.dashedBtnText}>+ Rest-pause</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.dashedBtn, totalSets === 0 && { opacity: 0.4 }]}
+          onPress={onRemoveLastSet}
+          disabled={totalSets === 0}
+        >
+          <Text style={styles.dashedBtnText}>− Remove set</Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 function parseNum(text: string): number | null {
-  const t = text.trim();
+  const t = text.trim().replace(',', '.');
   if (t === '') return null;
   const n = Number(t);
-  return Number.isNaN(n) ? null : n;
+  return Number.isFinite(n) ? n : null;
 }
+
+const show = (n: number | null | undefined) => (n == null ? '' : String(n));
 
 function SetRow({
   set,
+  label,
+  step,
+  units,
   onComplete,
-  onPatch,
+  onUncomplete,
+  onSave,
 }: {
   set: WorkoutSet;
-  onComplete: (values: { reps?: number | null; weight?: number | null }) => void;
-  onPatch: (
-    setId: string,
-    patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'completed'>>
-  ) => void;
+  label: string;
+  step: number;
+  units: WeightUnit;
+  onComplete: (values: { reps: number | null; weight: number | null }) => void;
+  onUncomplete: () => void;
+  onSave: (setId: string, patch: SetPatch) => void;
 }) {
-  const [weightText, setWeightText] = useState(set.weight != null ? String(set.weight) : '');
-  const [repsText, setRepsText] = useState(set.reps != null ? String(set.reps) : '');
+  const [weight, setWeight] = useState(show(set.weight));
+  const [reps, setReps] = useState(show(set.reps));
 
-  useEffect(() => {
-    setWeightText(set.weight != null ? String(set.weight) : '');
-    setRepsText(set.reps != null ? String(set.reps) : '');
-  }, [set.weight, set.reps, set.id]);
+  // A reload that changes the stored numbers (a swap re-seeds them) must show
+  // through; typing does not trigger it because it only fires on a new value.
+  useEffect(() => setWeight(show(set.weight)), [set.weight]);
+  useEffect(() => setReps(show(set.reps)), [set.reps]);
 
-  const currentValues = () => {
-    const weight = parseNum(weightText);
-    const repsRaw = parseNum(repsText);
-    const reps = repsRaw == null ? null : Math.round(repsRaw);
-    return { weight, reps };
+  const saveWeight = (next: number | null) => {
+    setWeight(show(next));
+    onSave(set.id, { weight: next, weightUnit: units });
   };
-
-  const commit = async () => {
-    const { weight, reps } = currentValues();
-    await onPatch(set.id, { weight, reps });
+  const saveReps = (next: number | null) => {
+    setReps(show(next));
+    onSave(set.id, { reps: next });
   };
+  const round = (n: number) => Math.round(n * 100) / 100;
 
   return (
-    <View style={[styles.setRow, set.completed && styles.setRowDone]}>
-      <Text style={[styles.col, styles.colSet, set.completed && styles.doneText]}>
-        {set.setIndex + 1}
-      </Text>
-      <TextInput
-        style={[styles.input, styles.colNum]}
-        keyboardType="decimal-pad"
-        value={weightText}
-        onChangeText={setWeightText}
-        onBlur={commit}
-        placeholder="—"
-        placeholderTextColor={colors.textMuted}
-        editable={!set.completed}
-      />
-      <TextInput
-        style={[styles.input, styles.colNum]}
-        keyboardType="number-pad"
-        value={repsText}
-        onChangeText={setRepsText}
-        onBlur={commit}
-        placeholder="—"
-        placeholderTextColor={colors.textMuted}
-        editable={!set.completed}
-      />
+    <View style={[styles.setRow, set.isWarmup && styles.warmupRow, set.completed && styles.doneRow]}>
+      <Text style={[styles.col, styles.colSet, set.isWarmup && styles.warmText]}>{label}</Text>
+      <View style={[styles.col, styles.colNum, styles.numGroup]}>
+        <Pressable
+          style={styles.stepBtn}
+          hitSlop={4}
+          onPress={() => {
+            const n = parseNum(weight);
+            if (n != null) saveWeight(round(Math.max(0, n - step)));
+          }}
+        >
+          <Text style={styles.stepperBtn}>−</Text>
+        </Pressable>
+        <TextInput
+          style={styles.numInput}
+          value={weight}
+          onChangeText={setWeight}
+          onEndEditing={() => saveWeight(parseNum(weight))}
+          keyboardType="decimal-pad"
+          placeholder="–"
+          placeholderTextColor={colors.textDim}
+          selectTextOnFocus
+        />
+        <Pressable
+          style={styles.stepBtn}
+          hitSlop={4}
+          onPress={() => saveWeight(round((parseNum(weight) ?? 0) + step))}
+        >
+          <Text style={styles.stepperBtn}>+</Text>
+        </Pressable>
+      </View>
+      <View style={[styles.col, styles.colNum, styles.numGroup]}>
+        <Pressable
+          style={styles.stepBtn}
+          hitSlop={4}
+          onPress={() => {
+            const n = parseNum(reps);
+            if (n != null) saveReps(Math.max(0, n - 1));
+          }}
+        >
+          <Text style={styles.stepperBtn}>−</Text>
+        </Pressable>
+        <TextInput
+          style={styles.numInput}
+          value={reps}
+          onChangeText={setReps}
+          onEndEditing={() => saveReps(parseNum(reps))}
+          keyboardType="number-pad"
+          placeholder="–"
+          placeholderTextColor={colors.textDim}
+          selectTextOnFocus
+        />
+        <Pressable style={styles.stepBtn} hitSlop={4} onPress={() => saveReps((parseNum(reps) ?? 0) + 1)}>
+          <Text style={styles.stepperBtn}>+</Text>
+        </Pressable>
+      </View>
       <Pressable
-        style={[styles.check, set.completed && styles.checkOn]}
-        onPress={async () => {
-          if (set.completed) {
-            await onPatch(set.id, { completed: false });
-          } else {
-            onComplete(currentValues());
-          }
-        }}
+        style={[styles.tickCircle, set.completed && styles.tickOn]}
+        hitSlop={6}
+        accessibilityLabel={set.completed ? 'Un-tick set' : 'Log set'}
+        onPress={() =>
+          set.completed ? onUncomplete() : onComplete({ weight: parseNum(weight), reps: parseNum(reps) })
+        }
       >
-        <Text style={styles.checkText}>{set.completed ? '✓' : '○'}</Text>
+        <Text style={[styles.tickText, set.completed && styles.tickTextOn]}>✓</Text>
       </Pressable>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.bg,
+  },
+  muted: {
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  secondaryBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.textDim,
+    borderRadius: 6,
+  },
+  secondaryBtnText: {
+    color: colors.text,
+    fontWeight: '600',
+  },
   stats: {
     flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: 2,
+    justifyContent: 'space-around',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   stat: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingVertical: 11,
     alignItems: 'center',
-    gap: 3,
   },
-  statV: { color: colors.text, fontSize: 21, fontWeight: '700' },
-  statL: { color: colors.textDim, fontSize: 9.5, letterSpacing: 0.7, fontWeight: '700' },
-  container: { flex: 1, backgroundColor: colors.bg, paddingHorizontal: spacing.md, paddingTop: spacing.sm },
-  center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  muted: { color: colors.textMuted },
-  empty: { color: colors.textMuted, textAlign: 'center', marginTop: 40, paddingHorizontal: 24 },
+  statV: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  statL: {
+    fontSize: 11,
+    color: colors.textDim,
+    marginTop: 4,
+    letterSpacing: 0.5,
+  },
+  empty: {
+    color: colors.textDim,
+    textAlign: 'center',
+    paddingVertical: spacing.xl,
+  },
   card: {
     backgroundColor: colors.surface,
+    marginHorizontal: spacing.md,
+    marginVertical: spacing.sm,
+    padding: spacing.md,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.md,
+  },
+  cardCurrent: {
+    borderColor: colors.accent,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: spacing.md,
   },
-  exName: { color: colors.text, fontWeight: '800', fontSize: 16 },
-  exLast: { color: colors.textMuted, fontSize: 11, marginBottom: 4 },
-  exMeta: { color: colors.textMuted, fontSize: 12, marginBottom: spacing.sm, marginTop: 2 },
-  setHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  setRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  setRowDone: { opacity: 0.75 },
-  col: { color: colors.textMuted, fontSize: 12, fontWeight: '700' },
-  colSet: { width: 36, textAlign: 'center' },
-  colNum: { flex: 1, marginHorizontal: 4 },
-  colDone: { width: 40 },
-  input: {
-    backgroundColor: colors.surfaceAlt,
+  cardCounter: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textDim,
+    letterSpacing: 0.5,
+  },
+  stateChip: {
+    fontSize: 12,
+    fontWeight: '700',
+    backgroundColor: colors.textDim,
+    color: colors.bg,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  stateChipCurrent: {
+    backgroundColor: colors.accent,
+    color: colors.onAccent,
+  },
+  exTile: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  exThumb: {
+    width: 44,
+    height: 44,
+    backgroundColor: colors.textDim,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+  },
+  exThumbText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.bg,
+  },
+  exName: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    flexWrap: 'wrap',
+  },
+  chip: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text,
+    backgroundColor: colors.border,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    flexWrap: 'wrap',
+  },
+  outlineBtn: {
+    flex: 1,
+    minWidth: '45%',
+    paddingVertical: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 8,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  outlineBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: colors.text,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+  },
+  accentBtn: {
+    flex: 1,
+    minWidth: '45%',
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.accent,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  accentBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.onAccent,
+  },
+  photoPanel: {
+    backgroundColor: colors.border,
+    borderRadius: 8,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    alignItems: 'center',
+  },
+  photoPlaceholder: {
+    width: 100,
+    height: 100,
+    backgroundColor: colors.bg,
+    borderRadius: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  photoInitials: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.textDim,
+  },
+  photoHint: {
+    fontSize: 12,
+    color: colors.textDim,
+    marginTop: spacing.xs,
     textAlign: 'center',
   },
-  check: {
+  photoCaption: {
+    fontSize: 12,
+    color: colors.textDim,
+  },
+  photoImage: {
+    width: '100%',
+    height: 160,
+    marginBottom: spacing.sm,
+    backgroundColor: '#ffffff',
+    borderRadius: 6,
+  },
+  noteText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+  },
+  noteInput: {
+    fontSize: 14,
+    color: colors.text,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 6,
+    padding: spacing.sm,
+    marginBottom: spacing.md,
+    minHeight: 44,
+  },
+  lastLine: {
+    fontSize: 13,
+    color: colors.textDim,
+    marginBottom: spacing.md,
+  },
+  setHeader: {
+    flexDirection: 'row',
+    marginBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.xs,
+  },
+  col: {
+    flex: 1,
+  },
+  colSet: {
+    width: 30,
+    flex: 0,
+  },
+  colNum: {
+    flex: 1,
+  },
+  colDone: {
     width: 40,
-    height: 36,
+    flex: 0,
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  warmupRow: {
+    backgroundColor: colors.border,
+  },
+  warmText: {
+    color: colors.textDim,
+  },
+  doneRow: {
+    opacity: 0.75,
+  },
+  numGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  stepBtn: {
+    width: 34,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  checkOn: { backgroundColor: colors.track, borderColor: colors.accent },
-  checkText: { color: colors.accent, fontWeight: '800', fontSize: 16 },
-  doneText: { color: colors.accent },
-  addSetBtn: { marginTop: 8, paddingVertical: 8 },
-  addSetText: { color: colors.accent, fontWeight: '700', textAlign: 'center' },
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    padding: spacing.md,
+  stepperBtn: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: colors.accent,
+  },
+  numInput: {
+    flex: 1,
+    minWidth: 40,
+    textAlign: 'center',
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
     backgroundColor: colors.bg,
+    borderRadius: 4,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.xs,
+  },
+  tickCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 2,
+    borderColor: colors.borderBright,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.xs,
+  },
+  tickOn: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  tickText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textDim,
+  },
+  tickTextOn: {
+    color: colors.onAccent,
+  },
+  actionGrid: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginTop: spacing.md,
+    flexWrap: 'wrap',
+  },
+  dashedBtn: {
+    flex: 1,
+    minWidth: '45%',
+    paddingVertical: spacing.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  dashedBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  footer: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    gap: 8,
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   addBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
     backgroundColor: colors.accent,
-    borderRadius: 10,
-    paddingVertical: 14,
+    borderRadius: 6,
+    alignItems: 'center',
   },
-  addBtnText: { color: colors.chipActiveText, fontWeight: '800', textAlign: 'center', fontSize: 16 },
-  discardLink: { paddingVertical: 6 },
-  discardLinkText: { color: colors.danger, textAlign: 'center', fontWeight: '600' },
-  secondaryBtn: {
-    marginTop: 8,
-    padding: spacing.md,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
+  addBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.onAccent,
   },
-  secondaryBtnText: { color: colors.text, fontWeight: '700' },
-});
+  discardLink: {
+    paddingHorizontal: spacing.md,
+    justifyContent: 'center',
+  },
+  discardLinkText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textDim,
+  },
+}));

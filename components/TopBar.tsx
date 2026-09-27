@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '@/lib/theme';
 
@@ -35,7 +35,12 @@ export function TopBar({
       </View>
 
       <View style={s.mid}>
-        <Text style={s.ttl}>128BIT FIT</Text>
+        {/* Beside the wordmark, not above it: stacked, the three lines are
+            taller than the 62px bar and the section name was clipped. */}
+        <View style={s.brand}>
+          <Image source={require('@/assets/brand/logo-topbar.png')} style={s.logo} />
+          <Text style={s.ttl}>128BIT FIT</Text>
+        </View>
         <Text style={s.sub}>{section.toUpperCase()}</Text>
       </View>
 
@@ -64,6 +69,8 @@ const s = StyleSheet.create({
   btn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
   btnT: { color: colors.text, fontSize: 24, lineHeight: 28 },
   mid: { flex: 1, alignItems: 'center' },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+  logo: { width: 16, height: 16 },
   ttl: { fontFamily: fonts.pixel, fontSize: 12.5, letterSpacing: 1, color: colors.text },
   sub: {
     fontFamily: fonts.pixel,

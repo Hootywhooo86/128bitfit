@@ -20,7 +20,7 @@ import {
   listRecentWeightEntries,
   weightInKg,
 } from '@/db/weight-queries';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 import { healthWeight } from '@/lib/health/use-weight';
 import { formatKg, latestWeight, type WeightReading } from '@/lib/weight-source';
@@ -179,7 +179,7 @@ export default function WeightLogScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   center: {
     flex: 1,
@@ -246,4 +246,4 @@ const styles = StyleSheet.create({
   weight: { color: colors.accent, fontWeight: '800', fontSize: 18 },
   meta: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   deleteHint: { color: colors.textMuted, fontSize: 10 },
-});
+}));

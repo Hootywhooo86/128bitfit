@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { calorieRingState } from '@/lib/calorie-ring';
 import { formatKcal } from '@/lib/nutrition';
 
@@ -94,7 +94,7 @@ export function CalorieProgress({ consumed, target, compact }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   wrap: {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -134,4 +134,4 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   fillOver: { backgroundColor: colors.danger },
-});
+}));

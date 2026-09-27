@@ -2,7 +2,8 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import migrations from '../drizzle/migrations';
-import { colors, spacing } from '../lib/theme';
+import { colors, spacing, themedStyles } from '../lib/theme';
+import { loadAccent } from './accent-settings';
 import { db } from './client';
 import { ensureIndexes, getCounts, importBundledData, type ImportProgress } from './import';
 
@@ -44,6 +45,10 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
         const result = await importBundledData((p) => {
           if (!cancelled) setImportState(p);
         });
+        if (cancelled) return;
+        // Before the first screen draws, so it never flashes the default.
+        // A failed read keeps the default rather than blocking the app.
+        await loadAccent().catch(() => undefined);
         if (cancelled) return;
         setExerciseCount(result.exerciseCount);
         setFoodCount(result.foodCount);
@@ -121,7 +126,7 @@ export function DatabaseProvider({ children }: { children: React.ReactNode }) {
   return <DbContext.Provider value={value}>{children}</DbContext.Provider>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   center: {
     flex: 1,
     backgroundColor: colors.bg,
@@ -158,4 +163,4 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: colors.accent,
   },
-});
+}));

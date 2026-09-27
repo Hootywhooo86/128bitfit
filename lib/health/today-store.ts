@@ -73,13 +73,17 @@ async function read(): Promise<void> {
   const day = today();
   try {
     const [reading] = await health.readDays(day, day);
-    publish({ status: 'ready', steps: reading?.steps ?? null });
+    publish({
+      status: 'ready',
+      steps: reading?.steps ?? null,
+      activeCalories: reading?.activeCalories ?? null,
+    });
   } catch {
     // Steps is granted — we just checked — so the connection is not the
     // problem and saying "Not connected" would send the user off to fix
     // something that is not broken. A granted scope that would not read is
     // "no reading", which the card already has copy for.
-    publish({ status: 'ready', steps: null });
+    publish({ status: 'ready', steps: null, activeCalories: null });
   }
 }
 

@@ -93,7 +93,14 @@
         "expo-notifications",
         {
           "color": "#ffffff",
-          "defaultChannel": "rest_timer"
+          "defaultChannel": "rest_timer",
+          "sounds": [
+            "./assets/sounds/rest_beep.wav",
+            "./assets/sounds/rest_chime.wav",
+            "./assets/sounds/rest_bell.wav",
+            "./assets/sounds/rest_arcade.wav",
+            "./assets/sounds/rest_buzz.wav"
+          ]
         }
       ],
       "expo-secure-store",

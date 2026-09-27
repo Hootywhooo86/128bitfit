@@ -22,7 +22,7 @@ import { MealSlot } from '@/components/MealSlot';
 import { mealTimestamp, type MealDay } from '@/lib/meal-time';
 import { parseDayKey } from '@/lib/fuel-day';
 import type { LabelReading } from '@/lib/nutrition-label';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 
 function parseOptionalNumber(raw: string): number | null {
@@ -340,7 +340,7 @@ function Field({
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   readBanner: {
     backgroundColor: colors.surface,
@@ -422,4 +422,4 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   saveText: { color: colors.chipActiveText, fontWeight: '800', fontSize: 16 },
-});
+}));

@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { deleteSession, listSessions, type SessionListItem } from '@/db/workout-queries';
-import { colors, fonts, spacing } from '@/lib/theme';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * Every workout logged, newest first, and the only place they can be deleted.
@@ -132,7 +132,7 @@ export default function HistoryScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 80, alignItems: 'center' },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
   date: { color: colors.text, fontSize: 15, fontFamily: fonts.bodySemi },
@@ -143,4 +143,4 @@ const s = StyleSheet.create({
   delT: { color: colors.danger, fontSize: 12.5, fontFamily: fonts.bodySemi },
   open: { marginTop: 10 },
   openT: { color: colors.accent, fontSize: 12.5, fontFamily: fonts.bodySemi },
-});
+}));

@@ -23,6 +23,7 @@ describe('reading a model reply', () => {
       protein: 19,
       fat: 16,
       carb: 1,
+      source: null,
       estimated: true,
     });
     expect(r.note).toBe('Portion sizes assumed standard.');
@@ -33,6 +34,25 @@ describe('reading a model reply', () => {
     if (r.status !== 'ok') throw new Error('expected ok');
     // Nothing downstream may treat these as measurements.
     expect(r.items.every((i) => i.estimated === true)).toBe(true);
+  });
+
+  it('counts an item as looked up only when the provider searched and the model named a source', () => {
+    const reply = JSON.stringify({
+      items: [
+        { name: 'Tortellini', portion: '1 serving', calories: 700, source: 'hellofresh.com' },
+        { name: 'Side salad', portion: '1 bowl', calories: 60, source: null },
+      ],
+    });
+    const searched = parseAiFood(reply, new Date(), true);
+    if (searched.status !== 'ok') throw new Error('expected ok');
+    expect(searched.items[0]).toMatchObject({ source: 'hellofresh.com', estimated: false });
+    expect(searched.items[1]).toMatchObject({ source: null, estimated: true });
+
+    // A model with no search can still write a site name. That is a claim,
+    // not a lookup, and stays an estimate.
+    const notSearched = parseAiFood(reply, new Date(), false);
+    if (notSearched.status !== 'ok') throw new Error('expected ok');
+    expect(notSearched.items.every((i) => i.estimated)).toBe(true);
   });
 
   it('picks the meal from the time of day', () => {
@@ -120,8 +140,8 @@ describe('failures say so plainly', () => {
 
 describe('totals', () => {
   const items: AiFoodItem[] = [
-    { name: 'a', portion: '1', calories: 100, protein: 10, fat: null, carb: 5, estimated: true },
-    { name: 'b', portion: '1', calories: 200, protein: 20, fat: null, carb: null, estimated: true },
+    { name: 'a', portion: '1', calories: 100, protein: 10, fat: null, carb: 5, source: null, estimated: true },
+    { name: 'b', portion: '1', calories: 200, protein: 20, fat: null, carb: null, source: null, estimated: true },
   ];
 
   it('adds what is there', () => {

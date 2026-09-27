@@ -25,19 +25,26 @@ export type AiSettings = {
    * have written down.
    */
   modelVision: boolean | null;
+  /**
+   * Let the provider search the web for nutrition figures and coach answers.
+   * On unless turned off: a search can cost extra on the user's own key.
+   */
+  webSearch: boolean;
 };
 
+const KEY_WEB_SEARCH = 'ai_web_search';
 const KEY_PROVIDER = 'ai_provider';
 const KEY_MODEL = 'ai_model';
 const KEY_BASE_URL = 'ai_base_url';
 const KEY_MODEL_VISION = 'ai_model_vision';
 
 export async function getAiSettings(): Promise<AiSettings> {
-  const [providerRaw, modelRaw, baseUrlRaw, visionRaw, hasKey] = await Promise.all([
+  const [providerRaw, modelRaw, baseUrlRaw, visionRaw, webRaw, hasKey] = await Promise.all([
     getSetting(KEY_PROVIDER),
     getSetting(KEY_MODEL),
     getSetting(KEY_BASE_URL),
     getSetting(KEY_MODEL_VISION),
+    getSetting(KEY_WEB_SEARCH),
     hasAiApiKey(),
   ]);
 
@@ -52,7 +59,7 @@ export async function getAiSettings(): Promise<AiSettings> {
   // '' means "typed by hand, nothing known" and is not the same as '0'.
   const modelVision = visionRaw === '1' ? true : visionRaw === '0' ? false : null;
 
-  return { provider, model, baseUrl, hasKey, modelVision };
+  return { provider, model, baseUrl, hasKey, modelVision, webSearch: webRaw !== '0' };
 }
 
 export async function updateAiSettings(patch: {
@@ -64,6 +71,7 @@ export async function updateAiSettings(patch: {
    * Pass null for a hand-typed model — that is "unknown", not "cannot".
    */
   modelVision?: boolean | null;
+  webSearch?: boolean;
   /** Pass undefined to leave unchanged; empty string clears. */
   apiKey?: string;
 }): Promise<AiSettings> {
@@ -80,6 +88,9 @@ export async function updateAiSettings(patch: {
   }
   if (patch.modelVision !== undefined) {
     await setSetting(KEY_MODEL_VISION, patch.modelVision == null ? '' : patch.modelVision ? '1' : '0');
+  }
+  if (patch.webSearch != null) {
+    await setSetting(KEY_WEB_SEARCH, patch.webSearch ? '1' : '0');
   }
   if (patch.baseUrl != null) {
     // Not trim(): a pasted address carries the same paste damage a pasted key
@@ -103,6 +114,7 @@ export async function getAiRuntimeConfig(): Promise<{
   baseUrl: string;
   apiKey: string | null;
   modelVision: boolean | null;
+  webSearch: boolean;
 }> {
   const settings = await getAiSettings();
   const apiKey = await getAiApiKey();
@@ -112,6 +124,7 @@ export async function getAiRuntimeConfig(): Promise<{
     baseUrl: settings.baseUrl,
     apiKey,
     modelVision: settings.modelVision,
+    webSearch: settings.webSearch,
   };
 }
 

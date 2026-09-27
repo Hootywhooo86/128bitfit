@@ -38,7 +38,11 @@ describe('deciding whether today can be read', () => {
 });
 
 describe('when subscribers should be woken', () => {
-  const ready = (steps: number | null): TodayHealth => ({ status: 'ready', steps });
+  const ready = (steps: number | null, activeCalories: number | null = null): TodayHealth => ({
+    status: 'ready',
+    steps,
+    activeCalories,
+  });
 
   it('holds a reading equal to itself, so a resume does not re-render everything', () => {
     expect(sameTodayHealth(ready(8412), ready(8412))).toBe(true);

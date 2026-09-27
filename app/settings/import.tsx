@@ -8,7 +8,7 @@ import { importExtras, type ExtrasOutcome } from '@/db/import-extras';
 import { importSets, type ImportOutcome } from '@/db/import-sets';
 import type { OpenGymReport } from '@/lib/import/opengym';
 import { parseImport, type ImportExtras, type ImportReport } from '@/lib/import/parse';
-import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * Import a training history from another app.
@@ -262,7 +262,7 @@ function ExtrasDone({ done }: { done: ExtrasOutcome }) {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 24, alignItems: 'center' },
   err: { color: colors.danger, fontSize: 13, lineHeight: 19, fontFamily: fonts.body },
   big: { color: colors.text, fontSize: 30, fontFamily: fonts.bodyBold, letterSpacing: -1 },
@@ -283,4 +283,4 @@ const s = StyleSheet.create({
     marginTop: 4,
   },
   primaryT: { fontFamily: fonts.pixel, fontSize: 10, color: colors.onAccent, letterSpacing: 1 },
-});
+}));

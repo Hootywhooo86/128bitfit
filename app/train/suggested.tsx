@@ -3,14 +3,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
+import { getDefaultRestSeconds } from '@/db/rest-settings';
 import { suggestWorkout, type WorkoutSuggestion } from '@/db/gap-queries';
 import { createRoutine, startRoutineWorkout } from '@/db/workout-queries';
 import { MUSCLE_LABELS, type MuscleGroup } from '@/lib/muscle-load';
-import { colors, fonts, spacing } from '@/lib/theme';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 const SETS = 3;
 const REPS = 10;
-const REST = 90;
 
 /**
  * A session built from the muscles you have not trained in the window.
@@ -43,13 +43,14 @@ export default function SuggestedWorkoutScreen() {
     if (!data || data.exercises.length === 0 || busy) return;
     setBusy(true);
     try {
+      const rest = await getDefaultRestSeconds();
       const routineId = await createRoutine({
         name: `Catch-up · ${new Date().toLocaleDateString()}`,
         exercises: data.exercises.map((s) => ({
           exerciseId: s.exercise.id,
           targetSets: SETS,
           targetReps: REPS,
-          restSeconds: REST,
+          restSeconds: rest,
           notes: null,
         })),
       });
@@ -145,7 +146,7 @@ export default function SuggestedWorkoutScreen() {
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   center: { paddingVertical: 80, alignItems: 'center' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: spacing.sm },
   chip: {
@@ -177,4 +178,4 @@ const s = StyleSheet.create({
     marginTop: spacing.sm,
   },
   secondaryT: { color: colors.text, fontSize: 13, fontFamily: fonts.bodySemi },
-});
+}));

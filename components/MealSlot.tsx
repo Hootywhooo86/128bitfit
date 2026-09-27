@@ -2,7 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MEAL_TYPES, type MealType } from '@/db/schema';
 import { describeMealTime, mealDayDate, mealTimestamp, type MealDay } from '@/lib/meal-time';
-import { colors, fonts, spacing } from '@/lib/theme';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 const LABELS: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -71,7 +71,7 @@ export function MealSlot({
   );
 }
 
-const s = StyleSheet.create({
+const s = themedStyles(() => StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: {
     backgroundColor: colors.surface,
@@ -93,4 +93,4 @@ const s = StyleSheet.create({
   },
   when: { color: colors.textMuted, fontSize: 12.5, fontFamily: fonts.body, flexShrink: 1 },
   toggle: { color: colors.textMuted, fontSize: 12.5, textDecorationLine: 'underline' },
-});
+}));

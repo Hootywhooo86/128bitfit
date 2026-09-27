@@ -2,7 +2,7 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTodaySteps } from '@/lib/health/use-health';
-import { colors, spacing } from '@/lib/theme';
+import { colors, spacing, themedStyles } from '@/lib/theme';
 
 /**
  * Steps on Home.
@@ -112,7 +112,7 @@ export function StepsCard() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => StyleSheet.create({
   wrap: {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -130,4 +130,4 @@ const styles = StyleSheet.create({
   source: { color: colors.textMuted, fontSize: 11 },
   link: { color: colors.accent, fontWeight: '700', fontSize: 13 },
   why: { color: colors.textMuted, fontSize: 12, textDecorationLine: 'underline', marginTop: 2 },
-});
+}));
