@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +12,13 @@ import {
 } from 'react-native';
 import { getExerciseById } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
-import { exerciseImageUrl, parseJsonArray } from '@/lib/exercise-images';
+import {
+  REPDB_CREDIT,
+  REPDB_URL,
+  exerciseImageSource,
+  isRepdbExercise,
+  parseJsonArray,
+} from '@/lib/exercise-images';
 import { isUserExercise } from '@/lib/exercise-sources';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 
@@ -50,8 +57,11 @@ export default function ExerciseDetailScreen() {
   const primary = parseJsonArray(exercise.primaryMuscles);
   const secondary = parseJsonArray(exercise.secondaryMuscles);
   const instructions = parseJsonArray(exercise.instructions);
-  const images = parseJsonArray(exercise.images);
-  const imageUrl = exerciseImageUrl(images[0]);
+  // Start and end of the movement, where there are two.
+  const sources = parseJsonArray(exercise.images)
+    .slice(0, 2)
+    .map(exerciseImageSource)
+    .filter((src): src is NonNullable<typeof src> => src != null);
 
   return (
     <>
@@ -74,8 +84,12 @@ export default function ExerciseDetailScreen() {
         }}
       />
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
-        {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.image} resizeMode="cover" />
+        {sources.length > 0 ? (
+          <View style={styles.imageRow}>
+            {sources.map((src, i) => (
+              <Image key={i} source={src} style={[styles.image, styles.imageHalf]} resizeMode="contain" />
+            ))}
+          </View>
         ) : (
           <View style={[styles.image, styles.imagePlaceholder]}>
             <Text style={styles.muted}>No image</Text>
@@ -88,6 +102,12 @@ export default function ExerciseDetailScreen() {
             .filter(Boolean)
             .join(' · ')}
         </Text>
+
+        {isRepdbExercise(exercise.id) ? (
+          <Pressable onPress={() => void Linking.openURL(REPDB_URL)} style={{ marginBottom: spacing.md }}>
+            <Text style={styles.credit}>{REPDB_CREDIT}</Text>
+          </Pressable>
+        ) : null}
 
         <Section title="Primary muscles" body={primary.join(', ') || '—'} />
         <Section title="Secondary muscles" body={secondary.join(', ') || '—'} />
@@ -128,6 +148,9 @@ const styles = themedStyles(() => StyleSheet.create({
     marginBottom: spacing.md,
   },
   imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  imageRow: { flexDirection: 'row', gap: spacing.sm },
+  imageHalf: { flex: 1, backgroundColor: '#ffffff' },
+  credit: { color: colors.textDim, fontSize: 12, textDecorationLine: 'underline' },
   name: { color: colors.text, fontSize: 22, fontWeight: '800', marginBottom: 4 },
   meta: { color: colors.textMuted, marginBottom: spacing.lg },
   sectionTitle: { color: colors.accent, fontWeight: '700', marginBottom: 6, fontSize: 14 },

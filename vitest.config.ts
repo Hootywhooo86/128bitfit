@@ -10,11 +10,15 @@ import { defineConfig } from 'vitest/config';
  */
 export default defineConfig({
   resolve: {
-    alias: { '@': path.resolve(__dirname, '.') },
+    alias: {
+      '@': path.resolve(__dirname, '.'),
+      // Tests always run against the empty bundle, built or not.
+      'repdb-generated': path.resolve(__dirname, 'lib/repdb-stub.ts'),
+    },
   },
   test: {
     include: ['**/*.test.ts'],
-    exclude: ['node_modules/**', 'android/**', 'ios/**'],
+    exclude: ['node_modules/**', 'android/**', 'ios/**', 'generated/**'],
     environment: 'node',
   },
 });

@@ -1,6 +1,7 @@
 import { count, eq, notInArray, sql } from 'drizzle-orm';
 import { PRESERVED_EXERCISE_CATEGORIES } from '@/lib/exercise-sources';
 import { PRESERVED_FOOD_SOURCES } from '@/lib/food-sources';
+import { REPDB } from 'repdb-generated';
 import { DATA_MANIFEST } from './data-manifest';
 import { db, sqlite } from './client';
 import { exercises, foods, meta } from './schema';
@@ -52,6 +53,16 @@ type FoodJson = {
 const META_IMPORT_VERSION = 'import_version';
 const META_EX_CHECKSUM = 'exercises_checksum';
 const META_FOOD_CHECKSUM = 'foods_checksum';
+/**
+ * RepDB exercises, when the build included them (scripts/build-repdb.mjs).
+ * Tracked separately from the manifest because they are not committed: a
+ * build with them and one without are both valid, and switching between the
+ * two must re-import rather than leave the table matching neither.
+ */
+const META_REPDB_CHECKSUM = 'repdb_checksum';
+
+/** Every bundled exercise this build ships: the committed catalogue plus RepDB's. */
+const expectedExerciseCount = () => DATA_MANIFEST.exercises.count + REPDB.exercises.length;
 
 async function getMeta(key: string): Promise<string | null> {
   const rows = await db.select().from(meta).where(eq(meta.key, key)).limit(1);
@@ -87,14 +98,16 @@ export async function needsImport(): Promise<boolean> {
   const version = await getMeta(META_IMPORT_VERSION);
   const exCs = await getMeta(META_EX_CHECKSUM);
   const foodCs = await getMeta(META_FOOD_CHECKSUM);
+  const repdbCs = (await getMeta(META_REPDB_CHECKSUM)) ?? 'none';
   if (
     version === DATA_MANIFEST.version &&
     exCs === DATA_MANIFEST.exercises.checksum &&
-    foodCs === DATA_MANIFEST.foods.checksum
+    foodCs === DATA_MANIFEST.foods.checksum &&
+    repdbCs === REPDB.checksum
   ) {
     const counts = await getCounts();
     if (
-      counts.exercises === DATA_MANIFEST.exercises.count &&
+      counts.exercises === expectedExerciseCount() &&
       counts.foods === DATA_MANIFEST.foods.count
     ) {
       return false;
@@ -134,7 +147,10 @@ export async function importBundledData(
   }
 
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const exerciseData = require('../assets/data/exercises.json') as ExerciseJson[];
+  const exerciseData = [
+    ...(require('../assets/data/exercises.json') as ExerciseJson[]),
+    ...REPDB.exercises,
+  ];
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const foodData = require('../assets/data/foods.json') as FoodJson[];
 
@@ -234,6 +250,7 @@ export async function importBundledData(
     await setMeta(META_IMPORT_VERSION, DATA_MANIFEST.version);
     await setMeta(META_EX_CHECKSUM, DATA_MANIFEST.exercises.checksum);
     await setMeta(META_FOOD_CHECKSUM, DATA_MANIFEST.foods.checksum);
+    await setMeta(META_REPDB_CHECKSUM, REPDB.checksum);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     report({ phase: 'error', message: `Import failed: ${message}` });

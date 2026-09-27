@@ -27,7 +27,7 @@ import {
 } from '@/db/workout-queries';
 import type { WorkoutSet } from '@/db/schema';
 import { getAppSettings, type WeightUnit } from '@/db/settings-queries';
-import { exerciseImageUrl } from '@/lib/exercise-images';
+import { exerciseImageSource } from '@/lib/exercise-images';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
@@ -340,7 +340,7 @@ function ExerciseCard({
     .map((w) => w[0])
     .join('')
     .toUpperCase();
-  const imageUrl = imageFailed ? null : exerciseImageUrl(se.image);
+  const imageSource = imageFailed ? null : exerciseImageSource(se.image);
   const caption = [primaryMuscle.toUpperCase(), se.equipment?.toUpperCase()].filter(Boolean).join(' · ');
 
   return (
@@ -393,9 +393,9 @@ function ExerciseCard({
       {/* The library's own picture of the movement, on the exercise in hand. */}
       {isCurrent ? (
         <Pressable style={styles.photoPanel} onPress={onHow}>
-          {imageUrl ? (
+          {imageSource ? (
             <Image
-              source={{ uri: imageUrl }}
+              source={imageSource}
               style={styles.photoImage}
               resizeMode="contain"
               onError={() => setImageFailed(true)}

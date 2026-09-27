@@ -13,6 +13,35 @@ Reference for the offline databases and where things live. The product brief is
 Optional and gitignored: `assets/exercises/` image files (~120 MB). Paths in the
 JSON still reference relative image names, so the app works without them.
 
+### RepDB (built, never committed)
+
+`scripts/build-repdb.mjs` adds [RepDB](https://github.com/RepDB/exercise-dataset)'s
+exercises that free-exercise-db does not already have (about 500 of 601, matched by
+normalised name) with their start/peak pictures resized to 256px (~3.3 MB). It fetches a
+pinned commit and writes `generated/repdb/` (gitignored): `exercises.json`, `images/`,
+and `index.ts`, which requires each image so Metro bundles them for offline use.
+
+- **Licence:** in-app use with the visible credit "Exercise data by RepDB (repdb.co)"
+  (Settings → About, the exercise detail screen, README); no republishing the dataset.
+  This repository is public, so the output must never be committed.
+- **Resolution:** code imports `repdb-generated`. Metro resolves it to
+  `generated/repdb/index.ts` when present and to `lib/repdb-stub.ts` (empty) otherwise;
+  TypeScript and vitest always see the stub. A plain checkout builds and tests with no
+  RepDB exercises.
+- **Mapping:** `scripts/repdb-map.mjs` maps RepDB's anatomical muscles and equipment
+  onto the app's vocabulary (what the muscle map draws and the library filters on). An
+  unmapped value fails the build rather than shipping an untagged exercise.
+- **Ids** are `repdb:<id>`, so they cannot collide with the catalogue. The import tracks
+  RepDB's checksum separately (`repdb_checksum` in `meta`), so a build with or without
+  it re-imports once and user-made exercises are preserved as before.
+- **CI:** `apk.yml` runs the script before building. `npm run verify:import` includes
+  the RepDB rows when they have been built.
+
+```bash
+node scripts/build-repdb.mjs                   # fetch the pinned commit
+node scripts/build-repdb.mjs --from ../repdb   # or use a local clone
+```
+
 Current counts and checksums live in `db/data-manifest.ts`.
 
 ## Regenerating

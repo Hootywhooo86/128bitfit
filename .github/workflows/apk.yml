@@ -48,6 +48,13 @@ jobs:
       # The datasets are bundled assets, not fetched at runtime. If they are
       # missing the app ships without its exercise or food database, so fail
       # here rather than produce a hollow APK.
+      # RepDB's ~500 extra exercises and their pictures. Built here rather than
+      # committed: its licence allows in-app use but not republishing the
+      # dataset, and this repository is public. Metro bundles generated/repdb
+      # when it exists, so this must run before the build.
+      - name: Build RepDB exercises
+        run: node scripts/build-repdb.mjs
+
       - name: Verify bundled data
         run: npm run verify:import
 

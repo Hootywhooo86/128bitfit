@@ -76,3 +76,12 @@ Not yet: AI meal photo, Health Connect, Wear OS.
 ## Platforms
 
 Primary target is **iOS / Android via Expo Go** (`npx expo start`). `expo-sqlite` web needs extra WASM/COOP setup; prefer a device or simulator for this slice.
+
+## Data credits
+
+- Exercises: [free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain).
+- Exercise data by [RepDB](https://repdb.co) — about 500 more exercises with pictures, added
+  to the APK at build time by `scripts/build-repdb.mjs`. RepDB's licence allows in-app use with
+  this credit and forbids republishing the dataset, so none of it is committed here.
+- Foods: [USDA FoodData Central](https://fdc.nal.usda.gov/) (public domain); barcode lookups
+  from [Open Food Facts](https://world.openfoodfacts.org/) (ODbL).
