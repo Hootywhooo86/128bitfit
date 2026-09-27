@@ -1,4 +1,5 @@
 import { getDayFuelSummary } from './food-queries';
+import { getTellCoach, listActiveInjuries } from './injury-queries';
 import { getAppSettings } from './settings-queries';
 import { getLatestWeightEntry, formatWeight } from './weight-queries';
 import { getLastCompletedWorkoutSummary } from './workout-queries';
@@ -55,11 +56,13 @@ export function coachModeLabel(mode: CoachMode): string {
 }
 
 export async function buildCoachContext(mode: CoachMode): Promise<CoachContextSummary> {
-  const [settings, fuel, lastWorkout, weight] = await Promise.all([
+  const [settings, fuel, lastWorkout, weight, tellCoach, hurts] = await Promise.all([
     getAppSettings(),
     getDayFuelSummary(new Date()),
     getLastCompletedWorkoutSummary(),
     getLatestWeightEntry(),
+    getTellCoach(),
+    listActiveInjuries(),
   ]);
 
   const today = {
@@ -143,6 +146,19 @@ export async function buildCoachContext(mode: CoachMode): Promise<CoachContextSu
     );
   } else {
     lines.push('', 'Recent weight: none logged yet');
+  }
+
+  if (tellCoach && hurts.length > 0) {
+    // What the user logged, in their words. The coach programs around it; it
+    // does not diagnose or prescribe rehab (see the system prompt).
+    lines.push(
+      '',
+      'Active pain/injury (user-reported, not a diagnosis — train around it, do not treat it):',
+      ...hurts.map(
+        (h) =>
+          `- ${h.area} (${h.severity})${h.avoid ? ` · avoiding: ${h.avoid}` : ''}${h.notes ? ` · worse with: ${h.notes}` : ''}`
+      )
+    );
   }
 
   const promptBlock = lines.filter((l) => l !== undefined).join('\n').trim();

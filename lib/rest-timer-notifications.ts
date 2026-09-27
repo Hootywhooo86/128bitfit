@@ -13,8 +13,21 @@
  */
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import { getRestPrefs } from '@/db/rest-settings';
 
 export const REST_CHANNEL_ID = 'rest_timer';
+
+/**
+ * One channel per sound/vibration combination. Android fixes a channel's sound
+ * and vibration when it is created, so a preference change has to move to a
+ * different channel — reconfiguring the existing one does nothing.
+ */
+export function restChannelFor(sound: boolean, vibrate: boolean): string {
+  if (sound && vibrate) return REST_CHANNEL_ID;
+  if (sound) return 'rest_timer_sound';
+  if (vibrate) return 'rest_timer_vibrate';
+  return 'rest_timer_silent';
+}
 export const REST_CATEGORY_ID = 'rest_timer';
 export const REST_ACTION_ADD_15 = 'rest_add_15';
 export const REST_ACTION_SKIP = 'rest_skip';
@@ -49,15 +62,22 @@ export async function ensureRestNotificationSetup(): Promise<void> {
   if (!notificationsSupported() || setupDone) return;
 
   if (Platform.OS === 'android') {
-    await Notifications.setNotificationChannelAsync(REST_CHANNEL_ID, {
-      name: 'Rest timer',
-      description: 'Alerts when your rest between sets is over',
-      importance: Notifications.AndroidImportance.HIGH,
-      vibrationPattern: [0, 250, 150, 250],
-      enableVibrate: true,
-      sound: 'default',
-      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-    });
+    for (const [sound, vibrate, name] of [
+      [true, true, 'Rest timer'],
+      [true, false, 'Rest timer (sound only)'],
+      [false, true, 'Rest timer (vibrate only)'],
+      [false, false, 'Rest timer (silent)'],
+    ] as const) {
+      await Notifications.setNotificationChannelAsync(restChannelFor(sound, vibrate), {
+        name,
+        description: 'Alerts when your rest between sets is over',
+        importance: Notifications.AndroidImportance.HIGH,
+        vibrationPattern: vibrate ? [0, 250, 150, 250] : null,
+        enableVibrate: vibrate,
+        sound: sound ? 'default' : null,
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+      });
+    }
   }
 
   // Category IDs must not contain `:` or `-` (expo-notifications).
@@ -124,6 +144,15 @@ export async function scheduleRestEndNotification(
   if (!notificationsSupported()) return null;
   await ensureRestNotificationSetup();
 
+  const prefs = await getRestPrefs().catch(() => null);
+  if (prefs && !prefs.lockScreen) {
+    // The in-app countdown still runs; the user asked for no OS alert.
+    await cancelRestNotification();
+    return null;
+  }
+  const sound = prefs?.sound ?? true;
+  const vibrate = prefs?.vibrate ?? true;
+
   const remainingMs = endsAt - Date.now();
   if (remainingMs < 500) {
     // Too soon to schedule; caller still has in-app path.
@@ -146,13 +175,13 @@ export async function scheduleRestEndNotification(
     content: {
       title: 'Rest over',
       body: 'Time for your next set.',
-      sound: 'default',
+      sound: sound ? 'default' : false,
       categoryIdentifier: REST_CATEGORY_ID,
       data,
       ...(Platform.OS === 'android'
         ? {
             priority: Notifications.AndroidNotificationPriority.HIGH,
-            vibrate: [0, 250, 150, 250],
+            ...(vibrate ? { vibrate: [0, 250, 150, 250] } : {}),
             color: '#ffffff',
           }
         : {
@@ -162,7 +191,7 @@ export async function scheduleRestEndNotification(
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds,
-      channelId: REST_CHANNEL_ID,
+      channelId: restChannelFor(sound, vibrate),
     },
   });
 

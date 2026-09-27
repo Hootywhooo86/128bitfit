@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
+import { REST_DEFAULT_SECONDS, getDefaultRestSeconds } from '@/db/rest-settings';
 import { distinctPrimaryMuscles, getExerciseById, listExercises } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
 import {
@@ -28,7 +29,6 @@ import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 const DEFAULT_SETS = 3;
 const DEFAULT_REPS = 10;
-const DEFAULT_REST = 90;
 
 type Row = RoutineDraftExercise & { name: string };
 
@@ -54,6 +54,11 @@ export default function BuildRoutineScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [picking, setPicking] = useState(false);
+  const [defaultRest, setDefaultRest] = useState(REST_DEFAULT_SECONDS);
+
+  useEffect(() => {
+    void getDefaultRestSeconds().then(setDefaultRest).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!ready) return;
@@ -93,7 +98,7 @@ export default function BuildRoutineScreen() {
         name: exercise.name,
         targetSets: DEFAULT_SETS,
         targetReps: DEFAULT_REPS,
-        restSeconds: DEFAULT_REST,
+        restSeconds: defaultRest,
       },
     ]);
   };

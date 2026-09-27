@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, gte, lt, ne, sql, inArray } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
+import { getDefaultRestSeconds } from './rest-settings';
 import { isUserExercise } from '@/lib/exercise-sources';
 import { resolveSetSeed, type LastPerformance } from '@/lib/set-prefill';
 import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
@@ -300,9 +301,10 @@ export async function startRoutineWorkout(routineId: string): Promise<string> {
   });
 
   const rex = await getRoutineExercises(routineId);
+  const fallbackRest = await getDefaultRestSeconds();
   for (const [i, re] of rex.entries()) {
     const seId = newId('se');
-    const rest = re.restSeconds ?? 60;
+    const rest = re.restSeconds ?? fallbackRest;
     await db.insert(sessionExercises).values({
       id: seId,
       sessionId: id,
@@ -345,7 +347,7 @@ export async function addExerciseToSession(
     .where(eq(sessionExercises.sessionId, sessionId));
   const position = existing[0]?.n ?? 0;
   const seId = newId('se');
-  const rest = opts?.restSeconds ?? 60;
+  const rest = opts?.restSeconds ?? (await getDefaultRestSeconds());
   await db.insert(sessionExercises).values({
     id: seId,
     sessionId,
