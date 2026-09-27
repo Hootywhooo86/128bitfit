@@ -3,7 +3,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Card, CardHead } from '@/components/ui';
 import { useReadiness } from '@/lib/health/use-readiness';
-import { GRADE_EMOJI, GRADE_LABEL } from '@/lib/readiness';
+import { GRADE_EMOJI, GRADE_LABEL, READINESS_BANDS } from '@/lib/readiness';
 import { colors, fonts, spacing } from '@/lib/theme';
 
 /**
@@ -73,14 +73,17 @@ export function ReadinessCard({ recentSets }: { recentSets: number | null }) {
         <Text style={s.why}>{r.reasons.join(' · ')}</Text>
       ) : null}
 
-      {/* Readiness legend */}
+      {/* What each face means, straight from the bands the score is graded on. */}
       <View style={s.legendContainer}>
-        <Text style={s.legendTitle}>Readiness Scale</Text>
+        <Text style={s.legendTitle}>SCALE</Text>
         <View style={s.legend}>
-          {(['bad', 'poor', 'ok', 'good', 'great'] as const).map((grade) => (
-            <View key={grade} style={s.legendItem}>
-              <Text style={s.legendEmoji}>{GRADE_EMOJI[grade]}</Text>
-              <Text style={s.legendLabel}>{GRADE_LABEL[grade]}</Text>
+          {READINESS_BANDS.map((b) => (
+            <View key={b.grade} style={s.legendItem}>
+              <Text style={s.legendEmoji}>{GRADE_EMOJI[b.grade]}</Text>
+              <Text style={s.legendLabel}>{GRADE_LABEL[b.grade]}</Text>
+              <Text style={s.legendRange}>
+                {b.min}–{b.max}
+              </Text>
             </View>
           ))}
         </View>
@@ -117,22 +120,26 @@ const s = StyleSheet.create({
     borderTopColor: colors.border,
   },
   legendTitle: {
-    fontSize: 11,
-    fontFamily: fonts.bodySemi,
+    fontSize: 8,
+    fontFamily: fonts.pixel,
     color: colors.textDim,
     marginBottom: spacing.sm,
     textAlign: 'center',
-    letterSpacing: 0.5,
+    letterSpacing: 1.5,
   },
   legend: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
+    justifyContent: 'space-between',
   },
   legendItem: {
+    flex: 1,
     alignItems: 'center',
-    minWidth: '30%',
+  },
+  legendRange: {
+    fontSize: 9.5,
+    color: colors.textDim,
+    fontFamily: fonts.body,
+    marginTop: 1,
   },
   legendEmoji: {
     fontSize: 18,

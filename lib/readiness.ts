@@ -59,12 +59,23 @@ export type RestQuality =
  */
 export const DEFAULT_SLEEP_TARGET_MIN = 7 * 60;
 
+/**
+ * The readiness score bands, lowest first. One list, so the grade and the
+ * legend that explains it cannot drift apart.
+ */
+export const READINESS_BANDS: { grade: Grade; min: number; max: number }[] = [
+  { grade: 'bad', min: 0, max: 24 },
+  { grade: 'poor', min: 25, max: 44 },
+  { grade: 'ok', min: 45, max: 64 },
+  { grade: 'good', min: 65, max: 84 },
+  { grade: 'great', min: 85, max: 100 },
+];
+
 export function gradeFromScore(score: number): Grade {
-  if (score < 25) return 'bad';
-  if (score < 45) return 'poor';
-  if (score < 65) return 'ok';
-  if (score < 85) return 'good';
-  return 'great';
+  for (let i = READINESS_BANDS.length - 1; i >= 0; i--) {
+    if (score >= READINESS_BANDS[i].min) return READINESS_BANDS[i].grade;
+  }
+  return 'bad';
 }
 
 /**
