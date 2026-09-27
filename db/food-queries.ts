@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, like, lt, sql } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
+import { drinkFluid } from '@/lib/drink-fluid';
 import {
   foodLogs,
   foods,
@@ -47,7 +48,14 @@ export type DayFuelSummary = {
    * macro, so the total is a floor rather than a figure. The UI marks it.
    */
   partial: { protein: boolean; fat: boolean; carb: boolean };
+  /** Everything drunk: water logged on its own plus drinks with a stated volume. */
   waterMl: number;
+  /** Water logged on its own — the part the +/- buttons change. */
+  waterLoggedMl: number;
+  /** Fluid from drinks logged as food, worked out from their servings. */
+  drinkMl: number;
+  /** Drinks logged by weight or with no serving, so not counted. Their names. */
+  unmeasuredDrinks: string[];
   logs: FoodLogWithName[];
   byMeal: Record<MealType, FoodLogWithName[]>;
 };
@@ -234,8 +242,30 @@ export async function getDayFuelSummary(day: Date = new Date()): Promise<DayFuel
     if (byMeal[mt]) byMeal[mt].push(log);
     else byMeal.snack.push(log);
   }
-  const waterMl = await getWaterTotalForDay(day);
-  return { goals, totals, partial, waterMl, logs, byMeal };
+  let drinkMl = 0;
+  const unmeasuredDrinks: string[] = [];
+  for (const log of logs) {
+    const fluid = drinkFluid({
+      name: log.displayName,
+      servingSize: log.servingSize,
+      servingUnit: log.servingUnit,
+      servings: log.servings,
+    });
+    if (fluid.status === 'counted') drinkMl += fluid.ml;
+    else if (fluid.status === 'unmeasured') unmeasuredDrinks.push(log.displayName);
+  }
+  const waterLoggedMl = Math.max(0, await getWaterTotalForDay(day));
+  return {
+    goals,
+    totals,
+    partial,
+    waterMl: waterLoggedMl + drinkMl,
+    waterLoggedMl,
+    drinkMl,
+    unmeasuredDrinks,
+    logs,
+    byMeal,
+  };
 }
 
 export type LogFoodInput = {
@@ -254,55 +284,9 @@ export type LogFoodInput = {
   notes?: string | null;
 };
 
-/**
- * Extract fluid volume in ml from a food serving if it's a drink.
- * Returns null if not a drink or volume cannot be determined with confidence.
- * Never estimates; returns null for unknown volumes per CLAUDE.md #5.
- */
-function extractDrinkFluidMl(
-  foodName: string,
-  servingSize: number | null,
-  servingUnit: string | null
-): number | null {
-  const lowerName = foodName.toLowerCase();
-  const drinkKeywords = ['drink', 'beverage', 'juice', 'water', 'tea', 'coffee', 'soda', 'pop', 'milk', 'beer', 'wine', 'liquor', 'smoothie'];
-  const isDrink = drinkKeywords.some(kw => lowerName.includes(kw));
-
-  if (!isDrink || servingSize === null || servingUnit === null) {
-    return null;
-  }
-
-  const unitLower = servingUnit.toLowerCase();
-  let mlPerUnit: number | null = null;
-
-  // Standard unit conversions to ml
-  if (unitLower === 'ml' || unitLower === 'milliliter' || unitLower === 'milliliters') {
-    mlPerUnit = 1;
-  } else if (unitLower === 'l' || unitLower === 'liter' || unitLower === 'liters') {
-    mlPerUnit = 1000;
-  } else if (unitLower === 'fl oz' || unitLower === 'fl oz.' || unitLower === 'fluid ounce' || unitLower === 'fluid ounces') {
-    mlPerUnit = 29.5735; // Standard fl oz to ml
-  } else if (unitLower === 'cup' || unitLower === 'cups') {
-    mlPerUnit = 236.588; // Standard cup to ml
-  } else if (unitLower === 'pint' || unitLower === 'pints') {
-    mlPerUnit = 473.176; // Standard pint to ml
-  } else if (unitLower === 'gallon' || unitLower === 'gallons') {
-    mlPerUnit = 3785.41; // Standard gallon to ml
-  }
-
-  if (mlPerUnit === null) {
-    // Unknown serving unit; cannot determine volume with confidence
-    return null;
-  }
-
-  const totalMl = servingSize * mlPerUnit;
-  return Math.round(totalMl);
-}
-
 export async function insertFoodLog(input: LogFoodInput): Promise<string> {
   const id = newId('fl');
   const loggedAt = input.loggedAt ?? new Date();
-  const foodName = input.customName || '';
 
   await db.insert(foodLogs).values({
     id,
@@ -344,23 +328,6 @@ export async function insertFoodLog(input: LogFoodInput): Promise<string> {
   })();
 
   // Log fluid volume for drinks (e.g., water, coffee, juice, soda)
-  void (async () => {
-    try {
-      const fluidMl = extractDrinkFluidMl(foodName, input.servingSize ?? null, input.servingUnit ?? null);
-      if (fluidMl !== null) {
-        const waterId = newId('wl');
-        const totalMl = Math.round(fluidMl * input.servings);
-        await db.insert(waterLogs).values({
-          id: waterId,
-          ml: totalMl,
-          loggedAt,
-        });
-        mirrorWater(waterId, loggedAt.getTime(), totalMl);
-      }
-    } catch {
-      // Failure to log fluid does not fail the food entry
-    }
-  })();
 
   return id;
 }

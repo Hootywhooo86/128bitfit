@@ -45,6 +45,9 @@ export default function HomeScreen() {
 
   const [calories, setCalories] = useState<number | null>(null);
   const [waterMl, setWaterMl] = useState(0);
+  const [waterLogged, setWaterLogged] = useState(0);
+  const [drinkMl, setDrinkMl] = useState(0);
+  const [unmeasured, setUnmeasured] = useState<string[]>([]);
   const [waterTarget, setWaterTarget] = useState(2500);
   const [lastWorkout, setLastWorkout] = useState<WorkoutSummary | null>(null);
   const [inProgress, setInProgress] = useState(false);
@@ -73,6 +76,9 @@ export default function HomeScreen() {
       setUnits(appSettings.units);
       setCalories(fuel.logs.length > 0 ? fuel.totals.calories : null);
       setWaterMl(fuel.waterMl);
+      setWaterLogged(fuel.waterLoggedMl);
+      setDrinkMl(fuel.drinkMl);
+      setUnmeasured(fuel.unmeasuredDrinks);
       setWaterTarget(fuel.goals.waterTargetMl);
       setLastWorkout(workout);
       setInProgress(active != null);
@@ -117,9 +123,13 @@ export default function HomeScreen() {
   }, [refresh, refreshHealth]);
 
   const water = async (ml: number) => {
-    const next = Math.max(0, waterMl + ml);
-    setWaterMl(next);
-    await addWater(ml);
+    // "−" takes back water tapped in, never below it: drinks are counted from
+    // their food logs and are removed by editing those, not from here.
+    const change = ml < 0 ? -Math.min(-ml, waterLogged) : ml;
+    if (change === 0) return;
+    setWaterMl((w) => w + change);
+    setWaterLogged((w) => w + change);
+    await addWater(change);
     void refresh();
   };
 
@@ -198,6 +208,16 @@ export default function HomeScreen() {
             <Text style={[s.waddT, { color: colors.textDim, fontSize: 16 }]}>−</Text>
           </Pressable>
         </View>
+        {drinkMl > 0 ? (
+          <Text style={s.wfoot}>Includes {drinkMl} ml from drinks you logged as food.</Text>
+        ) : null}
+        {unmeasured.length > 0 ? (
+          <Text style={s.wfoot}>
+            Not counted: {unmeasured.slice(0, 3).join(', ')}
+            {unmeasured.length > 3 ? ` and ${unmeasured.length - 3} more` : ''} — logged by weight, not
+            volume. Log drinks in ml or fl oz to count them.
+          </Text>
+        ) : null}
         <Text style={s.wfoot}>
           One glass = 250 ml (8 fl oz) · goal {waterTarget} ml (
           {Math.round(waterTarget / 29.574)} fl oz)
