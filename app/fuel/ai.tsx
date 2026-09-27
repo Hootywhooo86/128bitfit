@@ -18,7 +18,7 @@ import { describeIngredients, fallbackRecipeName, recipeTotals } from '@/lib/rec
 import type { MealType } from '@/db/schema';
 import { MAX_RECIPE_PHOTOS, estimateFood, type AiPhoto } from '@/lib/ai-food-client';
 import { getAiSettings } from '@/db/ai-settings';
-import { getProviderMeta, providerCanSearchWeb, type WebSearchOutcome } from '@/lib/ai-coach';
+import { providerCanSearchWeb, webSearchUnavailableReason, type WebSearchOutcome } from '@/lib/ai-coach';
 import { totalsOf, type AiFoodItem } from '@/lib/ai-food';
 import { defaultMealTypeForHour } from '@/lib/nutrition';
 import { MealSlot } from '@/components/MealSlot';
@@ -59,7 +59,8 @@ export default function AiFoodScreen() {
   const [providerLabel, setProviderLabel] = useState('');
   /** Whether the provider can search the web at all. */
   const [canSearch, setCanSearch] = useState(false);
-  const [providerName, setProviderName] = useState('');
+  const [cannotSearchReason, setCannotSearchReason] = useState('');
+  const [unavailableReason, setUnavailableReason] = useState('');
   /** Which Describe button is running, for its label. */
   const [running, setRunning] = useState<'estimate' | 'lookup' | null>(null);
   const [mealDay, setMealDay] = useState<MealDay>(() => parseDayKey(params.day) ?? 'today');
@@ -71,8 +72,8 @@ export default function AiFoodScreen() {
 
   useEffect(() => {
     void getAiSettings().then((a) => {
-      setCanSearch(providerCanSearchWeb(a.provider));
-      setProviderName(getProviderMeta(a.provider).label);
+      setCanSearch(providerCanSearchWeb(a.provider, a.model));
+      setCannotSearchReason(webSearchUnavailableReason(a.provider, a.model));
     });
   }, []);
 
@@ -83,6 +84,7 @@ export default function AiFoodScreen() {
       setMealType(out.mealType);
       setWeb(out.web);
       setProviderLabel(out.providerLabel);
+      setUnavailableReason(out.unavailableReason);
       setError(null);
       return;
     }
@@ -299,7 +301,7 @@ export default function AiFoodScreen() {
           <Text style={s.modelNote}>
             {canSearch
               ? 'Estimate is quick and uses no web search. Look up online searches first and shows where the numbers came from — it can cost a little more on your key.'
-              : `${providerName || 'Your AI provider'} cannot search the web, so only Estimate is available. Anthropic, Google Gemini, OpenAI and OpenRouter can look things up.`}
+              : `${cannotSearchReason} Until then only Estimate is available.`}
           </Text>
         </Card>
       ) : mode === 'recipe' ? null : !permission ? (
@@ -430,7 +432,7 @@ export default function AiFoodScreen() {
       {items ? (
         <>
           <Label>{items.some((i) => !i.estimated) ? 'WEB SEARCH — CHECK IT' : 'ESTIMATE — CHECK IT'}</Label>
-          <Note>{lookupSummary(web, providerLabel, items)}</Note>
+          <Note>{lookupSummary(web, providerLabel, items, unavailableReason)}</Note>
           {note ? <Text style={s.modelNote}>{note}</Text> : null}
 
           {items.map((it, i) => (
@@ -571,7 +573,8 @@ export default function AiFoodScreen() {
 function lookupSummary(
   web: WebSearchOutcome | null,
   provider: string,
-  items: AiFoodItem[]
+  items: AiFoodItem[],
+  unavailableReason: string
 ): string {
   const check = 'Check the portion before saving — every figure can be edited.';
   const sourced = items.filter((i) => !i.estimated).length;
@@ -587,7 +590,7 @@ function lookupSummary(
     return `The web search did not run (${provider}: ${web.message}), so these are the model's estimates. ${check}`;
   }
   if (web?.status === 'unsupported') {
-    return `${provider} cannot search the web, so these are the model's estimates, not measurements. ${check}`;
+    return `${unavailableReason} These are the model's estimates, not measurements. ${check}`;
   }
   return `These are the model's estimates, not measurements — nothing was looked up online. ${check}`;
 }

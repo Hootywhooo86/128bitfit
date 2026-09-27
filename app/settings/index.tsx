@@ -25,7 +25,12 @@ import {
   type AppSettings,
   type WeightUnit,
 } from '@/db/settings-queries';
-import { getProviderMeta, providerCanSearchWeb, type AiProviderId } from '@/lib/ai-coach';
+import {
+  getProviderMeta,
+  providerCanSearchWeb,
+  webSearchUnavailableReason,
+  type AiProviderId,
+} from '@/lib/ai-coach';
 import { explainFloor } from '@/lib/calorie-floor';
 import { HF_VISION_FAMILIES } from '@/lib/ai-fallback';
 import { AiKeyStoreError } from '@/lib/ai-secure';
@@ -366,7 +371,7 @@ export default function SettingsScreen() {
         <Text style={styles.aiTitle}>AI Coach — Bring your own key</Text>
         <Text style={styles.muted}>
           128BIT FIT does not sell AI subscriptions. Paste a key from Anthropic, OpenAI, Gemini,
-          OpenRouter, or point at a custom OpenAI-compatible endpoint (e.g. Ollama). Your key stays
+          OpenRouter, Groq, or point at a custom OpenAI-compatible endpoint (e.g. Ollama). Your key stays
           on this device.
         </Text>
 
@@ -397,9 +402,9 @@ export default function SettingsScreen() {
           <View style={{ flex: 1 }}>
             <Text style={styles.toggleTitle}>Look things up online</Text>
             <Text style={[styles.muted, { marginBottom: 0 }]}>
-              {providerCanSearchWeb(aiProvider)
+              {providerCanSearchWeb(aiProvider, aiModel || providerMeta.defaultModel)
                 ? `Lets the coach, meal photos and recipe links search the web for real figures instead of guessing. Describing a meal has its own Estimate and Look up online buttons either way. Searches can cost extra on your key.`
-                : `${providerMeta.label} cannot search the web, so food figures stay estimates. Anthropic, Google Gemini, OpenAI and OpenRouter can.`}
+                : webSearchUnavailableReason(aiProvider, aiModel || providerMeta.defaultModel)}
             </Text>
           </View>
           <View style={[styles.switch, aiWebSearch && styles.switchOn]}>

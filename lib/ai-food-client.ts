@@ -10,7 +10,13 @@
  * in one sentence and pointed at the manual form.
  */
 import { getAiRuntimeConfig } from '@/db/ai-settings';
-import { AiCoachError, getProviderMeta, visionSupport, type WebSearchOutcome } from './ai-coach';
+import {
+  AiCoachError,
+  getProviderMeta,
+  visionSupport,
+  webSearchUnavailableReason,
+  type WebSearchOutcome,
+} from './ai-coach';
 import { callWithRotation } from './ai-rotate';
 import { describeNetworkFailure } from './net-errors';
 import {
@@ -37,7 +43,12 @@ export const MAX_RECIPE_PHOTOS = 5;
 
 export type AiFoodOutcome =
   | (Exclude<AiFoodResult, { status: 'ok' }>)
-  | (Extract<AiFoodResult, { status: 'ok' }> & { web: WebSearchOutcome; providerLabel: string })
+  | (Extract<AiFoodResult, { status: 'ok' }> & {
+      web: WebSearchOutcome;
+      providerLabel: string;
+      /** Why a search could not run on this provider/model, for the summary. */
+      unavailableReason: string;
+    })
   | { status: 'unavailable'; message: string }
   | { status: 'failed'; message: string };
 
@@ -91,11 +102,18 @@ export async function estimateFood(
     // call on a provider that does not rotate, so this is the old behaviour
     // everywhere except Hugging Face — where describing a meal now falls over
     // to the next model exactly as photographing one does.
-    const attempt = await callWithRotation(messages, signal, { webSearch });
+    // A food request that searches at all is one where guessing is the thing
+    // to avoid, so the search is required rather than left to the model.
+    const attempt = await callWithRotation(messages, signal, { webSearch, forceSearch: webSearch });
     const searched = attempt.web.status === 'on' && attempt.web.sources.length > 0;
     const parsed = parseAiFood(attempt.content, new Date(), searched);
     if (parsed.status !== 'ok') return parsed;
-    return { ...parsed, web: attempt.web, providerLabel: getProviderMeta(cfg.provider).label };
+    return {
+      ...parsed,
+      web: attempt.web,
+      providerLabel: getProviderMeta(cfg.provider).label,
+      unavailableReason: webSearchUnavailableReason(cfg.provider, cfg.model),
+    };
   } catch (e) {
     if (e instanceof AiCoachError) {
       // The provider's own words when it answered; a translated sentence when
