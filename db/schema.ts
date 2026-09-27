@@ -163,6 +163,38 @@ export const offFoodCache = sqliteTable('off_food_cache', {
   nutrientKeysPresent: text('nutrient_keys_present').notNull().default('[]'),
 });
 
+export const INJURY_SEVERITIES = ['mild', 'moderate', 'severe'] as const;
+export type InjurySeverity = (typeof INJURY_SEVERITIES)[number];
+
+/**
+ * Pain & injury log. A training aid, not a diagnosis: it records what the user
+ * says hurts so the coach can work around it. Nothing reads it as medical data.
+ */
+export const injuries = sqliteTable('injuries', {
+  id: text('id').primaryKey(),
+  area: text('area').notNull(),
+  severity: text('severity', { enum: INJURY_SEVERITIES }).notNull().default('mild'),
+  /** What makes it worse, in the user's words. */
+  notes: text('notes'),
+  /** Movements to stay off, in the user's words. */
+  avoid: text('avoid'),
+  startedAt: integer('started_at', { mode: 'timestamp' }).notNull(),
+  resolvedAt: integer('resolved_at', { mode: 'timestamp' }),
+});
+
+export const PHOTO_POSES = ['front', 'side', 'back'] as const;
+export type PhotoPose = (typeof PHOTO_POSES)[number];
+
+/** Progress photos. The image is a file on the phone; this is its index. */
+export const progressPhotos = sqliteTable('progress_photos', {
+  id: text('id').primaryKey(),
+  pose: text('pose', { enum: PHOTO_POSES }).notNull(),
+  uri: text('uri').notNull(),
+  takenAt: integer('taken_at', { mode: 'timestamp' }).notNull(),
+});
+
+export type Injury = typeof injuries.$inferSelect;
+export type ProgressPhoto = typeof progressPhotos.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
 export type OffFoodCache = typeof offFoodCache.$inferSelect;
 export type Food = typeof foods.$inferSelect;

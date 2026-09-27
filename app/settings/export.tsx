@@ -57,9 +57,10 @@ export default function ExportScreen() {
       <Stack.Screen options={{ title: 'Export data' }} />
 
       <Text style={styles.muted}>
-        Everything you have logged: workouts, sets, food, water, weight, settings and coach
-        threads. JSON is the complete, re-importable copy; the CSVs are one table each for
-        spreadsheets.
+        Everything you have logged: workouts, sets, food, water, weight, injury log, settings and
+        coach threads. JSON is the complete, re-importable copy; the CSVs are one table each for
+        spreadsheets. Progress photos are listed with where each file is on the phone; the
+        pictures themselves are not copied into the export.
       </Text>
       <Text style={styles.muted}>
         Bundled exercise and food reference data is left out — it ships with the app and is not
