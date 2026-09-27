@@ -19,7 +19,7 @@ import {
   getLastCompletedWorkoutSummary,
   type WorkoutSummary,
 } from '@/db/workout-queries';
-import { useTodaySteps } from '@/lib/health/use-health';
+import { useTodaySteps, useTodayCalories } from '@/lib/health/use-health';
 import { broadcastHealthRefresh } from '@/lib/health/use-health-refresh';
 import { withMinimumDuration } from '@/lib/min-duration';
 import { formatKg } from '@/lib/weight-source';
@@ -28,8 +28,9 @@ import type { WeightUnit } from '@/db/settings-queries';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
 /**
- * Home, laid out as prototype/app-shell.html: the session card, TODAY tiles,
- * WATER, PROGRESS, the stat row, muscle coverage, then the week.
+ * Home, laid out as prototype/app-shell.html: the session card, TODAY tiles
+ * (STEPS, KCAL, BURNED from Health Connect), WATER input, PROGRESS, the stat row,
+ * muscle coverage, then the week.
  *
  * Every number here is real or absent. A tile with no reading shows a dash, not
  * a zero — see the empty-state table in CLAUDE.md.
@@ -39,6 +40,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const { state: healthState, refresh: refreshHealth } = useTodaySteps();
+  const { activeCalories } = useTodayCalories();
   const [refreshing, setRefreshing] = useState(false);
 
   const [calories, setCalories] = useState<number | null>(null);
@@ -171,7 +173,7 @@ export default function HomeScreen() {
             label: 'STEPS',
           },
           { value: calories == null ? null : Math.round(calories).toLocaleString(), label: 'KCAL' },
-          { value: waterMl > 0 ? `${(waterMl / 1000).toFixed(1)}L` : null, label: 'WATER' },
+          { value: activeCalories != null ? Math.round(activeCalories).toLocaleString() : null, label: 'BURNED' },
         ]}
       />
 

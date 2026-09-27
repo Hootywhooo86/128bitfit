@@ -47,3 +47,10 @@ export function useTodaySteps() {
 
   return { state, refresh, connect, openSettings: health.openSettings };
 }
+
+export function useTodayCalories() {
+  const state = useSyncExternalStore(subscribeTodayHealth, getTodayHealth, getTodayHealth);
+  // activeCalories is read when steps are read (same store), so only a single
+  // useEffect is needed; this hook just selects out the calories field.
+  return { activeCalories: state.status === 'ready' ? state.activeCalories : null };
+}

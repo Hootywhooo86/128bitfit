@@ -14,7 +14,7 @@ export type TodayHealth =
   | { status: 'unavailable' }
   | { status: 'update' }
   | { status: 'denied' }
-  | { status: 'ready'; steps: number | null };
+  | { status: 'ready'; steps: number | null; activeCalories: number | null };
 
 /**
  * Whether it is worth reading, and what to say when it is not.
@@ -35,12 +35,15 @@ export function todayHealthGate(
   // others, so requiring the full set reported "denied" to anyone who had
   // connected and granted steps — which is most people.
   if (!grants || !grants.read.includes('steps')) return { status: 'denied' };
+  // activeCalories is optional — if not granted, we still say 'read' for steps
   return 'read';
 }
 
 /** True when two readings are the same fact, so subscribers are not woken for nothing. */
 export function sameTodayHealth(a: TodayHealth, b: TodayHealth): boolean {
   if (a.status !== b.status) return false;
-  if (a.status === 'ready' && b.status === 'ready') return a.steps === b.steps;
+  if (a.status === 'ready' && b.status === 'ready') {
+    return a.steps === b.steps && a.activeCalories === b.activeCalories;
+  }
   return true;
 }
