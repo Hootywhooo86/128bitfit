@@ -1,3 +1,4 @@
+import { DEFAULT_REST_SOUND, isRestSound, type RestSound } from '@/lib/rest-sounds';
 import { getSetting, setSetting } from './settings-queries';
 
 /**
@@ -9,7 +10,7 @@ import { getSetting, setSetting } from './settings-queries';
  */
 export type RestPrefs = {
   defaultSeconds: number;
-  sound: boolean;
+  sound: RestSound;
   vibrate: boolean;
   /** Schedule the OS notification, so it fires with the phone locked. */
   lockScreen: boolean;
@@ -41,7 +42,7 @@ export async function getRestPrefs(): Promise<RestPrefs> {
   ]);
   return {
     defaultSeconds: secs == null ? REST_DEFAULT_SECONDS : clampRest(Number(secs)),
-    sound: sound !== '0',
+    sound: isRestSound(sound) ? sound : DEFAULT_REST_SOUND,
     vibrate: vibrate !== '0',
     lockScreen: lock !== '0',
   };
@@ -53,7 +54,7 @@ export async function getDefaultRestSeconds(): Promise<number> {
 
 export async function updateRestPrefs(patch: Partial<RestPrefs>): Promise<RestPrefs> {
   if (patch.defaultSeconds != null) await setSetting(KEYS.defaultSeconds, String(clampRest(patch.defaultSeconds)));
-  if (patch.sound != null) await setSetting(KEYS.sound, patch.sound ? '1' : '0');
+  if (patch.sound != null) await setSetting(KEYS.sound, patch.sound);
   if (patch.vibrate != null) await setSetting(KEYS.vibrate, patch.vibrate ? '1' : '0');
   if (patch.lockScreen != null) await setSetting(KEYS.lockScreen, patch.lockScreen ? '1' : '0');
   return getRestPrefs();
