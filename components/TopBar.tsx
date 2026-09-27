@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '@/lib/theme';
 
@@ -35,6 +35,7 @@ export function TopBar({
       </View>
 
       <View style={s.mid}>
+        <Image source={require('@/assets/brand/logo.png')} style={s.logo} />
         <Text style={s.ttl}>128BIT FIT</Text>
         <Text style={s.sub}>{section.toUpperCase()}</Text>
       </View>
@@ -64,6 +65,7 @@ const s = StyleSheet.create({
   btn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 11 },
   btnT: { color: colors.text, fontSize: 24, lineHeight: 28 },
   mid: { flex: 1, alignItems: 'center' },
+  logo: { width: 28, height: 28, marginBottom: 4 },
   ttl: { fontFamily: fonts.pixel, fontSize: 12.5, letterSpacing: 1, color: colors.text },
   sub: {
     fontFamily: fonts.pixel,
