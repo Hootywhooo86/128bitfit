@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CalorieRing } from '@/components/CalorieRing';
 import { DayStrip } from '@/components/DayStrip';
 import { FastingCard } from '@/components/FastingCard';
@@ -20,7 +20,8 @@ import {
   fuelWindow,
   startOfDay,
 } from '@/lib/fuel-day';
-import { useFast } from '@/lib/fasting-store';
+import { fastProgress, formatElapsed } from '@/lib/fasting';
+import { endFast, useFast } from '@/lib/fasting-store';
 import { formatKcal } from '@/lib/nutrition';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
@@ -58,6 +59,27 @@ export default function FuelScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const { fast } = useFast();
+
+  /**
+   * Every way into logging food goes through here. During a fast it asks
+   * first — one sentence, and breaking the fast is one tap — rather than
+   * letting a meal land in the middle of a timer that still says "fasting".
+   */
+  const logFood = (href: string) => {
+    if (!fast) return router.push(href as never);
+    const into = formatElapsed(fastProgress(fast, Date.now()).elapsedMs);
+    Alert.alert('You are fasting', `${into} into your ${fast.hours}h fast. Logging food ends it.`, [
+      { text: 'Keep fasting', style: 'cancel' },
+      {
+        text: 'Break fast',
+        onPress: () => {
+          void endFast()
+            .then(() => router.push(href as never))
+            .catch((e) => Alert.alert('Could not end the fast', e instanceof Error ? e.message : String(e)));
+        },
+      },
+    ]);
+  };
 
   const refresh = useCallback(async () => {
     if (!ready) return;
@@ -134,11 +156,11 @@ export default function FuelScreen() {
         items={[
           // AI first: describing a meal or photographing it is the fastest way
           // in for anything the catalog does not have.
-          { icon: '✦', label: 'AI', onPress: () => router.push(`/fuel/ai?day=${dayParam}`) },
-          { icon: '▣', label: 'SCAN', onPress: () => router.push(`/fuel/scan?day=${dayParam}`) },
-          { icon: '⌕', label: 'SEARCH', onPress: () => router.push(`/fuel/add?day=${dayParam}`) },
-          { icon: '◉', label: 'LABEL', onPress: () => router.push(`/fuel/label?day=${dayParam}`) },
-          { icon: '✎', label: 'CUSTOM', onPress: () => router.push(`/fuel/custom-hub?day=${dayParam}`) },
+          { icon: '✦', label: 'AI', onPress: () => logFood(`/fuel/ai?day=${dayParam}`) },
+          { icon: '▣', label: 'SCAN', onPress: () => logFood(`/fuel/scan?day=${dayParam}`) },
+          { icon: '⌕', label: 'SEARCH', onPress: () => logFood(`/fuel/add?day=${dayParam}`) },
+          { icon: '◉', label: 'LABEL', onPress: () => logFood(`/fuel/label?day=${dayParam}`) },
+          { icon: '✎', label: 'CUSTOM', onPress: () => logFood(`/fuel/custom-hub?day=${dayParam}`) },
         ]}
       />
 
@@ -180,7 +202,7 @@ export default function FuelScreen() {
 
             <Pressable
               style={s.addf}
-              onPress={() => router.push(`/fuel/add?meal=${meal}&day=${dayParam}`)}
+              onPress={() => logFood(`/fuel/add?meal=${meal}&day=${dayParam}`)}
             >
               <Text style={s.addfT}>+ Add food</Text>
             </Pressable>
