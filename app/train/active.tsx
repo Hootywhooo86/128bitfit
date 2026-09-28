@@ -32,6 +32,8 @@ import type { WorkoutSet } from '@/db/schema';
 import { getAppSettings, type WeightUnit } from '@/db/settings-queries';
 import { exerciseImageSource } from '@/lib/exercise-images';
 import { isUserExercise } from '@/lib/exercise-sources';
+import { equipmentGroup } from '@/lib/equipment-groups';
+import { plateHint } from '@/lib/plates';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
@@ -247,6 +249,7 @@ export default function ActiveWorkoutScreen() {
                 onHow={() => router.push({ pathname: '/exercise/[id]', params: { id: se.exerciseId } })}
                 onAddPhoto={() => router.push({ pathname: '/exercise/new', params: { id: se.exerciseId } })}
                 onMove={(by) => void act(() => moveSessionExercise(se.id, by))}
+                onPlates={(w) => router.push({ pathname: '/train/plates', params: { target: String(w) } })}
                 onSwap={() =>
                   router.push({ pathname: '/train/add-exercise', params: { sessionId, swap: se.id } })
                 }
@@ -334,6 +337,7 @@ function ExerciseCard({
   onHow,
   onAddPhoto,
   onMove,
+  onPlates,
   onSwap,
   onOptions,
   onSaveNote,
@@ -358,6 +362,7 @@ function ExerciseCard({
   /** Your own exercise with no picture: open it to take or pick one. */
   onAddPhoto: () => void;
   onMove: (by: -1 | 1) => void;
+  onPlates: (weight: number) => void;
   onSwap: () => void;
   onOptions: () => void;
   onSaveNote: (note: string) => void;
@@ -392,6 +397,12 @@ function ExerciseCard({
   // One you made, with no picture yet: offer to add one rather than show a
   // grey tile with its initials.
   const canAddPhoto = !imageSource && isUserExercise(se.category);
+  // Barbell lifts: what to load for the next set still to do. One line,
+  // read-only, so logging a set is exactly as fast as before.
+  const nextSet = se.sets.find((st) => !st.completed);
+  const plateWeight = nextSet?.weight ?? null;
+  const plateLine =
+    equipmentGroup(se.equipment) === 'barbell' && nextSet ? plateHint(plateWeight, units) : null;
   const caption = [primaryMuscle.toUpperCase(), se.equipment?.toUpperCase()].filter(Boolean).join(' · ');
 
   return (
@@ -557,6 +568,12 @@ function ExerciseCard({
           />
         );
       })}
+
+      {plateLine ? (
+        <Pressable onPress={() => onPlates(plateWeight!)} hitSlop={6} style={styles.plateHint}>
+          <Text style={styles.plateHintText}>{plateLine} ›</Text>
+        </Pressable>
+      ) : null}
 
       <View style={styles.actionGrid}>
         <Pressable style={styles.dashedBtn} onPress={() => setNoteOpen(true)}>
@@ -788,6 +805,8 @@ const styles = themedStyles(() => StyleSheet.create({
     letterSpacing: 0.5,
   },
   moveRow: { flexDirection: 'row', gap: 8, marginRight: 10 },
+  plateHint: { paddingVertical: 8 },
+  plateHintText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   moveBtn: {
     width: 36,
     height: 32,
