@@ -7,6 +7,8 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useMemo } from 'react';
 import { View } from 'react-native';
 import { OnboardingGate } from '@/components/OnboardingGate';
+// Registers the background GPS task; it has to exist before any fix arrives.
+import '@/lib/cardio-tracker';
 import { DatabaseProvider } from '@/db/DatabaseProvider';
 import { useAccent } from '@/lib/accent';
 import { RestTimerProvider } from '@/lib/rest-timer';

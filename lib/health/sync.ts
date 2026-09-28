@@ -103,6 +103,7 @@ export async function pushWorkout(input: {
   startedAt: number;
   endedAt: number;
   title?: string;
+  exerciseType?: number;
 }): Promise<HealthWriteResult> {
   if (!(input.endedAt > input.startedAt)) return NOTHING;
   const grants = await health.getGrants();
@@ -113,6 +114,7 @@ export async function pushWorkout(input: {
       startedAt: input.startedAt,
       endedAt: input.endedAt,
       title: input.title,
+      exerciseType: input.exerciseType,
     },
   ]);
   return { written, error: null };

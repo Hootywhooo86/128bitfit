@@ -116,6 +116,7 @@ export function mirrorWorkout(input: {
   startedAt: number;
   endedAt: number;
   title?: string;
+  exerciseType?: number;
 }): void {
   fire('your workout', () => pushWorkout(input));
 }

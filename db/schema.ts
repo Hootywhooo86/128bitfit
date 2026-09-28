@@ -1,4 +1,4 @@
-import { integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { index, integer, real, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /** Key/value store for import versioning and app settings. */
 export const meta = sqliteTable('meta', {
@@ -226,3 +226,53 @@ export const coachMessages = sqliteTable('coach_messages', {
 
 export type CoachThread = typeof coachThreads.$inferSelect;
 export type CoachMessage = typeof coachMessages.$inferSelect;
+
+export const CARDIO_STATUSES = ['recording', 'paused', 'finished'] as const;
+
+/**
+ * One outdoor (GPS) or indoor (typed-in) cardio session.
+ *
+ * Times are plain milliseconds, unlike the strength tables: a GPS track needs
+ * sub-second order, and splitting it by hand is where rounding bugs live.
+ * The totals are written when the session finishes, from its points, so the
+ * history list does not re-read every fix to show a distance.
+ */
+export const cardioSessions = sqliteTable('cardio_sessions', {
+  id: text('id').primaryKey(),
+  sport: text('sport').notNull(),
+  status: text('status', { enum: CARDIO_STATUSES }).notNull().default('recording'),
+  startedAt: integer('started_at').notNull(),
+  endedAt: integer('ended_at'),
+  /** Set while manually paused; the pause's length is added to pausedMs on resume. */
+  pausedAt: integer('paused_at'),
+  pausedMs: integer('paused_ms').notNull().default(0),
+  /** Bumped on every resume, so no distance is drawn across a pause. */
+  segment: integer('segment').notNull().default(0),
+  distanceM: real('distance_m'),
+  movingS: integer('moving_s'),
+  elapsedS: integer('elapsed_s'),
+  elevGainM: real('elev_gain_m'),
+  /** Typed in by hand (treadmill, indoor ride): there is no route. */
+  manual: integer('manual', { mode: 'boolean' }).notNull().default(false),
+  notes: text('notes'),
+});
+
+/** Every GPS fix the phone reported while recording, as it reported it. */
+export const cardioPoints = sqliteTable(
+  'cardio_points',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    sessionId: text('session_id').notNull(),
+    t: integer('t').notNull(),
+    lat: real('lat').notNull(),
+    lon: real('lon').notNull(),
+    alt: real('alt'),
+    accuracy: real('accuracy'),
+    speed: real('speed'),
+    segment: integer('segment').notNull().default(0),
+  },
+  (table) => [index('cardio_points_session_t').on(table.sessionId, table.t)]
+);
+
+export type CardioSession = typeof cardioSessions.$inferSelect;
+export type CardioPoint = typeof cardioPoints.$inferSelect;

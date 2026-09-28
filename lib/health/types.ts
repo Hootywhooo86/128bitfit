@@ -145,6 +145,8 @@ export type HealthWorkoutEntry = WithClientId & {
   endedAt: number;
   /** Shown in the health app's own UI. */
   title?: string;
+  /** Health Connect ExerciseType; strength training when left out. */
+  exerciseType?: number;
 };
 
 /*

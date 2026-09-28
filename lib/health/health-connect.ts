@@ -484,7 +484,7 @@ export const healthConnectProvider: HealthProvider = {
         // no energy figure goes with it.
         .map((e) => ({
           recordType: 'ExerciseSession' as const,
-          exerciseType: EXERCISE_TYPE_STRENGTH_TRAINING,
+          exerciseType: e.exerciseType ?? EXERCISE_TYPE_STRENGTH_TRAINING,
           title: e.title,
           startTime: new Date(e.startedAt).toISOString(),
           endTime: new Date(e.endedAt).toISOString(),

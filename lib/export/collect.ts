@@ -19,6 +19,8 @@
 import { asc, eq } from 'drizzle-orm';
 import { db } from '@/db/client';
 import {
+  cardioPoints,
+  cardioSessions,
   coachMessages,
   coachThreads,
   exercises,
@@ -152,6 +154,11 @@ export async function collectExport(): Promise<ExportTable[]> {
     .orderBy(asc(coachMessages.createdAt));
   const injuryRows = await db.select().from(injuries).orderBy(asc(injuries.startedAt));
   const photoRows = await db.select().from(progressPhotos).orderBy(asc(progressPhotos.takenAt));
+  const cardioRows = await db.select().from(cardioSessions).orderBy(asc(cardioSessions.startedAt));
+  const pointRows = await db
+    .select()
+    .from(cardioPoints)
+    .orderBy(asc(cardioPoints.sessionId), asc(cardioPoints.t));
 
   return [
     {
@@ -300,6 +307,51 @@ export async function collectExport(): Promise<ExportTable[]> {
       name: 'progress_photos',
       columns: ['id', 'pose', 'taken_at', 'file'],
       rows: photoRows.map((r) => ({ id: r.id, pose: r.pose, taken_at: r.takenAt, file: r.uri })),
+    },
+    {
+      name: 'cardio_sessions',
+      columns: [
+        'id',
+        'sport',
+        'status',
+        'started_at',
+        'ended_at',
+        'distance_m',
+        'moving_s',
+        'elapsed_s',
+        'elev_gain_m',
+        'manual',
+        'notes',
+      ],
+      rows: cardioRows.map((r) => ({
+        id: r.id,
+        sport: r.sport,
+        status: r.status,
+        started_at: new Date(r.startedAt),
+        ended_at: r.endedAt == null ? null : new Date(r.endedAt),
+        distance_m: r.distanceM,
+        moving_s: r.movingS,
+        elapsed_s: r.elapsedS,
+        elev_gain_m: r.elevGainM,
+        manual: r.manual,
+        notes: r.notes,
+      })),
+    },
+    {
+      // Every fix as the phone reported it, unfiltered: the export is the raw
+      // record, and any app reading it can apply its own cleaning.
+      name: 'cardio_points',
+      columns: ['session_id', 't', 'lat', 'lon', 'alt', 'accuracy', 'speed', 'segment'],
+      rows: pointRows.map((r) => ({
+        session_id: r.sessionId,
+        t: new Date(r.t),
+        lat: r.lat,
+        lon: r.lon,
+        alt: r.alt,
+        accuracy: r.accuracy,
+        speed: r.speed,
+        segment: r.segment,
+      })),
     },
   ];
 }

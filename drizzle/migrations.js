@@ -10,6 +10,7 @@ import m0005 from './0005_blue_mulholland_black.sql';
 import m0006 from './0006_misty_power_pack.sql';
 import m0007 from './0007_tired_captain_universe.sql';
 import m0008 from './0008_foamy_azazel.sql';
+import m0009 from './0009_keen_cammi.sql';
 
   export default {
     journal,
@@ -22,7 +23,8 @@ m0004,
 m0005,
 m0006,
 m0007,
-m0008
+m0008,
+m0009
     }
   }
   
