@@ -7,10 +7,12 @@ import {
   setAutoPause,
   setCardioKeepAwake,
   setDistanceUnit,
+  setDotColour,
+  setLineColour,
   setMapStyle,
   type CardioSettings,
 } from '@/db/map-settings';
-import { MAP_ATTRIBUTION, MAP_ROUTE_BLUE, MAP_STYLES, type MapStyleId } from '@/lib/map-style';
+import { MAP_ATTRIBUTION, MAP_ROUTE_BLUE, MAP_STYLES, ROUTE_COLOURS, casingFor, type MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 /** Settings → Map: how the cardio map looks and behaves. */
@@ -47,8 +49,16 @@ export default function MapSettingsScreen() {
               accessibilityState={{ selected: on }}
             >
               <View style={[s.swatch, m.id === 'dark' ? s.swDark : s.swLight]}>
-                <View style={s.swRoute} />
-                <View style={s.swDot} />
+                <View style={[s.swRoute, { backgroundColor: cfg?.lineColour ?? MAP_ROUTE_BLUE }]} />
+                <View
+                  style={[
+                    s.swDot,
+                    {
+                      backgroundColor: cfg?.dotColour ?? MAP_ROUTE_BLUE,
+                      borderColor: casingFor(cfg?.dotColour ?? MAP_ROUTE_BLUE),
+                    },
+                  ]}
+                />
               </View>
               <Text style={[s.styleT, on && s.styleTOn]}>{m.label}</Text>
             </Pressable>
@@ -56,6 +66,17 @@ export default function MapSettingsScreen() {
         })}
       </View>
       <Note>What the map opens with. The button on the map switches it for one session.</Note>
+
+      <Label>YOUR DOT</Label>
+      <Swatches
+        value={cfg?.dotColour ?? MAP_ROUTE_BLUE}
+        onPick={(hex) => void save({ dotColour: hex }, () => setDotColour(hex))}
+      />
+      <Label>YOUR LINE</Label>
+      <Swatches
+        value={cfg?.lineColour ?? MAP_ROUTE_BLUE}
+        onPick={(hex) => void save({ lineColour: hex }, () => setLineColour(hex))}
+      />
 
       <Label>RECORDING</Label>
       <ToggleRow
@@ -103,6 +124,30 @@ export default function MapSettingsScreen() {
   );
 }
 
+/** The route colours, as tappable dots. The ticked one is in use. */
+function Swatches({ value, onPick }: { value: string; onPick: (hex: string) => void }) {
+  return (
+    <View style={s.swatches}>
+      {ROUTE_COLOURS.map((c) => {
+        const on = c.hex.toLowerCase() === value.toLowerCase();
+        return (
+          <Pressable
+            key={c.hex}
+            onPress={() => onPick(c.hex)}
+            style={[s.swatchBtn, on && s.swatchOn]}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on }}
+            accessibilityLabel={c.name}
+            hitSlop={4}
+          >
+            <View style={[s.swatchDot, { backgroundColor: c.hex }]} />
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 const s = themedStyles(() =>
   StyleSheet.create({
     styles: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
@@ -143,6 +188,18 @@ const s = themedStyles(() =>
     styleT: { color: colors.textMuted, fontFamily: fonts.bodySemi },
     styleTOn: { color: colors.text },
     err: { color: colors.danger, marginTop: 6 },
+    swatches: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: spacing.sm },
+    swatchBtn: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 2,
+      borderColor: 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    swatchOn: { borderColor: colors.text },
+    swatchDot: { width: 30, height: 30, borderRadius: 15, borderWidth: 1, borderColor: colors.borderBright },
     units: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
     unit: {
       flex: 1,

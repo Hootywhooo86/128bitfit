@@ -93,6 +93,7 @@ export async function getCardioFixes(sessionId: string, afterId = 0): Promise<(F
     lon: r.lon,
     alt: r.alt,
     accuracy: r.accuracy,
+    speed: r.speed,
     segment: r.segment,
   }));
 }

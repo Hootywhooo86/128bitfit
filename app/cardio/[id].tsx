@@ -22,7 +22,7 @@ import {
 import { mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import { useCardioEnergy } from '@/lib/health/use-cardio-energy';
 import type { EnergyResult } from '@/lib/workout-energy';
-import type { MapStyleId } from '@/lib/map-style';
+import { MAP_ROUTE_BLUE, type MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 /** A finished cardio session: the route, the totals and the splits. */
@@ -33,6 +33,7 @@ export default function CardioSummaryScreen() {
   const [fixes, setFixes] = useState<Fix[]>([]);
   const [unit, setUnit] = useState<DistanceUnit>('km');
   const [styleId, setStyleId] = useState<MapStyleId>('dark');
+  const [colours, setColours] = useState({ dot: MAP_ROUTE_BLUE, line: MAP_ROUTE_BLUE });
   const [autoPause, setAutoPause] = useState(true);
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function CardioSummaryScreen() {
       ]);
       setUnit(cs.distanceUnit);
       setStyleId(cs.mapStyle);
+      setColours({ dot: cs.dotColour, line: cs.lineColour });
       setAutoPause(cs.autoPause);
       setFixes(pts);
       setSession(s);
@@ -129,7 +131,15 @@ export default function CardioSummaryScreen() {
 
       {fixes.length >= 2 ? (
         <View style={s.map}>
-          <RouteMap fixes={fixes} here={null} styleId={styleId} follow={false} showEnds />
+          <RouteMap
+            fixes={fixes}
+            here={null}
+            styleId={styleId}
+            follow={false}
+            showEnds
+            dotColour={colours.dot}
+            lineColour={colours.line}
+          />
         </View>
       ) : !session.manual ? (
         <Note>No route was recorded — the phone never got a usable GPS position.</Note>

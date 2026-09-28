@@ -32,7 +32,7 @@ import {
 } from '@/lib/cardio';
 import { mirrorWorkout } from '@/lib/health/mirror';
 import { ensureLocationAccess, startTracking, stopTracking, type LocationAccess } from '@/lib/cardio-tracker';
-import type { MapStyleId } from '@/lib/map-style';
+import { MAP_ROUTE_BLUE, type MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 import { useSessionAwake } from '@/lib/use-session-awake';
 
@@ -54,6 +54,7 @@ export default function RecordCardioScreen() {
   const [sport, setSport] = useState<Sport>(sportById(params.sport));
   const [picking, setPicking] = useState(false);
   const [styleId, setStyleId] = useState<MapStyleId>('dark');
+  const [colours, setColours] = useState({ dot: MAP_ROUTE_BLUE, line: MAP_ROUTE_BLUE });
   const [autoPause, setAutoPauseOn] = useState(true);
   const [keepAwake, setKeepAwake] = useState(false);
   const [unit, setUnit] = useState<DistanceUnit>('km');
@@ -73,6 +74,7 @@ export default function RecordCardioScreen() {
     void (async () => {
       const [cs, open] = await Promise.all([getCardioSettings(), getOpenCardioSession()]);
       setStyleId(cs.mapStyle);
+      setColours({ dot: cs.dotColour, line: cs.lineColour });
       setAutoPauseOn(cs.autoPause);
       setKeepAwake(cs.keepAwake);
       setUnit(cs.distanceUnit);
@@ -268,9 +270,15 @@ export default function RecordCardioScreen() {
   const speedLabel = unit === 'mi' ? 'mph' : 'km/h';
   const avgValue = sport.showSpeed ? formatSpeed(stats.avgSpeed, unit) : formatPace(stats.avgPace);
   const avgLabel = sport.showSpeed ? `Avg speed (${speedLabel})` : `Avg pace (/${unitLabel})`;
+  // Only while actually recording, and only from a recent fix: a figure from
+  // before a pause, or from a phone that stopped reporting, is not "current".
+  const lastFixT = fixes.length ? fixes[fixes.length - 1].t : 0;
+  const curSpeed = recording && now - lastFixT < 15_000 ? stats.currentSpeed : null;
   const curValue = sport.showSpeed
-    ? formatSpeed(stats.currentSpeed, unit)
-    : formatPace(paceFromSpeed(stats.currentSpeed, unit));
+    ? formatSpeed(curSpeed, unit)
+    : curSpeed === 0
+      ? 'Stopped'
+      : formatPace(paceFromSpeed(curSpeed, unit));
   const curLabel = sport.showSpeed ? `Speed (${speedLabel})` : `Pace (/${unitLabel})`;
   const distValue = session ? formatDistance(stats.distanceM, unit) : '–';
 
@@ -312,6 +320,8 @@ export default function RecordCardioScreen() {
         follow
         bottomInset={bottomH}
         recenterKey={recenter}
+        dotColour={colours.dot}
+        lineColour={colours.line}
       />
 
       <View style={[s.top, { paddingTop: insets.top + 8 }]} pointerEvents="box-none">
@@ -350,12 +360,12 @@ export default function RecordCardioScreen() {
 
           <View style={s.stats}>
             <Stat value={formatDuration(timeS)} label="Time" />
-            <Stat value={session ? avgValue : '–'} label={avgLabel} />
+            <Stat value={session ? curValue : '–'} label={curLabel} />
             <Stat value={distValue} label={`Distance (${unitLabel})`} />
           </View>
           {expanded ? (
             <View style={[s.stats, s.statsMore]}>
-              <Stat value={session ? curValue : '–'} label={curLabel} />
+              <Stat value={session ? avgValue : '–'} label={avgLabel} />
               <Stat value={session ? formatDuration(stats.movingS) : '–'} label="Moving time" />
               <Stat
                 value={stats.elevGainM != null ? String(Math.round(unit === 'mi' ? stats.elevGainM * 3.28084 : stats.elevGainM)) : '–'}

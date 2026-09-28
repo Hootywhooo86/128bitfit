@@ -47,7 +47,7 @@ describe('haversine', () => {
 });
 
 describe('cleaning fixes', () => {
-  it('drops fixes the phone rates worse than 30 m', () => {
+  it('drops fixes the phone rates worse than 40 m', () => {
     const fixes = walk(10, 1.4);
     fixes[5] = { ...fixes[5], accuracy: 65 };
     expect(cleanFixes(fixes, WALK)).toHaveLength(10);
@@ -123,6 +123,29 @@ describe('distance, time and pace', () => {
     const b = walk(30, 1.5, { start: 200, fromM: 45 + 300 });
     const s = cardioStats([...a, ...b], WALK, { autoPause: false, unit: 'km' });
     expect(s.movingS).toBe(60);
+  });
+});
+
+describe('current speed', () => {
+  it("trusts the phone's own speed over wobbling positions", () => {
+    // Positions say 1.5 m/s; the phone says 1.2 m/s for the last few seconds.
+    const fixes = walk(60, 1.5).map((f) => ({ ...f, speed: 1.2 }));
+    expect(cardioStats(fixes, WALK, { autoPause: true, unit: 'km' }).currentSpeed).toBeCloseTo(1.2, 6);
+  });
+
+  it('only averages the last few seconds of reported speed', () => {
+    const fixes = walk(60, 1.5).map((f, i) => ({ ...f, speed: i < 50 ? 3 : 1 }));
+    expect(cardioStats(fixes, WALK, { autoPause: true, unit: 'km' }).currentSpeed).toBeCloseTo(1, 6);
+  });
+
+  it('reads standing still as zero, not a glacial pace', () => {
+    const fixes = walk(60, 1.5).map((f, i) => ({ ...f, speed: i > 50 ? 0.1 : 1.5 }));
+    expect(cardioStats(fixes, WALK, { autoPause: true, unit: 'km' }).currentSpeed).toBe(0);
+  });
+
+  it('falls back to positions when the phone reports no speed', () => {
+    const s = cardioStats(walk(60, 1.5, { speed: null }), WALK, { autoPause: true, unit: 'km' });
+    expect(s.currentSpeed).toBeCloseTo(1.5, 2);
   });
 });
 

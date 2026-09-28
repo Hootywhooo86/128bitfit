@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Polyline } from 'react-native-svg';
 import type { Fix } from '@/lib/cardio';
-import { MAP_ATTRIBUTION, MAP_ROUTE_BLUE, MAP_ROUTE_CASING, mapStyleUrl, type MapStyleId } from '@/lib/map-style';
+import { MAP_ATTRIBUTION, MAP_ROUTE_BLUE, casingFor, mapStyleUrl, type MapStyleId } from '@/lib/map-style';
 import { pointGeoJson, projectToBox, routeBounds, routeGeoJson } from '@/lib/route-geometry';
 import { colors, fonts, themedStyles } from '@/lib/theme';
 
@@ -28,6 +28,8 @@ export function RouteMap({
   showEnds,
   bottomInset = 0,
   recenterKey = 0,
+  dotColour = MAP_ROUTE_BLUE,
+  lineColour = MAP_ROUTE_BLUE,
 }: {
   fixes: readonly Fix[];
   here: Here | null;
@@ -39,6 +41,9 @@ export function RouteMap({
   bottomInset?: number;
   /** Bump to snap back to the dot after panning away. */
   recenterKey?: number;
+  /** From Settings → Map; blue unless changed. */
+  dotColour?: string;
+  lineColour?: string;
 }) {
   const camera = useRef<CameraRef>(null);
   const [failed, setFailed] = useState(false);
@@ -77,7 +82,8 @@ export function RouteMap({
 
   const start = here ?? (last ? { lat: last.lat, lon: last.lon } : null);
 
-  if (failed) return <RouteGrid fixes={fixes} here={here} showEnds={showEnds} />;
+  if (failed)
+    return <RouteGrid fixes={fixes} here={here} showEnds={showEnds} dotColour={dotColour} lineColour={lineColour} />;
   // Nothing to centre on yet: wait for the first fix rather than open on a
   // map of the whole world and swoop in.
   if (follow && !start) return <RouteGrid fixes={[]} here={null} message="Finding your position…" />;
@@ -108,13 +114,13 @@ export function RouteMap({
             id="route-casing"
             type="line"
             layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            paint={{ 'line-color': MAP_ROUTE_CASING, 'line-width': 7, 'line-opacity': 0.85 }}
+            paint={{ 'line-color': casingFor(lineColour), 'line-width': 7, 'line-opacity': 0.85 }}
           />
           <Layer
             id="route-line"
             type="line"
             layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-            paint={{ 'line-color': MAP_ROUTE_BLUE, 'line-width': 4.5 }}
+            paint={{ 'line-color': lineColour, 'line-width': 4.5 }}
           />
         </GeoJSONSource>
         {showEnds && first ? (
@@ -124,8 +130,8 @@ export function RouteMap({
               type="circle"
               paint={{
                 'circle-radius': 6,
-                'circle-color': MAP_ROUTE_CASING,
-                'circle-stroke-color': MAP_ROUTE_BLUE,
+                'circle-color': casingFor(lineColour),
+                'circle-stroke-color': lineColour,
                 'circle-stroke-width': 3,
               }}
             />
@@ -138,8 +144,8 @@ export function RouteMap({
               type="circle"
               paint={{
                 'circle-radius': 8,
-                'circle-color': MAP_ROUTE_BLUE,
-                'circle-stroke-color': MAP_ROUTE_CASING,
+                'circle-color': dotColour,
+                'circle-stroke-color': casingFor(dotColour),
                 'circle-stroke-width': 3,
               }}
             />
@@ -157,11 +163,15 @@ export function RouteGrid({
   here,
   showEnds,
   message = 'Map needs signal — your route is still recording',
+  dotColour = MAP_ROUTE_BLUE,
+  lineColour = MAP_ROUTE_BLUE,
 }: {
   fixes: readonly Fix[];
   here: Here | null;
   showEnds?: boolean;
   message?: string;
+  dotColour?: string;
+  lineColour?: string;
 }) {
   const [size, setSize] = useState({ w: 0, h: 0 });
   const onLayout = (e: LayoutChangeEvent) =>
@@ -186,15 +196,15 @@ export function RouteGrid({
             const pts = seg.map(project).map((p) => `${p.x},${p.y}`).join(' ');
             return (
               <React.Fragment key={i}>
-                <Polyline points={pts} fill="none" stroke={MAP_ROUTE_CASING} strokeOpacity={0.85} strokeWidth={7} strokeLinecap="round" strokeLinejoin="round" />
-                <Polyline points={pts} fill="none" stroke={MAP_ROUTE_BLUE} strokeWidth={4.5} strokeLinecap="round" strokeLinejoin="round" />
+                <Polyline points={pts} fill="none" stroke={casingFor(lineColour)} strokeOpacity={0.85} strokeWidth={7} strokeLinecap="round" strokeLinejoin="round" />
+                <Polyline points={pts} fill="none" stroke={lineColour} strokeWidth={4.5} strokeLinecap="round" strokeLinejoin="round" />
               </React.Fragment>
             );
           })}
           {showEnds && fixes[0] ? (
-            <Circle {...xy(project(fixes[0]))} r={6} fill={MAP_ROUTE_CASING} stroke={MAP_ROUTE_BLUE} strokeWidth={3} />
+            <Circle {...xy(project(fixes[0]))} r={6} fill={casingFor(lineColour)} stroke={lineColour} strokeWidth={3} />
           ) : null}
-          {dot ? <Circle {...xy(project(dot))} r={8} fill={MAP_ROUTE_BLUE} stroke={MAP_ROUTE_CASING} strokeWidth={3} /> : null}
+          {dot ? <Circle {...xy(project(dot))} r={8} fill={dotColour} stroke={casingFor(dotColour)} strokeWidth={3} /> : null}
         </Svg>
       ) : null}
       <Text style={styles.offline}>{message}</Text>
