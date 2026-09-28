@@ -16,6 +16,7 @@ import {
   startCardioSession,
 } from '@/db/cardio-queries';
 import { getCardioSettings, setLastSport } from '@/db/map-settings';
+import { getSetting, setSetting } from '@/db/settings-queries';
 import type { CardioSession } from '@/db/schema';
 import {
   GOOD_FIX_M,
@@ -37,6 +38,8 @@ import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 import { useSessionAwake } from '@/lib/use-session-awake';
 
 type Here = { lat: number; lon: number; accuracy: number | null };
+
+const BATTERY_TIP_KEY = 'cardio_battery_tip_shown';
 
 /**
  * Record an outdoor session: full-screen map, the blue dot and the blue line
@@ -112,7 +115,7 @@ export default function RecordCardioScreen() {
   // A session left open by an app kill has lost its tracker: start it again.
   useEffect(() => {
     if (session && session.status !== 'finished' && access === 'granted') {
-      void startTracking(sportById(session.sport).label).catch(() => undefined);
+      void startTracking(sportById(session.sport).label, session.startedAt).catch(() => undefined);
     }
   }, [session?.id, access]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -159,6 +162,30 @@ export default function RecordCardioScreen() {
       return;
     }
     if (access !== 'granted') return;
+
+    // Once, before the first recording: some phones stop background apps to
+    // save battery, which is the one thing that can break a pocketed or
+    // backpacked recording. The app cannot see that setting, so it explains
+    // and offers the page where it lives; it never blocks the start.
+    if (!(await getSetting(BATTERY_TIP_KEY))) {
+      await setSetting(BATTERY_TIP_KEY, '1');
+      const openIt = await new Promise<boolean>((resolve) =>
+        Alert.alert(
+          'Keep recording with the screen off',
+          'Recording carries on with the phone locked — in a pocket or a backpack. Some phones stop apps in the background to save battery, though. To be sure, open App info → Battery and choose "Unrestricted" for 128BIT FIT.',
+          [
+            { text: 'Not now', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Open App info', onPress: () => resolve(true) },
+          ],
+          { cancelable: true, onDismiss: () => resolve(false) }
+        )
+      );
+      if (openIt) {
+        void Linking.openSettings();
+        return;
+      }
+    }
+
     const go = async () => {
       setBusy(true);
       try {
