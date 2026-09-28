@@ -146,6 +146,14 @@ export default function TrainScreen() {
         <MenuRow icon="▸" name="Pick something else" onPress={() => router.push('/train/start')} />
       ) : null}
 
+      <Label>CARDIO</Label>
+      <MenuRow
+        icon="»"
+        name="Cardio"
+        sub="Walk, run or ride with a live map"
+        onPress={() => router.push('/cardio')}
+      />
+
       <Label>AT THE GYM</Label>
       <MenuRow
         icon="▥"

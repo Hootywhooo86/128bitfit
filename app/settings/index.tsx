@@ -244,6 +244,13 @@ export default function SettingsScreen() {
         </View>
       </Pressable>
 
+      <Pressable style={styles.charCard} onPress={() => router.push('/settings/map')}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Map</Text>
+          <Text style={styles.muted}>Dark or light, auto-pause, screen on →</Text>
+        </View>
+      </Pressable>
+
       <Pressable style={styles.charCard} onPress={() => router.push('/settings/health')}>
         <View style={{ flex: 1 }}>
           <Text style={styles.aiTitle}>Health Connect</Text>

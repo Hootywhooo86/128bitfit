@@ -85,3 +85,7 @@ Primary target is **iOS / Android via Expo Go** (`npx expo start`). `expo-sqlite
   this credit and forbids republishing the dataset, so none of it is committed here.
 - Foods: [USDA FoodData Central](https://fdc.nal.usda.gov/) (public domain); barcode lookups
   from [Open Food Facts](https://world.openfoodfacts.org/) (ODbL).
+- Cardio maps: © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors, tiles
+  and styles from [OpenFreeMap](https://openfreemap.org) (free, no key), drawn with
+  [MapLibre](https://maplibre.org). Routes are recorded and kept on the phone; only map tiles
+  are downloaded.

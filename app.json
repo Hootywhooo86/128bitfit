@@ -10,7 +10,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Allow 128BIT FIT to scan food barcodes."
+        "NSCameraUsageDescription": "Allow 128BIT FIT to scan food barcodes.",
+        "NSLocationWhenInUseUsageDescription": "Allow 128BIT FIT to record the route of your walks, runs and rides. It stays on this phone."
       }
     },
     "android": {
@@ -54,7 +55,11 @@
         "android.permission.health.WRITE_HYDRATION",
         "android.permission.health.WRITE_NUTRITION",
         "android.permission.health.WRITE_STEPS",
-        "android.permission.health.WRITE_WEIGHT"
+        "android.permission.health.WRITE_WEIGHT",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION"
       ]
     },
     "web": {
@@ -105,6 +110,15 @@
       ],
       "expo-secure-store",
       "react-native-health-connect",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow 128BIT FIT to record the route of your walks, runs and rides. It stays on this phone.",
+          "isAndroidForegroundServiceEnabled": true,
+          "isAndroidBackgroundLocationEnabled": false
+        }
+      ],
+      "@maplibre/maplibre-react-native",
       "expo-sharing",
       "expo-build-properties",
       "./plugins/with-latin-only-mlkit"
