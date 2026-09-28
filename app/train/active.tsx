@@ -21,6 +21,7 @@ import {
   discardSession,
   liveRecordFor,
   loadActiveWorkout,
+  moveSessionExercise,
   removeSessionExercise,
   setSessionExerciseNote,
   updateSet,
@@ -245,6 +246,7 @@ export default function ActiveWorkoutScreen() {
                 onSetCurrent={() => setCurrentExerciseId(se.id)}
                 onHow={() => router.push({ pathname: '/exercise/[id]', params: { id: se.exerciseId } })}
                 onAddPhoto={() => router.push({ pathname: '/exercise/new', params: { id: se.exerciseId } })}
+                onMove={(by) => void act(() => moveSessionExercise(se.id, by))}
                 onSwap={() =>
                   router.push({ pathname: '/train/add-exercise', params: { sessionId, swap: se.id } })
                 }
@@ -331,6 +333,7 @@ function ExerciseCard({
   onSetCurrent,
   onHow,
   onAddPhoto,
+  onMove,
   onSwap,
   onOptions,
   onSaveNote,
@@ -354,6 +357,7 @@ function ExerciseCard({
   onHow: () => void;
   /** Your own exercise with no picture: open it to take or pick one. */
   onAddPhoto: () => void;
+  onMove: (by: -1 | 1) => void;
   onSwap: () => void;
   onOptions: () => void;
   onSaveNote: (note: string) => void;
@@ -396,6 +400,27 @@ function ExerciseCard({
         <Text style={styles.cardCounter}>
           EXERCISE {index + 1} / {total}
         </Text>
+        {/* Re-order when the machine you wanted is taken. */}
+        <View style={styles.moveRow}>
+          <Pressable
+            style={[styles.moveBtn, index === 0 && styles.moveBtnOff]}
+            onPress={() => onMove(-1)}
+            disabled={index === 0}
+            hitSlop={6}
+            accessibilityLabel="Move exercise up"
+          >
+            <Text style={styles.moveBtnText}>↑</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.moveBtn, index === total - 1 && styles.moveBtnOff]}
+            onPress={() => onMove(1)}
+            disabled={index === total - 1}
+            hitSlop={6}
+            accessibilityLabel="Move exercise down"
+          >
+            <Text style={styles.moveBtnText}>↓</Text>
+          </Pressable>
+        </View>
         <Text style={[styles.stateChip, (isCurrent || allDone) && styles.stateChipCurrent]}>{stateChip}</Text>
       </View>
 
@@ -493,10 +518,18 @@ function ExerciseCard({
       ) : null}
 
       <View style={styles.setHeader}>
-        <Text style={[styles.col, styles.colSet]}>SET</Text>
-        <Text style={[styles.col, styles.colNum]}>WEIGHT ({units.toUpperCase()})</Text>
-        <Text style={[styles.col, styles.colNum]}>REPS</Text>
-        <Text style={[styles.col, styles.colDone]} />
+        {/* Same columns as the rows below, and shrink-to-fit so a large
+            system font cannot run SET into WEIGHT. */}
+        <Text style={[styles.col, styles.colSet, styles.headText]} numberOfLines={1} adjustsFontSizeToFit>
+          SET
+        </Text>
+        <Text style={[styles.col, styles.colNum, styles.headText]} numberOfLines={1} adjustsFontSizeToFit>
+          WEIGHT ({units.toUpperCase()})
+        </Text>
+        <Text style={[styles.col, styles.colNum, styles.headText]} numberOfLines={1} adjustsFontSizeToFit>
+          REPS
+        </Text>
+        <View style={styles.colDone} />
       </View>
 
       {se.sets.map((set, setIdx) => {
@@ -601,7 +634,9 @@ function SetRow({
 
   return (
     <View style={[styles.setRow, set.isWarmup && styles.warmupRow, set.completed && styles.doneRow]}>
-      <Text style={[styles.col, styles.colSet, set.isWarmup && styles.warmText]}>{label}</Text>
+      <Text style={[styles.col, styles.colSet, styles.setLabel, set.isWarmup && styles.warmText]} numberOfLines={1} adjustsFontSizeToFit>
+        {label}
+      </Text>
       <View style={[styles.col, styles.colNum, styles.numGroup]}>
         <Pressable
           style={styles.stepBtn}
@@ -746,11 +781,24 @@ const styles = themedStyles(() => StyleSheet.create({
     marginBottom: spacing.md,
   },
   cardCounter: {
+    flex: 1,
     fontSize: 12,
     fontWeight: '700',
     color: colors.textDim,
     letterSpacing: 0.5,
   },
+  moveRow: { flexDirection: 'row', gap: 8, marginRight: 10 },
+  moveBtn: {
+    width: 36,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.borderBright,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moveBtnOff: { opacity: 0.3 },
+  moveBtnText: { color: colors.text, fontSize: 16, fontWeight: '700' },
   stateChip: {
     fontSize: 12,
     fontWeight: '700',
@@ -918,8 +966,17 @@ const styles = themedStyles(() => StyleSheet.create({
     flex: 1,
   },
   colDone: {
-    width: 40,
+    width: 36,
     flex: 0,
+  },
+  // The set number was unstyled, so it drew near-black on the dark card.
+  setLabel: { color: colors.textMuted, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  headText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
   setRow: {
     flexDirection: 'row',

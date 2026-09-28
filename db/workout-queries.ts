@@ -29,6 +29,7 @@ import {
   type WorkoutSession,
   type WorkoutSet,
 } from './schema';
+import { moveInOrder } from '@/lib/reorder';
 
 export type SessionExerciseWithMeta = SessionExercise & {
   exerciseName: string;
@@ -493,6 +494,33 @@ export async function deleteSet(setId: string): Promise<void> {
 export async function removeSessionExercise(sessionExerciseId: string): Promise<void> {
   await db.delete(sets).where(eq(sets.sessionExerciseId, sessionExerciseId));
   await db.delete(sessionExercises).where(eq(sessionExercises.id, sessionExerciseId));
+}
+
+/**
+ * Moves an exercise up or down the workout, for when the machine you wanted
+ * is taken. Renumbers the whole session from the new order (see moveInOrder).
+ */
+export async function moveSessionExercise(sessionExerciseId: string, by: -1 | 1): Promise<void> {
+  const [owner] = await db
+    .select({ sessionId: sessionExercises.sessionId })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.id, sessionExerciseId))
+    .limit(1);
+  if (!owner) throw new Error('That exercise is no longer in the workout.');
+  const rows = await db
+    .select({ id: sessionExercises.id })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.sessionId, owner.sessionId))
+    .orderBy(asc(sessionExercises.position), asc(sessionExercises.id));
+  const order = moveInOrder(
+    rows.map((r) => r.id),
+    sessionExerciseId,
+    by
+  );
+  if (!order) return;
+  for (let i = 0; i < order.length; i++) {
+    await db.update(sessionExercises).set({ position: i }).where(eq(sessionExercises.id, order[i]));
+  }
 }
 
 export async function setSessionExerciseNote(sessionExerciseId: string, note: string): Promise<void> {
