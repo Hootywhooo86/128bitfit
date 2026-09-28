@@ -22,6 +22,7 @@ import {
   liveRecordFor,
   loadActiveWorkout,
   moveSessionExercise,
+  toggleSupersetWithNext,
   removeSessionExercise,
   setSessionExerciseNote,
   updateSet,
@@ -32,6 +33,9 @@ import type { WorkoutSet } from '@/db/schema';
 import { getAppSettings, type WeightUnit } from '@/db/settings-queries';
 import { exerciseImageSource } from '@/lib/exercise-images';
 import { isUserExercise } from '@/lib/exercise-sources';
+import { equipmentGroup } from '@/lib/equipment-groups';
+import { plateHint } from '@/lib/plates';
+import { afterSupersetTick, supersetLabels } from '@/lib/superset';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
@@ -109,8 +113,14 @@ export default function ActiveWorkoutScreen() {
   ) => {
     await completeSet(set.id, values);
     if (values.weight != null) await updateSet(set.id, { weightUnit: units });
-    const rest = se.restSeconds ?? DEFAULT_REST_SECONDS;
-    timer.start(rest, se.id, sessionId);
+    // A superset rests only after its last exercise; before that, go
+    // straight on to the partner.
+    const next = workout ? afterSupersetTick(workout.exercises, se.id) : { rest: true, nextCurrentId: se.id };
+    if (next.rest) {
+      const rest = se.restSeconds ?? DEFAULT_REST_SECONDS;
+      timer.start(rest, se.id, sessionId);
+    }
+    if (next.nextCurrentId !== se.id) setCurrentExerciseId(next.nextCurrentId);
     await refresh();
     // After the tick has saved and the rest has started, so it never costs
     // the three seconds. A failed check just means no trophy this time.
@@ -124,6 +134,8 @@ export default function ActiveWorkoutScreen() {
       })
       .catch(() => undefined);
   };
+
+  const supersetTags = supersetLabels(workout?.exercises ?? []);
 
   const onFinish = () => {
     Alert.alert('Finish workout?', 'Mark this session as completed.', [
@@ -247,11 +259,17 @@ export default function ActiveWorkoutScreen() {
                 onHow={() => router.push({ pathname: '/exercise/[id]', params: { id: se.exerciseId } })}
                 onAddPhoto={() => router.push({ pathname: '/exercise/new', params: { id: se.exerciseId } })}
                 onMove={(by) => void act(() => moveSessionExercise(se.id, by))}
+                supersetLabel={supersetTags.get(se.id) ?? null}
+                onPlates={(w) => router.push({ pathname: '/train/plates', params: { target: String(w) } })}
                 onSwap={() =>
                   router.push({ pathname: '/train/add-exercise', params: { sessionId, swap: se.id } })
                 }
                 onOptions={() =>
                   Alert.alert(se.exerciseName, undefined, [
+                    {
+                      text: se.supersetGroup ? 'Remove from superset' : 'Superset with next',
+                      onPress: () => void act(() => toggleSupersetWithNext(se.id)),
+                    },
                     {
                       text: 'Remove from workout',
                       style: 'destructive',
@@ -334,6 +352,8 @@ function ExerciseCard({
   onHow,
   onAddPhoto,
   onMove,
+  onPlates,
+  supersetLabel,
   onSwap,
   onOptions,
   onSaveNote,
@@ -358,6 +378,9 @@ function ExerciseCard({
   /** Your own exercise with no picture: open it to take or pick one. */
   onAddPhoto: () => void;
   onMove: (by: -1 | 1) => void;
+  onPlates: (weight: number) => void;
+  /** "A1", "A2"… when this exercise is in a superset. */
+  supersetLabel: string | null;
   onSwap: () => void;
   onOptions: () => void;
   onSaveNote: (note: string) => void;
@@ -392,6 +415,12 @@ function ExerciseCard({
   // One you made, with no picture yet: offer to add one rather than show a
   // grey tile with its initials.
   const canAddPhoto = !imageSource && isUserExercise(se.category);
+  // Barbell lifts: what to load for the next set still to do. One line,
+  // read-only, so logging a set is exactly as fast as before.
+  const nextSet = se.sets.find((st) => !st.completed);
+  const plateWeight = nextSet?.weight ?? null;
+  const plateLine =
+    equipmentGroup(se.equipment) === 'barbell' && nextSet ? plateHint(plateWeight, units) : null;
   const caption = [primaryMuscle.toUpperCase(), se.equipment?.toUpperCase()].filter(Boolean).join(' · ');
 
   return (
@@ -436,6 +465,7 @@ function ExerciseCard({
       </View>
 
       <View style={styles.chipRow}>
+        {supersetLabel ? <Text style={[styles.chip, styles.supersetChip]}>SUPERSET {supersetLabel}</Text> : null}
         {primaryMuscle ? <Text style={styles.chip}>{primaryMuscle.toUpperCase()}</Text> : null}
         {se.equipment ? <Text style={styles.chip}>{se.equipment.toUpperCase()}</Text> : null}
         {se.best ? (
@@ -557,6 +587,12 @@ function ExerciseCard({
           />
         );
       })}
+
+      {plateLine ? (
+        <Pressable onPress={() => onPlates(plateWeight!)} hitSlop={6} style={styles.plateHint}>
+          <Text style={styles.plateHintText}>{plateLine} ›</Text>
+        </Pressable>
+      ) : null}
 
       <View style={styles.actionGrid}>
         <Pressable style={styles.dashedBtn} onPress={() => setNoteOpen(true)}>
@@ -788,6 +824,9 @@ const styles = themedStyles(() => StyleSheet.create({
     letterSpacing: 0.5,
   },
   moveRow: { flexDirection: 'row', gap: 8, marginRight: 10 },
+  plateHint: { paddingVertical: 8 },
+  supersetChip: { borderWidth: 1, borderColor: colors.accent, color: colors.accent },
+  plateHintText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
   moveBtn: {
     width: 36,
     height: 32,

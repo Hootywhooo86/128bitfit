@@ -32,6 +32,7 @@ import {
   type Sport,
 } from '@/lib/cardio';
 import { mirrorWorkout } from '@/lib/health/mirror';
+import { clearLiveCardioStats } from '@/lib/cardio-live-notification';
 import { ensureLocationAccess, startTracking, stopTracking, type LocationAccess } from '@/lib/cardio-tracker';
 import { MAP_ROUTE_BLUE, type MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
@@ -259,6 +260,9 @@ export default function RecordCardioScreen() {
               onPress: async () => {
                 await stopTracking();
                 await discardCardioSessions([session.id]);
+                // Again after the session is gone: a stats update already in
+                // flight when tracking stopped could have put it back.
+                await clearLiveCardioStats();
                 router.back();
               },
             },
@@ -271,6 +275,7 @@ export default function RecordCardioScreen() {
           try {
             await stopTracking();
             const done = await finishCardioSession(session.id, { autoPause, unit });
+            await clearLiveCardioStats();
             if (done?.endedAt) {
               // Duration and sport only, like strength sessions: nothing estimated.
               mirrorWorkout({

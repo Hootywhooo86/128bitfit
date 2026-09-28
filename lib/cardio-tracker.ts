@@ -19,6 +19,7 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { recordFixes } from '@/db/cardio-queries';
+import { clearLiveCardioStats, postLiveCardioStats } from './cardio-live-notification';
 
 export const CARDIO_TASK = 'bitfit-cardio-location';
 
@@ -43,6 +44,11 @@ if (!TaskManager.isTaskDefined(CARDIO_TASK)) {
     } catch {
       // A failed write loses these few fixes; the next batch still records.
       // There is no screen to tell from inside a background task.
+    }
+    try {
+      await postLiveCardioStats();
+    } catch {
+      // The lock-screen figures are a convenience; the recording is unaffected.
     }
   });
 }
@@ -81,6 +87,7 @@ export async function startTracking(sportLabel: string, startedAt = Date.now()):
 }
 
 export async function stopTracking(): Promise<void> {
+  await clearLiveCardioStats();
   try {
     if (await Location.hasStartedLocationUpdatesAsync(CARDIO_TASK)) {
       await Location.stopLocationUpdatesAsync(CARDIO_TASK);

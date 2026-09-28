@@ -1,9 +1,11 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
+  getInProgressSession,
   getWorkoutSummary,
   personalRecordsIn,
+  repeatWorkout,
   type SessionPr,
   type WorkoutSummary,
 } from '@/db/workout-queries';
@@ -52,6 +54,24 @@ export default function WorkoutSummaryScreen() {
     })();
   }, [id]);
 
+  const repeat = async () => {
+    if (!summary) return;
+    try {
+      const running = await getInProgressSession();
+      if (running) {
+        Alert.alert('A workout is already running', 'Finish or discard it first, then repeat this one.', [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open it', onPress: () => router.replace({ pathname: '/train/active', params: { id: running.id } }) },
+        ]);
+        return;
+      }
+      const newId = await repeatWorkout(summary.session.id);
+      router.replace({ pathname: '/train/active', params: { id: newId } });
+    } catch (e) {
+      Alert.alert('Could not start', e instanceof Error ? e.message : String(e));
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.center}>
@@ -99,6 +119,11 @@ export default function WorkoutSummaryScreen() {
         <Pressable style={styles.btn} onPress={() => router.replace('/(tabs)/train')}>
           <Text style={styles.btnText}>Back to Train</Text>
         </Pressable>
+        {summary.session.status === 'completed' && summary.exercises.length > 0 ? (
+          <Pressable style={styles.btnGhost} onPress={() => void repeat()}>
+            <Text style={styles.btnGhostText}>Repeat this workout</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </>
   );
@@ -215,4 +240,12 @@ const styles = themedStyles(() => StyleSheet.create({
     paddingVertical: 14,
   },
   btnText: { color: colors.chipActiveText, fontWeight: '800', textAlign: 'center', fontSize: 16 },
+  btnGhost: {
+    marginTop: spacing.sm,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderBright,
+    paddingVertical: 14,
+  },
+  btnGhostText: { color: colors.text, fontWeight: '700', textAlign: 'center', fontSize: 15 },
 }));

@@ -4,7 +4,13 @@ import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
 import { Label, MenuRow, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { listStartableRoutines, type StartableRoutine } from '@/db/start-queries';
-import { getInProgressSession, startFreestyleWorkout } from '@/db/workout-queries';
+import {
+  getInProgressSession,
+  getLastCompletedWorkoutSummary,
+  repeatWorkout,
+  startFreestyleWorkout,
+  type WorkoutSummary,
+} from '@/db/workout-queries';
 import { describeLastRun, routineSummary } from '@/lib/routine-summary';
 import { colors } from '@/lib/theme';
 
@@ -23,16 +29,19 @@ export default function StartWorkoutScreen() {
   const [running, setRunning] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [last, setLast] = useState<WorkoutSummary | null>(null);
 
   const load = useCallback(async () => {
     if (!ready) return;
     try {
-      const [list, active] = await Promise.all([
+      const [list, active, previous] = await Promise.all([
         listStartableRoutines(),
         getInProgressSession(),
+        getLastCompletedWorkoutSummary(),
       ]);
       setRoutines(list);
       setRunning(active?.id ?? null);
+      setLast(previous && previous.exercises.length > 0 ? previous : null);
     } finally {
       setLoading(false);
     }
@@ -49,6 +58,19 @@ export default function StartWorkoutScreen() {
     setBusy(true);
     try {
       const id = await startFreestyleWorkout();
+      router.replace({ pathname: '/train/active', params: { id } });
+    } catch (e) {
+      Alert.alert('Could not start', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const repeat = async () => {
+    if (busy || !last) return;
+    setBusy(true);
+    try {
+      const id = await repeatWorkout(last.session.id);
       router.replace({ pathname: '/train/active', params: { id } });
     } catch (e) {
       Alert.alert('Could not start', e instanceof Error ? e.message : String(e));
@@ -109,6 +131,26 @@ export default function StartWorkoutScreen() {
           );
         })
       )}
+
+      {last ? (
+        <>
+          <Label>AGAIN</Label>
+          <MenuRow
+            icon="↻"
+            name="Repeat last workout"
+            sub={[
+              describeLastRun(last.session.endedAt ?? last.session.startedAt),
+              last.exercises
+                .slice(0, 3)
+                .map((e) => e.name)
+                .join(', ') + (last.exercises.length > 3 ? ` +${last.exercises.length - 3}` : ''),
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+            onPress={() => void repeat()}
+          />
+        </>
+      ) : null}
 
       <Label>NO PLAN</Label>
       <MenuRow

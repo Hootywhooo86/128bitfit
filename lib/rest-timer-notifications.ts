@@ -36,12 +36,17 @@ export type RestNotificationData = {
 let setupDone = false;
 
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (n) => {
+    // The live cardio figures update every few seconds; with the app open
+    // they belong in the shade, not popping up over the map.
+    const quiet = n.request.content.data?.type === 'cardio_live';
+    return {
+      shouldShowBanner: !quiet,
+      shouldShowList: true,
+      shouldPlaySound: !quiet,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 export function notificationsSupported(): boolean {

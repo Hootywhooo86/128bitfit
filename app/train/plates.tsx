@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BigStepper } from '@/components/BigStepper';
@@ -18,6 +19,8 @@ export default function PlatesScreen() {
   const [unit, setUnit] = useState<WeightUnit>('lb');
   const [target, setTarget] = useState(185);
   const [bar, setBar] = useState(45);
+  // Opened from a set in a live workout: start at that set's weight.
+  const params = useLocalSearchParams<{ target?: string }>();
 
   useEffect(() => {
     void getAppSettings().then((a) => {
@@ -26,8 +29,10 @@ export default function PlatesScreen() {
         setTarget(100);
         setBar(20);
       }
+      const t = Number(params.target);
+      if (Number.isFinite(t) && t > 0) setTarget(t);
     });
-  }, []);
+  }, [params.target]);
 
   const plates = PLATES[unit];
   const r = platesFor(target, bar, plates);

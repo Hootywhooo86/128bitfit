@@ -82,6 +82,8 @@ export const sessionExercises = sqliteTable('session_exercises', {
   position: integer('position').notNull().default(0),
   restSeconds: integer('rest_seconds').default(60),
   notes: text('notes'),
+  /** Exercises sharing a group are a superset: rest only after the last of them. */
+  supersetGroup: text('superset_group'),
 });
 
 export const SET_TYPES = ['normal', 'drop', 'rp'] as const;

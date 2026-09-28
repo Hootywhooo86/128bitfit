@@ -82,3 +82,20 @@ export function warmupSets(working: number, unit: WeightUnit, bar = BARS[unit][0
     return { pct, weight: Math.round(raw / step) * step, reps };
   });
 }
+
+/**
+ * One line for the live workout: what goes on each side of a standard bar
+ * for this weight. "Per side: 45 + 10 + 2.5", "Bar only", or null when the
+ * weight is below the bar or not set — no hint beats a wrong one.
+ */
+export function plateHint(weight: number | null, unit: WeightUnit): string | null {
+  if (weight == null || !Number.isFinite(weight) || weight <= 0) return null;
+  const bar = BARS[unit][0];
+  const r = platesFor(weight, bar, PLATES[unit]);
+  if (r.status !== 'ok') return null;
+  if (r.perSide.length === 0) return `Bar only (${bar} ${unit})`;
+  const load = r.perSide.join(' + ');
+  return r.shortPerSide > 0
+    ? `Per side: ${load} — closest to ${weight} is ${r.loaded} ${unit}`
+    : `Per side: ${load} (${bar} ${unit} bar)`;
+}
