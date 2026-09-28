@@ -6,10 +6,8 @@ import { Label, MenuRow, Note, Screen, SessionCard } from '@/components/ui';
 import { getOpenCardioSession, listCardioSessions } from '@/db/cardio-queries';
 import { getCardioSettings } from '@/db/map-settings';
 import type { CardioSession } from '@/db/schema';
-import { getAppSettings } from '@/db/settings-queries';
 import {
   DEFAULT_SPORT,
-  distanceUnitFor,
   formatDistance,
   formatDuration,
   sportById,
@@ -36,15 +34,14 @@ export default function CardioHomeScreen() {
   useFocusEffect(
     useCallback(() => {
       void (async () => {
-        const [o, h, app, cs] = await Promise.all([
+        const [o, h, cs] = await Promise.all([
           getOpenCardioSession(),
           listCardioSessions(),
-          getAppSettings(),
           getCardioSettings(),
         ]);
         setOpen(o);
         setHistory(h);
-        setUnit(distanceUnitFor(app.units));
+        setUnit(cs.distanceUnit);
         setLast(cs.lastSport);
         setLoaded(true);
       })();

@@ -45,7 +45,9 @@ function isCoachMode(v: string): v is CoachMode {
 
 export default function CoachSessionScreen() {
   const router = useRouter();
-  const { mode: modeParam } = useLocalSearchParams<{ mode: string }>();
+  const { mode: modeParam, cardio } = useLocalSearchParams<{ mode: string; cardio?: string }>();
+  // Opened from a cardio summary: debrief that session rather than the latest.
+  const cardioId = typeof cardio === 'string' && cardio ? cardio : null;
   const raw = typeof modeParam === 'string' ? modeParam : Array.isArray(modeParam) ? modeParam[0] : '';
   const mode: CoachMode = isCoachMode(raw) ? raw : 'ask';
   const { ready } = useDb();
@@ -73,7 +75,7 @@ export default function CoachSessionScreen() {
     (async () => {
       try {
         const [summary, runtime] = await Promise.all([
-          buildCoachContext(mode),
+          buildCoachContext(mode, { cardioId }),
           getAiRuntimeConfig(),
         ]);
         if (cancelled) return;
@@ -90,7 +92,7 @@ export default function CoachSessionScreen() {
       cancelled = true;
       abortRef.current?.abort();
     };
-  }, [ready, mode]);
+  }, [ready, mode, cardioId]);
 
   const onAsk = useCallback(async () => {
     if (!ctx || asking) return;
@@ -180,11 +182,11 @@ export default function CoachSessionScreen() {
     setAsking(false);
     openingQuestion.current = '';
     try {
-      setCtx(await buildCoachContext(mode));
+      setCtx(await buildCoachContext(mode, { cardioId }));
     } catch (e) {
       setLoadError(e instanceof Error ? e.message : String(e));
     }
-  }, [mode]);
+  }, [mode, cardioId]);
 
   if (!ready || (!ctx && !loadError)) {
     return (

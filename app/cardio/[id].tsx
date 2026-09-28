@@ -8,10 +8,8 @@ import { Card, CardHead, Label, MenuRow, Note, Screen } from '@/components/ui';
 import { deleteCardioSession, getCardioFixes, getCardioSession } from '@/db/cardio-queries';
 import { getCardioSettings } from '@/db/map-settings';
 import type { CardioSession } from '@/db/schema';
-import { getAppSettings } from '@/db/settings-queries';
 import {
   cardioStats,
-  distanceUnitFor,
   formatDistance,
   formatDuration,
   formatPace,
@@ -22,6 +20,8 @@ import {
   type Fix,
 } from '@/lib/cardio';
 import { mirrorWorkoutRemoved } from '@/lib/health/mirror';
+import { useCardioEnergy } from '@/lib/health/use-cardio-energy';
+import type { EnergyResult } from '@/lib/workout-energy';
 import type { MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
@@ -37,13 +37,12 @@ export default function CardioSummaryScreen() {
 
   useEffect(() => {
     void (async () => {
-      const [s, pts, app, cs] = await Promise.all([
+      const [s, pts, cs] = await Promise.all([
         getCardioSession(String(id)),
         getCardioFixes(String(id)),
-        getAppSettings(),
         getCardioSettings(),
       ]);
-      setUnit(distanceUnitFor(app.units));
+      setUnit(cs.distanceUnit);
       setStyleId(cs.mapStyle);
       setAutoPause(cs.autoPause);
       setFixes(pts);
@@ -53,6 +52,19 @@ export default function CardioSummaryScreen() {
 
   const sport = sportById(session?.sport);
   const stats = useMemo(() => cardioStats(fixes, sport, { autoPause, unit }), [fixes, sport, autoPause, unit]);
+  const energy = useCardioEnergy(
+    session
+      ? {
+          sport,
+          startedAt: session.startedAt,
+          endedAt: session.endedAt,
+          manual: session.manual,
+          movingS: session.manual ? session.movingS : Math.round(stats.movingS),
+          distanceM: session.manual ? session.distanceM : stats.distanceM,
+          climbM: session.manual ? null : stats.elevGainM,
+        }
+      : null
+  );
 
   if (session === undefined) {
     return (
@@ -165,6 +177,16 @@ export default function CardioSummaryScreen() {
         </>
       ) : null}
 
+      <EnergyCard energy={energy} />
+
+      <Label>COACH</Label>
+      <MenuRow
+        icon="◈"
+        name="Ask the coach about this"
+        sub="A debrief of this session, with your recent cardio and food"
+        onPress={() => router.push({ pathname: '/coach/[mode]', params: { mode: 'debrief', cardio: session.id } })}
+      />
+
       <Label>MORE</Label>
       {fixes.length >= 2 ? (
         <MenuRow icon="⇪" name="Export route (GPX)" sub="Open it in Strava, Komoot or any map app" onPress={() => void shareGpx()} />
@@ -173,6 +195,35 @@ export default function CardioSummaryScreen() {
         <Text style={s.deleteT}>Delete session</Text>
       </Pressable>
     </Screen>
+  );
+}
+
+/** Active calories, and whether they were measured or worked out — never shown the same way. */
+function EnergyCard({ energy }: { energy: EnergyResult | null }) {
+  if (!energy) return null;
+  if (energy.status === 'unknown') {
+    return (
+      <Card>
+        <CardHead title="CALORIES" />
+        <Text style={s.energyNote}>
+          No figure yet — needs {energy.missing.join(' and ')}.
+          {energy.missing.includes('your body weight') ? ' Log a weigh-in and this fills in.' : ''}
+        </Text>
+      </Card>
+    );
+  }
+  const measured = energy.status === 'measured';
+  return (
+    <Card>
+      <CardHead title="ACTIVE CALORIES" note={measured ? 'measured' : 'estimate'} />
+      <Text style={s.energyValue}>
+        {measured ? '' : '~'}
+        {energy.kcal.toLocaleString()} kcal
+      </Text>
+      <Text style={s.energyNote}>
+        {measured ? `Measured by ${energy.source} for this session.` : `${energy.basis}. ${energy.caveat}`}
+      </Text>
+    </Card>
   );
 }
 
@@ -225,5 +276,7 @@ const s = themedStyles(() =>
       alignItems: 'center',
     },
     deleteT: { color: colors.danger, fontFamily: fonts.bodySemi },
+    energyValue: { color: colors.text, fontSize: 26, fontFamily: fonts.bodyBold, marginTop: 4 },
+    energyNote: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18, marginTop: 6, fontFamily: fonts.body },
   })
 );

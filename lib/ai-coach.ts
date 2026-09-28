@@ -697,7 +697,7 @@ export function defaultUserPromptForMode(
   switch (mode) {
     case 'debrief':
       return [
-        'Please give a post-workout debrief based on my local data.',
+        'Please give a debrief of my most recent session based on my local data — strength or cardio, whichever the context says was last, or the cardio session it names.',
         'Cover: what went well, one improvement for next time, recovery/fuel tip.',
         '',
         '--- Local context ---',

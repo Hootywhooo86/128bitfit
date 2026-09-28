@@ -247,7 +247,7 @@ export default function SettingsScreen() {
       <Pressable style={styles.charCard} onPress={() => router.push('/settings/map')}>
         <View style={{ flex: 1 }}>
           <Text style={styles.aiTitle}>Map</Text>
-          <Text style={styles.muted}>Dark or light, auto-pause, screen on →</Text>
+          <Text style={styles.muted}>Dark or light, km or miles, auto-pause →</Text>
         </View>
       </Pressable>
 

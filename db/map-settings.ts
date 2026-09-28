@@ -1,12 +1,13 @@
-import { DEFAULT_SPORT, sportById, type SportId } from '@/lib/cardio';
+import { DEFAULT_SPORT, distanceUnitFor, sportById, type DistanceUnit, type SportId } from '@/lib/cardio';
 import type { MapStyleId } from '@/lib/map-style';
-import { getSetting, setSetting } from './settings-queries';
+import { getAppSettings, getSetting, setSetting } from './settings-queries';
 
 const KEYS = {
   style: 'map_style',
   autoPause: 'cardio_auto_pause',
   lastSport: 'cardio_last_sport',
   keepAwake: 'cardio_keep_awake',
+  distanceUnit: 'distance_unit',
 } as const;
 
 export type CardioSettings = {
@@ -20,20 +21,29 @@ export type CardioSettings = {
    * with the screen off, and a lit screen in a pocket is a flat battery.
    */
   keepAwake: boolean;
+  /**
+   * Its own setting: plenty of people weigh in pounds and run in kilometres.
+   * Until it is chosen it follows the weight unit, which is what the app did
+   * before the setting existed.
+   */
+  distanceUnit: DistanceUnit;
 };
 
 export async function getCardioSettings(): Promise<CardioSettings> {
-  const [style, autoPause, lastSport, keepAwake] = await Promise.all([
+  const [style, autoPause, lastSport, keepAwake, unit, app] = await Promise.all([
     getSetting(KEYS.style),
     getSetting(KEYS.autoPause),
     getSetting(KEYS.lastSport),
     getSetting(KEYS.keepAwake),
+    getSetting(KEYS.distanceUnit),
+    getAppSettings(),
   ]);
   return {
     mapStyle: style === 'light' ? 'light' : 'dark',
     autoPause: autoPause !== '0',
     lastSport: lastSport ? sportById(lastSport).id : DEFAULT_SPORT,
     keepAwake: keepAwake === '1',
+    distanceUnit: unit === 'km' || unit === 'mi' ? unit : distanceUnitFor(app.units),
   };
 }
 
@@ -41,3 +51,4 @@ export const setMapStyle = (style: MapStyleId) => setSetting(KEYS.style, style);
 export const setAutoPause = (on: boolean) => setSetting(KEYS.autoPause, on ? '1' : '0');
 export const setLastSport = (id: SportId) => setSetting(KEYS.lastSport, id);
 export const setCardioKeepAwake = (on: boolean) => setSetting(KEYS.keepAwake, on ? '1' : '0');
+export const setDistanceUnit = (unit: DistanceUnit) => setSetting(KEYS.distanceUnit, unit);

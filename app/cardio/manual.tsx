@@ -4,10 +4,9 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import { SportPicker } from '@/components/SportPicker';
 import { Label, MenuRow, Note, Screen } from '@/components/ui';
 import { saveManualCardio } from '@/db/cardio-queries';
-import { setLastSport } from '@/db/map-settings';
-import { getAppSettings } from '@/db/settings-queries';
+import { getCardioSettings, setLastSport } from '@/db/map-settings';
 import { mirrorWorkout } from '@/lib/health/mirror';
-import { METRES_PER, distanceUnitFor, sportById, type DistanceUnit } from '@/lib/cardio';
+import { METRES_PER, sportById, type DistanceUnit } from '@/lib/cardio';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 /**
@@ -25,7 +24,7 @@ export default function ManualCardioScreen() {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    void getAppSettings().then((a) => setUnit(distanceUnitFor(a.units)));
+    void getCardioSettings().then((c) => setUnit(c.distanceUnit));
   }, []);
 
   const mins = Number(minutes.replace(',', '.'));
