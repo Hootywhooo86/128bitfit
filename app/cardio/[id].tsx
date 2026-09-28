@@ -20,6 +20,7 @@ import {
   type DistanceUnit,
   type Fix,
 } from '@/lib/cardio';
+import { offerBreakdown } from '@/lib/ai-breakdown';
 import { mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import { useCardioEnergy } from '@/lib/health/use-cardio-energy';
 import type { EnergyResult } from '@/lib/workout-energy';
@@ -29,7 +30,7 @@ import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 /** A finished cardio session: the route, the totals and the splits. */
 export default function CardioSummaryScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, fresh } = useLocalSearchParams<{ id: string; fresh?: string }>();
   const [session, setSession] = useState<CardioSession | null | undefined>(undefined);
   const [fixes, setFixes] = useState<Fix[]>([]);
   const [unit, setUnit] = useState<DistanceUnit>('km');
@@ -50,6 +51,8 @@ export default function CardioSummaryScreen() {
       setAutoPause(cs.autoPause);
       setFixes(pts);
       setSession(s);
+      // Straight after Finish, not when opened from history.
+      if (s && fresh === '1') void offerBreakdown(router, { cardioId: s.id });
     })();
   }, [id]);
 

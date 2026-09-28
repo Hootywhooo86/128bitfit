@@ -133,7 +133,7 @@ export default function ActiveWorkoutScreen() {
         onPress: async () => {
           timer.skip();
           await completeSession(sessionId);
-          router.replace(`/train/summary?id=${encodeURIComponent(sessionId)}`);
+          router.replace(`/train/summary?id=${encodeURIComponent(sessionId)}&fresh=1`);
         },
       },
     ]);

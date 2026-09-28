@@ -9,6 +9,7 @@ import {
 } from '@/db/workout-queries';
 import { PixelTrophy } from '@/components/PixelTrophy';
 import { HeartRateCard } from '@/components/HeartRateCard';
+import { offerBreakdown } from '@/lib/ai-breakdown';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 
 function formatDuration(ms: number): string {
@@ -22,7 +23,7 @@ function formatDuration(ms: number): string {
 }
 
 export default function WorkoutSummaryScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, fresh } = useLocalSearchParams<{ id: string; fresh?: string }>();
   const router = useRouter();
   const [summary, setSummary] = useState<WorkoutSummary | null>(null);
   const [prs, setPrs] = useState<SessionPr[]>([]);
@@ -43,6 +44,8 @@ export default function WorkoutSummaryScreen() {
       const s = await getWorkoutSummary(sid);
       setSummary(s);
       setLoading(false);
+      // Straight after Finish, not when opened again from history.
+      if (s && fresh === '1') void offerBreakdown(router);
       // After the summary renders: a record is worth waiting a beat for, and
       // the session is already saved either way.
       setPrs(await personalRecordsIn(sid).catch(() => []));

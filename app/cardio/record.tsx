@@ -254,7 +254,7 @@ export default function RecordCardioScreen() {
                 exerciseType: sport.healthType,
               });
             }
-            router.replace({ pathname: '/cardio/[id]', params: { id: session.id } });
+            router.replace({ pathname: '/cardio/[id]', params: { id: session.id, fresh: '1' } });
           } catch (e) {
             Alert.alert('Could not save it', e instanceof Error ? e.message : String(e));
           } finally {
