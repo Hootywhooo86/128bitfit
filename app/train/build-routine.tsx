@@ -3,19 +3,18 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { AddSelectedBar, ExerciseBrowser } from '@/components/ExerciseBrowser';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { REST_DEFAULT_SECONDS, getDefaultRestSeconds } from '@/db/rest-settings';
-import { distinctPrimaryMuscles, getExerciseById, listExercises } from '@/db/queries';
+import { getExerciseById } from '@/db/queries';
 import type { Exercise } from '@/db/schema';
 import {
   createRoutine,
@@ -25,6 +24,7 @@ import {
   type RoutineDraftExercise,
 } from '@/db/workout-queries';
 import { clearNewExercise, takeNewExercise } from '@/lib/exercise-handoff';
+import { toggleById } from '@/lib/exercise-meta';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 const DEFAULT_SETS = 3;
@@ -257,7 +257,10 @@ export default function BuildRoutineScreen() {
 
       <PickExercise
         visible={picking}
-        onPick={add}
+        onPick={(list) => {
+          setPicking(false);
+          list.forEach(add);
+        }}
         onClose={() => setPicking(false)}
         onMakeOwn={(withName) => {
           setPicking(false);
@@ -304,11 +307,12 @@ function NumField({
 }
 
 /**
- * The same search as Add exercise: by name, muscle, equipment or category.
+ * The exercise library, as a picker: tap as many as the routine needs, in the
+ * order they should run, then add them together.
  *
- * Also the way out to making one. The library is 876 exercises and does not
- * have your gym's machines in it, so a search that finds nothing has to lead
- * somewhere — otherwise the routine cannot contain the lift you actually do.
+ * Also the way out to making one. The library does not have your gym's
+ * machines in it, so a search that finds nothing has to lead somewhere —
+ * otherwise the routine cannot contain the lift you actually do.
  */
 function PickExercise({
   visible,
@@ -317,116 +321,49 @@ function PickExercise({
   onMakeOwn,
 }: {
   visible: boolean;
-  onPick: (e: Exercise) => void;
+  onPick: (exercises: Exercise[]) => void;
   onClose: () => void;
   onMakeOwn: (withName: string) => void;
 }) {
-  const [query, setQuery] = useState('');
-  const [muscle, setMuscle] = useState<string | null>(null);
-  const [muscles, setMuscles] = useState<string[]>([]);
-  const [items, setItems] = useState<Exercise[]>([]);
+  const [picked, setPicked] = useState<Exercise[]>([]);
 
+  // A fresh pick every time it opens; last visit's ticks are not this one's.
   useEffect(() => {
-    if (visible) void distinctPrimaryMuscles().then(setMuscles);
+    if (visible) setPicked([]);
   }, [visible]);
-
-  const refresh = useCallback(async () => {
-    setItems(await listExercises({ search: query, primaryMuscle: muscle }));
-  }, [query, muscle]);
-
-  useEffect(() => {
-    if (!visible) return;
-    const t = setTimeout(() => void refresh(), 150);
-    return () => clearTimeout(t);
-  }, [visible, refresh]);
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={s.modal}>
         <View style={s.modalHead}>
-          <Text style={s.modalTitle}>ADD AN EXERCISE</Text>
+          <Text style={s.modalTitle}>ADD EXERCISES</Text>
           <Pressable onPress={onClose} hitSlop={10}>
             <Text style={s.close}>✕</Text>
           </Pressable>
         </View>
 
-        <TextInput
-          style={s.input}
-          value={query}
-          onChangeText={setQuery}
-          placeholder="Search name, muscle or equipment…"
-          placeholderTextColor={colors.textDim}
-          autoCorrect={false}
-        />
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={s.chips}
-          contentContainerStyle={{ gap: 8 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Chip label="All" active={!muscle} onPress={() => setMuscle(null)} />
-          {muscles.map((m) => (
-            <Chip
-              key={m}
-              label={m}
-              active={muscle === m}
-              onPress={() => setMuscle(muscle === m ? null : m)}
-            />
-          ))}
-        </ScrollView>
-
-        <Pressable style={s.makeOwn} onPress={() => onMakeOwn(query)}>
-          <Text style={s.makeOwnT}>
-            + Make your own{query.trim() ? ` — “${query.trim()}”` : ''}
-          </Text>
-          <Text style={s.makeOwnSub}>
-            Photograph the machine or fill it in by hand. It comes straight back into this
-            routine.
-          </Text>
-        </Pressable>
-
-        <FlatList
-          data={items}
-          keyExtractor={(e) => e.id}
-          keyboardShouldPersistTaps="handled"
-          renderItem={({ item }) => (
-            <Pressable style={s.pickRow} onPress={() => onPick(item)}>
-              <Text style={s.pickName}>{item.name}</Text>
-              <Text style={s.pickMeta}>
-                {[item.equipment, item.category === 'custom' ? 'yours' : null, item.level]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </Text>
-            </Pressable>
-          )}
-          ListEmptyComponent={
-            <Text style={s.pickEmpty}>
-              {query.trim() || muscle
-                ? 'Nothing in the library matches that. Make it yourself above and it goes into this routine.'
-                : 'No exercises yet.'}
-            </Text>
-          }
-        />
+        {visible ? (
+          <ExerciseBrowser
+            mode="multi"
+            canOpen={false}
+            selectedIds={picked.map((e) => e.id)}
+            onPress={(e) => setPicked((prev) => toggleById(prev, e))}
+            header={(query) => (
+              <Pressable style={s.makeOwn} onPress={() => onMakeOwn(query)}>
+                <Text style={s.makeOwnT}>
+                  + Make your own{query.trim() ? ` — “${query.trim()}”` : ''}
+                </Text>
+                <Text style={s.makeOwnSub}>
+                  Photograph the machine or fill it in by hand. It comes straight back into this
+                  routine.
+                </Text>
+              </Pressable>
+            )}
+          />
+        ) : null}
+        <AddSelectedBar count={picked.length} onPress={() => onPick(picked)} />
       </View>
     </Modal>
-  );
-}
-
-function Chip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={[s.chip, active && s.chipOn]}>
-      <Text style={[s.chipT, active && s.chipTOn]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -491,18 +428,6 @@ const s = themedStyles(() => StyleSheet.create({
   },
   modalTitle: { fontFamily: fonts.pixel, fontSize: 10, color: colors.text, letterSpacing: 1 },
   close: { color: colors.textMuted, fontSize: 22 },
-  chips: { maxHeight: 38, marginBottom: spacing.sm },
-  chip: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  chipOn: { borderColor: colors.accent, backgroundColor: colors.track },
-  chipT: { color: colors.textMuted, fontSize: 12 },
-  chipTOn: { color: colors.text, fontWeight: '700' },
   makeOwn: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -510,7 +435,6 @@ const s = themedStyles(() => StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
-    marginBottom: spacing.sm,
   },
   makeOwnT: { color: colors.text, fontSize: 14, fontFamily: fonts.bodySemi },
   makeOwnSub: {
@@ -520,8 +444,4 @@ const s = themedStyles(() => StyleSheet.create({
     marginTop: 4,
     fontFamily: fonts.body,
   },
-  pickRow: { paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: colors.border },
-  pickName: { color: colors.text, fontSize: 14.5, fontFamily: fonts.body },
-  pickMeta: { color: colors.textDim, fontSize: 11.5, marginTop: 3, fontFamily: fonts.body },
-  pickEmpty: { color: colors.textDim, fontSize: 12.5, textAlign: 'center', marginTop: 40 },
 }));
