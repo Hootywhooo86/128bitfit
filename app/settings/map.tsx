@@ -1,23 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ToggleRow } from '@/components/ToggleRow';
-import { Label, MenuRow, Note, Screen } from '@/components/ui';
-import { getCardioSettings, setAutoPause, setCardioKeepAwake, setMapStyle, type CardioSettings } from '@/db/map-settings';
-import { getAppSettings } from '@/db/settings-queries';
+import { Label, Note, Screen } from '@/components/ui';
+import {
+  getCardioSettings,
+  setAutoPause,
+  setCardioKeepAwake,
+  setDistanceUnit,
+  setMapStyle,
+  type CardioSettings,
+} from '@/db/map-settings';
 import { MAP_ATTRIBUTION, MAP_ROUTE_BLUE, MAP_STYLES, type MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 /** Settings → Map: how the cardio map looks and behaves. */
 export default function MapSettingsScreen() {
   const [cfg, setCfg] = useState<CardioSettings | null>(null);
-  const [units, setUnits] = useState<'kg' | 'lb'>('lb');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    void Promise.all([getCardioSettings(), getAppSettings()]).then(([c, a]) => {
-      setCfg(c);
-      setUnits(a.units);
-    });
+    void getCardioSettings().then(setCfg);
   }, []);
 
   const save = async (patch: Partial<CardioSettings>, write: () => Promise<void>) => {
@@ -70,13 +72,26 @@ export default function MapSettingsScreen() {
         disabled={!cfg}
         onChange={(v) => void save({ keepAwake: v }, () => setCardioKeepAwake(v))}
       />
-      <MenuRow
-        icon="⇄"
-        name="Distance unit"
-        sub="Follows your weight unit in Settings"
-        value={units === 'lb' ? 'Miles' : 'Kilometres'}
-        href="/settings"
-      />
+
+      <Label>DISTANCE</Label>
+      <View style={s.units}>
+        {(['km', 'mi'] as const).map((u) => {
+          const on = cfg?.distanceUnit === u;
+          return (
+            <Pressable
+              key={u}
+              style={[s.unit, on && s.styleOn]}
+              onPress={() => void save({ distanceUnit: u }, () => setDistanceUnit(u))}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: on }}
+            >
+              <Text style={[s.styleT, on && s.styleTOn]}>{u === 'km' ? 'Kilometres' : 'Miles'}</Text>
+              <Text style={s.unitSub}>{u === 'km' ? 'Pace per km · km/h' : 'Pace per mile · mph'}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Note>Separate from your weight unit. Changing it re-reads every past session in the new unit.</Note>
       {error ? <Text style={s.err}>{error}</Text> : null}
 
       <Label>MAP DATA</Label>
@@ -128,5 +143,18 @@ const s = themedStyles(() =>
     styleT: { color: colors.textMuted, fontFamily: fonts.bodySemi },
     styleTOn: { color: colors.text },
     err: { color: colors.danger, marginTop: 6 },
+    units: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+    unit: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingVertical: 14,
+      paddingHorizontal: 10,
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      gap: 4,
+    },
+    unitSub: { color: colors.textDim, fontSize: 12, fontFamily: fonts.body },
   })
 );

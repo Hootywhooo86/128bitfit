@@ -17,11 +17,9 @@ import {
 } from '@/db/cardio-queries';
 import { getCardioSettings, setLastSport } from '@/db/map-settings';
 import type { CardioSession } from '@/db/schema';
-import { getAppSettings } from '@/db/settings-queries';
 import {
   GOOD_FIX_M,
   cardioStats,
-  distanceUnitFor,
   formatDistance,
   formatDuration,
   formatPace,
@@ -73,11 +71,11 @@ export default function RecordCardioScreen() {
   // Settings, and any session an earlier visit (or an app kill) left open.
   useEffect(() => {
     void (async () => {
-      const [cs, app, open] = await Promise.all([getCardioSettings(), getAppSettings(), getOpenCardioSession()]);
+      const [cs, open] = await Promise.all([getCardioSettings(), getOpenCardioSession()]);
       setStyleId(cs.mapStyle);
       setAutoPauseOn(cs.autoPause);
       setKeepAwake(cs.keepAwake);
-      setUnit(distanceUnitFor(app.units));
+      setUnit(cs.distanceUnit);
       if (open) {
         setSession(open);
         setSport(sportById(open.sport));

@@ -1,4 +1,7 @@
+import { cardioCoachLines, describeCardio } from '@/lib/cardio-coach';
+import { getCardioSession, listCardioSessions } from './cardio-queries';
 import { getDayFuelSummary } from './food-queries';
+import { getCardioSettings } from './map-settings';
 import { getTellCoach, listActiveInjuries } from './injury-queries';
 import { getAppSettings } from './settings-queries';
 import { getLatestWeightEntry, formatWeight } from './weight-queries';
@@ -55,14 +58,20 @@ export function coachModeLabel(mode: CoachMode): string {
   return MODE_LABELS[mode] ?? mode;
 }
 
-export async function buildCoachContext(mode: CoachMode): Promise<CoachContextSummary> {
-  const [settings, fuel, lastWorkout, weight, tellCoach, hurts] = await Promise.all([
+export async function buildCoachContext(
+  mode: CoachMode,
+  opts: { cardioId?: string | null } = {}
+): Promise<CoachContextSummary> {
+  const [settings, fuel, lastWorkout, weight, tellCoach, hurts, cardio, cardioCfg, focusCardio] = await Promise.all([
     getAppSettings(),
     getDayFuelSummary(new Date()),
     getLastCompletedWorkoutSummary(),
     getLatestWeightEntry(),
     getTellCoach(),
     listActiveInjuries(),
+    listCardioSessions(100),
+    getCardioSettings(),
+    opts.cardioId ? getCardioSession(opts.cardioId) : Promise.resolve(null),
   ]);
 
   const today = {
@@ -135,6 +144,19 @@ export async function buildCoachContext(mode: CoachMode): Promise<CoachContextSu
     );
   } else {
     lines.push('', 'Last workout: none logged yet');
+  }
+
+  // Cardio: totals and the newest session, and which kind of session was
+  // last, so a debrief talks about the one the user just did.
+  lines.push('', ...cardioCoachLines(cardio, cardioCfg.distanceUnit, Date.now(), focusCardio));
+  const newestCardio = cardio[0];
+  if (!focusCardio && newestCardio && lastWorkoutBlock) {
+    const cardioNewer = newestCardio.startedAt > new Date(lastWorkoutBlock.date).getTime();
+    lines.push(
+      `- Most recent session overall: ${
+        cardioNewer ? `cardio (${describeCardio(newestCardio, cardioCfg.distanceUnit)})` : 'the strength workout above'
+      }`
+    );
   }
 
   if (recentWeight) {
