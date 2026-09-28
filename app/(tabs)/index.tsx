@@ -4,11 +4,14 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { MuscleLoadCard } from '@/components/MuscleLoadCard';
 import { ReadinessCard } from '@/components/ReadinessCard';
 import { StepsCard } from '@/components/StepsCard';
+import { WeeklyRecapCard } from '@/components/WeeklyRecapCard';
 import { WeightCard } from '@/components/WeightCard';
 import { Bar, Card, CardHead, Label, MenuRow, Screen, SessionCard, Stat3 } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { addWater, getDayFuelSummary } from '@/db/food-queries';
 import { countRecentSets, getMuscleTally, periodFor } from '@/db/muscle-queries';
+import { getCardioSettings } from '@/db/map-settings';
+import { getWeeklyRecap } from '@/db/recap-queries';
 import { getAppSettings } from '@/db/settings-queries';
 import { getLatestWeightEntry, weightInKg } from '@/db/weight-queries';
 import type { WeightEntry } from '@/db/schema';
@@ -25,6 +28,8 @@ import { withMinimumDuration } from '@/lib/min-duration';
 import { formatKg } from '@/lib/weight-source';
 import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
 import type { WeightUnit } from '@/db/settings-queries';
+import type { DistanceUnit } from '@/lib/cardio';
+import type { WeeklyRecap } from '@/lib/weekly-recap';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
 /**
@@ -57,12 +62,14 @@ export default function HomeScreen() {
   const [tally, setTally] = useState<MuscleTally>(emptyTally());
   const [recentSets, setRecentSets] = useState<number | null>(null);
   const [untagged, setUntagged] = useState<{ count: number; sets: number }>({ count: 0, sets: 0 });
+  const [recap, setRecap] = useState<WeeklyRecap | null>(null);
+  const [distanceUnit, setDistanceUnit] = useState<DistanceUnit>('mi');
 
   const refresh = useCallback(async () => {
     if (!ready) return;
     try {
       const since = periodFor(7).since;
-      const [appSettings, fuel, workout, active, weight, count, t, rs, un] = await Promise.all([
+      const [appSettings, fuel, workout, active, weight, count, t, rs, un, week, cardioCfg] = await Promise.all([
         getAppSettings(),
         getDayFuelSummary(new Date()),
         getLastCompletedWorkoutSummary(),
@@ -72,6 +79,8 @@ export default function HomeScreen() {
         getMuscleTally(since),
         countRecentSets(2),
         listUntaggedExercises(),
+        getWeeklyRecap(),
+        getCardioSettings(),
       ]);
       setUnits(appSettings.units);
       setCalories(fuel.logs.length > 0 ? fuel.totals.calories : null);
@@ -87,6 +96,8 @@ export default function HomeScreen() {
       setTally(t);
       setRecentSets(rs);
       setUntagged({ count: un.length, sets: un.reduce((n, e) => n + e.setCount, 0) });
+      setRecap(week);
+      setDistanceUnit(cardioCfg.distanceUnit);
     } finally {
       setLoading(false);
     }
@@ -252,6 +263,7 @@ export default function HomeScreen() {
       ) : null}
 
       <Label>THIS WEEK</Label>
+      <WeeklyRecapCard recap={recap} weightUnit={units} distanceUnit={distanceUnit} />
       <MenuRow
         icon="✦"
         name="Weekly check-in"
