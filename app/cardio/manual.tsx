@@ -60,7 +60,7 @@ export default function ManualCardioScreen() {
         title: sport.label,
         exerciseType: sport.healthType,
       });
-      router.replace({ pathname: '/cardio/[id]', params: { id } });
+      router.replace({ pathname: '/cardio/[id]', params: { id, fresh: '1' } });
     } catch (e) {
       Alert.alert('Could not save it', e instanceof Error ? e.message : String(e));
     } finally {

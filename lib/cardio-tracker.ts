@@ -59,7 +59,8 @@ export async function ensureLocationAccess(): Promise<LocationAccess> {
   return asked.granted ? 'granted' : 'denied';
 }
 
-export async function startTracking(sportLabel: string): Promise<void> {
+/** `startedAt` so a recording picked up after an app kill still says when it began. */
+export async function startTracking(sportLabel: string, startedAt = Date.now()): Promise<void> {
   if (await Location.hasStartedLocationUpdatesAsync(CARDIO_TASK)) return;
   await Location.startLocationUpdatesAsync(CARDIO_TASK, {
     accuracy: Location.Accuracy.BestForNavigation,
@@ -72,7 +73,7 @@ export async function startTracking(sportLabel: string): Promise<void> {
     showsBackgroundLocationIndicator: true,
     foregroundService: {
       notificationTitle: `Recording your ${sportLabel.toLowerCase()}`,
-      notificationBody: 'Open 128BIT FIT to pause or finish.',
+      notificationBody: `Started ${new Date(startedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · open 128BIT FIT to pause or finish.`,
       notificationColor: '#000000',
       killServiceOnDestroy: false,
     },

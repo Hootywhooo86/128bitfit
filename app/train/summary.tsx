@@ -8,8 +8,8 @@ import {
   type WorkoutSummary,
 } from '@/db/workout-queries';
 import { PixelTrophy } from '@/components/PixelTrophy';
-import { useWorkoutEnergy } from '@/lib/health/use-workout-energy';
-import type { EnergyResult } from '@/lib/workout-energy';
+import { HeartRateCard } from '@/components/HeartRateCard';
+import { offerBreakdown } from '@/lib/ai-breakdown';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 
 function formatDuration(ms: number): string {
@@ -23,7 +23,7 @@ function formatDuration(ms: number): string {
 }
 
 export default function WorkoutSummaryScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, fresh } = useLocalSearchParams<{ id: string; fresh?: string }>();
   const router = useRouter();
   const [summary, setSummary] = useState<WorkoutSummary | null>(null);
   const [prs, setPrs] = useState<SessionPr[]>([]);
@@ -36,7 +36,6 @@ export default function WorkoutSummaryScreen() {
     if (!started || !ended) return null;
     return { startedAt: new Date(started).getTime(), endedAt: new Date(ended).getTime() };
   }, [summary?.session.startedAt, summary?.session.endedAt]);
-  const energy = useWorkoutEnergy(window);
 
   useEffect(() => {
     if (!id) return;
@@ -45,6 +44,8 @@ export default function WorkoutSummaryScreen() {
       const s = await getWorkoutSummary(sid);
       setSummary(s);
       setLoading(false);
+      // Straight after Finish, not when opened again from history.
+      if (s && fresh === '1') void offerBreakdown(router);
       // After the summary renders: a record is worth waiting a beat for, and
       // the session is already saved either way.
       setPrs(await personalRecordsIn(sid).catch(() => []));
@@ -85,7 +86,7 @@ export default function WorkoutSummaryScreen() {
 
         <PrCard prs={prs} />
 
-        <EnergyCard energy={energy} />
+        {window ? <HeartRateCard startedAt={window.startedAt} endedAt={window.endedAt} /> : null}
 
         <Text style={styles.section}>Exercises</Text>
         {summary.exercises.map((ex, i) => (
@@ -145,36 +146,6 @@ function PrCard({ prs }: { prs: SessionPr[] }) {
  * distinction is the whole reason this card exists rather than a fourth number
  * in the stat row, where it would read as measured like the other three.
  */
-function EnergyCard({ energy }: { energy: EnergyResult | null }) {
-  // Still reading. A number that appears and then changes is worse than a gap.
-  if (!energy) return null;
-
-  if (energy.status === 'unknown') {
-    return (
-      <View style={styles.energy}>
-        <Text style={styles.energyLabel}>ENERGY</Text>
-        <Text style={styles.energyNote}>
-          No figure for this one — {energy.missing.join(' and ')} missing. Add it and future
-          sessions get one.
-        </Text>
-      </View>
-    );
-  }
-
-  const measured = energy.status === 'measured';
-  return (
-    <View style={styles.energy}>
-      <Text style={styles.energyLabel}>ENERGY</Text>
-      <Text style={styles.energyValue}>
-        {energy.kcal.toLocaleString()} kcal{measured ? '' : ' (estimate)'}
-      </Text>
-      <Text style={styles.energyNote}>
-        {measured ? `Measured by ${energy.source}.` : `${energy.basis}. ${energy.caveat}`}
-      </Text>
-    </View>
-  );
-}
-
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={styles.stat}>
@@ -200,14 +171,6 @@ const styles = themedStyles(() => StyleSheet.create({
     alignItems: 'center',
   },
   statValue: { color: colors.text, fontWeight: '800', fontSize: 18 },
-  energy: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
   pr: {
     backgroundColor: colors.surface,
     borderRadius: 12,
@@ -223,9 +186,6 @@ const styles = themedStyles(() => StyleSheet.create({
   prName: { color: colors.text, fontSize: 15, fontWeight: '700' },
   prNote: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18 },
   prFoot: { color: colors.textDim, fontSize: 11.5, lineHeight: 16 },
-  energyLabel: { color: colors.textMuted, fontSize: 11, letterSpacing: 1, fontWeight: '700' },
-  energyValue: { color: colors.text, fontWeight: '800', fontSize: 22, marginTop: 6 },
-  energyNote: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginTop: 6 },
   statLabel: { color: colors.textMuted, fontSize: 11, marginTop: 4 },
   section: {
     color: colors.textMuted,

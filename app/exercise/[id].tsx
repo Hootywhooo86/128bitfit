@@ -1,5 +1,5 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -28,15 +28,17 @@ export default function ExerciseDetailScreen() {
   const [exercise, setExercise] = useState<Exercise | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!id) return;
-    (async () => {
-      setLoading(true);
-      const row = await getExerciseById(decodeURIComponent(id));
-      setExercise(row);
-      setLoading(false);
-    })();
-  }, [id]);
+  // On focus, so coming back from editing shows the new name or photo.
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return;
+      void (async () => {
+        const row = await getExerciseById(decodeURIComponent(id));
+        setExercise(row);
+        setLoading(false);
+      })();
+    }, [id])
+  );
 
   if (loading) {
     return (
@@ -90,6 +92,15 @@ export default function ExerciseDetailScreen() {
               <Image key={i} source={src} style={[styles.image, styles.imageHalf]} resizeMode="contain" />
             ))}
           </View>
+        ) : isUserExercise(exercise.category) ? (
+          // Yours, with no picture yet: the empty box is the way to add one.
+          <Pressable
+            style={[styles.image, styles.imagePlaceholder]}
+            onPress={() => router.push({ pathname: '/exercise/new', params: { id: exercise.id } })}
+          >
+            <Text style={styles.addPhoto}>＋ Add a photo</Text>
+            <Text style={styles.muted}>Take one of the machine, or pick one from your gallery</Text>
+          </Pressable>
         ) : (
           <View style={[styles.image, styles.imagePlaceholder]}>
             <Text style={styles.muted}>No image</Text>
@@ -147,7 +158,8 @@ const styles = themedStyles(() => StyleSheet.create({
     backgroundColor: colors.surface,
     marginBottom: spacing.md,
   },
-  imagePlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  imagePlaceholder: { alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: spacing.md },
+  addPhoto: { color: colors.accent, fontSize: 16, fontWeight: '700' },
   imageRow: { flexDirection: 'row', gap: spacing.sm },
   imageHalf: { flex: 1, backgroundColor: '#ffffff' },
   credit: { color: colors.textDim, fontSize: 12, textDecorationLine: 'underline' },

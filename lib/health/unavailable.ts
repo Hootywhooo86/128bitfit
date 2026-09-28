@@ -14,6 +14,7 @@ import {
   type HealthPermissionState,
   type HealthProvider,
   type HealthWindow,
+  type HeartRateSample,
   type HealthWriteResult,
 } from './types';
 import { eachDay } from './dates';
@@ -46,6 +47,10 @@ export const unavailableProvider: HealthProvider = {
 
   async readWindow(): Promise<HealthWindow> {
     return { heartRateAvg: null, heartRateMax: null, activeCalories: null };
+  },
+
+  async readHeartRateSeries(): Promise<HeartRateSample[]> {
+    return [];
   },
 
   async writeEntries(): Promise<number> {

@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -15,11 +16,19 @@ import {
   ExerciseNotEditableError,
   addExerciseToSession,
   createCustomExercise,
+  setCustomExerciseImages,
   updateCustomExercise,
 } from '@/db/workout-queries';
 import { getExerciseById } from '@/db/queries';
 import { stageNewExercise } from '@/lib/exercise-handoff';
 import { identifyEquipment } from '@/lib/ai-exercise-client';
+import {
+  isLocalPhoto,
+  keepExercisePhoto,
+  pickPhotoFromGallery,
+  preparePhoto,
+  removeExercisePhoto,
+} from '@/lib/exercise-photo';
 import { MUSCLE_GROUPS, MUSCLE_LABELS, type MuscleGroup } from '@/lib/muscle-load';
 import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
@@ -60,6 +69,13 @@ export default function NewExerciseScreen() {
   const [unmapped, setUnmapped] = useState<string[]>([]);
   const [identified, setIdentified] = useState(Boolean(presetName) || Boolean(editId));
   const [camOpen, setCamOpen] = useState(false);
+  // The exercise's picture: a freshly prepared photo in the cache, or the one
+  // it already has. `savedPhoto` is what is stored now, so an edit knows
+  // whether the picture changed and which old file to clean up.
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [savedPhoto, setSavedPhoto] = useState<string | null>(null);
+  // Camera opened from the form just to take the picture, not to identify.
+  const [photoOnly, setPhotoOnly] = useState(false);
 
   // Prefilled when the user searched for something the library does not have
   // and chose to make it — retyping what they just typed is the kind of small
@@ -88,6 +104,16 @@ export default function NewExerciseScreen() {
       };
       setName(row.name);
       setEquipment(row.equipment ?? '');
+      try {
+        const imgs = JSON.parse(row.images ?? '[]');
+        const first = Array.isArray(imgs) && typeof imgs[0] === 'string' ? imgs[0] : null;
+        if (isLocalPhoto(first)) {
+          setPhoto(first);
+          setSavedPhoto(first);
+        }
+      } catch {
+        // No picture to show.
+      }
       setPrimary(parse(row.primaryMuscles));
       setSecondary(parse(row.secondaryMuscles));
       try {
@@ -102,21 +128,32 @@ export default function NewExerciseScreen() {
     };
   }, [editingId]);
 
-  const identify = async () => {
-    if (busy || !camera.current) return;
+  /**
+   * A photo from the camera or the gallery becomes the exercise's picture and,
+   * unless the camera was opened just for the picture, goes to the AI to
+   * identify the machine. With no AI, or an AI that could not tell, the photo
+   * is still kept and the form opens to fill in by hand.
+   */
+  const takeInPhoto = async (sourceUri: string, identifyIt: boolean) => {
     setBusy(true);
     setError(null);
     setNote(null);
     setUnmapped([]);
     try {
-      const shot = await camera.current.takePictureAsync({ quality: 0.6, base64: true });
-      if (!shot?.base64) {
-        setError('The camera did not return a photo. Try again.');
+      const prepared = await preparePhoto(sourceUri);
+      setPhoto(prepared.uri);
+      if (!identifyIt || !prepared.base64) {
+        setIdentified(true);
+        setCamOpen(false);
+        setPhotoOnly(false);
         return;
       }
-      const out = await identifyEquipment(shot.base64);
+      const out = await identifyEquipment(prepared.base64);
       if (out.status !== 'ok') {
-        setError(out.message);
+        // The photo is kept either way; say what went wrong and carry on.
+        setNote(`${out.message} Your photo is kept as the exercise's picture.`);
+        setIdentified(true);
+        setCamOpen(false);
         return;
       }
       const e = out.exercise;
@@ -134,6 +171,38 @@ export default function NewExerciseScreen() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const identify = async () => {
+    if (busy || !camera.current) return;
+    try {
+      const shot = await camera.current.takePictureAsync({ quality: 0.8 });
+      if (!shot?.uri) {
+        setError('The camera did not return a photo. Try again.');
+        return;
+      }
+      await takeInPhoto(shot.uri, !photoOnly);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not take the photo.');
+    }
+  };
+
+  const fromGallery = async (identifyIt: boolean) => {
+    if (busy) return;
+    try {
+      const uri = await pickPhotoFromGallery();
+      if (uri) await takeInPhoto(uri, identifyIt);
+    } catch (e) {
+      setError(`Could not open that image: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  };
+
+  /** Keeps the picture for `id` if it changed, and clears up the one it replaced. */
+  const savePhotoFor = async (id: string) => {
+    if (photo === savedPhoto) return;
+    const kept = photo ? keepExercisePhoto(id, photo) : null;
+    await setCustomExerciseImages(id, kept ? [kept] : []);
+    removeExercisePhoto(savedPhoto);
   };
 
   const toggle = (m: MuscleGroup, which: 'p' | 's') => {
@@ -168,6 +237,7 @@ export default function NewExerciseScreen() {
             .map((l) => l.trim())
             .filter(Boolean),
         });
+        await savePhotoFor(editingId);
         if (router.canGoBack()) router.back();
         else router.replace('/exercise');
         return;
@@ -183,6 +253,7 @@ export default function NewExerciseScreen() {
           .map((l) => l.trim())
           .filter(Boolean),
       });
+      await savePhotoFor(id);
 
       // Reached from a routine being built: hand the exercise back and return
       // to the draft, which is still mounted behind this screen. Routing
@@ -227,7 +298,7 @@ export default function NewExerciseScreen() {
     <Screen section={editingId ? 'Edit exercise' : 'New exercise'} back>
       {!identified ? (
         <>
-          <Label>IDENTIFY FROM A PHOTO</Label>
+          <Label>{photoOnly ? 'TAKE A PHOTO' : 'IDENTIFY FROM A PHOTO'}</Label>
           <Note>
             Point the camera at the machine and the AI fills this form in — what it is, the muscles
             it works, and how to use it. Check it before saving: it is an identification, not a
@@ -236,9 +307,18 @@ export default function NewExerciseScreen() {
           <View style={{ height: spacing.md }} />
 
           {!camOpen ? (
-            <Pressable style={s.primary} onPress={() => setCamOpen(true)}>
-              <Text style={s.primaryT}>PHOTOGRAPH EQUIPMENT</Text>
-            </Pressable>
+            <>
+              <Pressable style={s.primary} onPress={() => setCamOpen(true)}>
+                <Text style={s.primaryT}>PHOTOGRAPH EQUIPMENT</Text>
+              </Pressable>
+              <Pressable
+                style={[s.secondary, { marginBottom: 10 }, busy && { opacity: 0.5 }]}
+                onPress={() => void fromGallery(true)}
+                disabled={busy}
+              >
+                <Text style={s.secondaryT}>{busy ? 'Reading the photo…' : 'Choose a photo from your gallery'}</Text>
+              </Pressable>
+            </>
           ) : !permission ? (
             <View style={s.center}>
               <ActivityIndicator color={colors.accent} />
@@ -263,13 +343,22 @@ export default function NewExerciseScreen() {
                 onPress={() => void identify()}
                 disabled={busy}
               >
-                <Text style={s.primaryT}>{busy ? 'IDENTIFYING…' : 'IDENTIFY'}</Text>
+                <Text style={s.primaryT}>
+                  {busy ? (photoOnly ? 'SAVING PHOTO…' : 'IDENTIFYING…') : photoOnly ? 'TAKE PHOTO' : 'IDENTIFY'}
+                </Text>
               </Pressable>
             </>
           )}
 
-          <Pressable style={s.secondary} onPress={() => setIdentified(true)}>
-            <Text style={s.secondaryT}>Fill it in by hand</Text>
+          <Pressable
+            style={s.secondary}
+            onPress={() => {
+              setIdentified(true);
+              setCamOpen(false);
+              setPhotoOnly(false);
+            }}
+          >
+            <Text style={s.secondaryT}>{photoOnly ? 'Back to the form' : 'Fill it in by hand'}</Text>
           </Pressable>
 
           {error ? (
@@ -294,6 +383,43 @@ export default function NewExerciseScreen() {
               </Card>
             </>
           ) : null}
+
+          <Label>PHOTO</Label>
+          <Card>
+            {photo ? (
+              <Image source={{ uri: photo }} style={s.photo} resizeMode="cover" />
+            ) : (
+              <Text style={s.help}>
+                Add a picture of the machine so you know it at a glance in your workouts and the
+                library. It stays on this phone.
+              </Text>
+            )}
+            <View style={s.photoRow}>
+              <Pressable
+                style={[s.photoBtn, busy && { opacity: 0.5 }]}
+                disabled={busy}
+                onPress={() => {
+                  setPhotoOnly(true);
+                  setCamOpen(true);
+                  setIdentified(false);
+                }}
+              >
+                <Text style={s.secondaryT}>{photo ? 'Retake' : 'Take photo'}</Text>
+              </Pressable>
+              <Pressable
+                style={[s.photoBtn, busy && { opacity: 0.5 }]}
+                disabled={busy}
+                onPress={() => void fromGallery(false)}
+              >
+                <Text style={s.secondaryT}>{busy ? 'Reading…' : 'From gallery'}</Text>
+              </Pressable>
+              {photo ? (
+                <Pressable style={s.photoBtn} onPress={() => setPhoto(null)}>
+                  <Text style={[s.secondaryT, { color: colors.danger }]}>Remove</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </Card>
 
           <Label>EXERCISE</Label>
           <Card>
@@ -361,6 +487,17 @@ const s = themedStyles(() => StyleSheet.create({
     fontFamily: fonts.body,
   },
   multi: { minHeight: 110, textAlignVertical: 'top', marginBottom: 0 },
+  photo: { width: '100%', aspectRatio: 4 / 3, borderRadius: radius.md, marginBottom: 10, backgroundColor: colors.surfaceAlt },
+  photoRow: { flexDirection: 'row', gap: 8 },
+  photoBtn: {
+    flex: 1,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 6 },
   chip: {
     backgroundColor: colors.surface,

@@ -45,7 +45,7 @@ function isCoachMode(v: string): v is CoachMode {
 
 export default function CoachSessionScreen() {
   const router = useRouter();
-  const { mode: modeParam, cardio } = useLocalSearchParams<{ mode: string; cardio?: string }>();
+  const { mode: modeParam, cardio, auto } = useLocalSearchParams<{ mode: string; cardio?: string; auto?: string }>();
   // Opened from a cardio summary: debrief that session rather than the latest.
   const cardioId = typeof cardio === 'string' && cardio ? cardio : null;
   const raw = typeof modeParam === 'string' ? modeParam : Array.isArray(modeParam) ? modeParam[0] : '';
@@ -165,6 +165,15 @@ export default function CoachSessionScreen() {
       abortRef.current = null;
     }
   }, [ctx, asking, mode, question, threadId, turns]);
+
+  // Opened from "Get an AI breakdown?" after a workout: run the debrief once,
+  // as soon as the context is ready, rather than make the user tap again.
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (auto !== '1' || autoRan.current || !ctx || asking || turns.length > 0) return;
+    autoRan.current = true;
+    void onAsk();
+  }, [auto, ctx, asking, turns.length, onAsk]);
 
   /**
    * Starts over: new thread, fresh context.

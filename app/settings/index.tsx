@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -52,6 +52,8 @@ import { HfModelPicker } from '@/components/HfModelPicker';
 import { Screen } from '@/components/ui';
 import { accentName } from '@/lib/accent';
 import { UpdateCard } from '@/components/UpdateCard';
+import { ToggleRow } from '@/components/ToggleRow';
+import { breakdownPromptOn, setBreakdownPrompt } from '@/lib/ai-breakdown';
 import { REPDB } from 'repdb-generated';
 import { REPDB_CREDIT, REPDB_URL } from '@/lib/exercise-images';
 
@@ -67,6 +69,10 @@ export default function SettingsScreen() {
   const [waterTarget, setWaterTarget] = useState('2500');
   const [units, setUnits] = useState<WeightUnit>('lb');
   const [keepAwake, setKeepAwake] = useState(true);
+  const [breakdownAsk, setBreakdownAsk] = useState(true);
+  useEffect(() => {
+    void breakdownPromptOn().then(setBreakdownAsk);
+  }, []);
   const [activity, setActivity] = useState<ActivityLevel>(DEFAULT_ACTIVITY);
   const [goal, setGoal] = useState<Goal>(DEFAULT_GOAL);
   const [profile, setProfile] = useState<CalorieProfile | null>(null);
@@ -376,6 +382,16 @@ export default function SettingsScreen() {
           <View style={[styles.knob, keepAwake && styles.knobOn]} />
         </View>
       </Pressable>
+
+      <ToggleRow
+        name="Offer an AI breakdown when I finish"
+        sub="Only asked when an AI key is set up below"
+        value={breakdownAsk}
+        onChange={(v) => {
+          setBreakdownAsk(v);
+          void setBreakdownPrompt(v);
+        }}
+      />
 
       <View style={styles.aiCard}>
         <Text style={styles.aiTitle}>AI Coach — Bring your own key</Text>
