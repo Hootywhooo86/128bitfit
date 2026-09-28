@@ -34,8 +34,10 @@ export type SessionExerciseWithMeta = SessionExercise & {
   exerciseName: string;
   primaryMuscles: string[];
   equipment: string | null;
-  /** First library image path, for the reference panel. Null for custom exercises. */
+  /** First picture: a library image path, or a photo you took. Null when there is none. */
   image: string | null;
+  /** 'custom' / 'imported' for one you made, which can be given a photo. */
+  category: string | null;
   /** Heaviest completed working set in a finished session, with its unit. */
   best: { weight: number; unit: string } | null;
   sets: WorkoutSet[];
@@ -162,6 +164,7 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       primaryMuscles: exercises.primaryMuscles,
       equipment: exercises.equipment,
       images: exercises.images,
+      category: exercises.category,
     })
     .from(sessionExercises)
     .innerJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
@@ -219,6 +222,7 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       primaryMuscles: JSON.parse(se.primaryMuscles ?? '[]'),
       equipment: se.equipment,
       image: typeof images[0] === 'string' ? images[0] : null,
+      category: se.category,
       best,
       sets: setRows,
       lastPerformance: await getLastPerformance(se.exerciseId, sessionId),
@@ -1181,6 +1185,8 @@ export type CustomExerciseInput = {
   primaryMuscles: string[];
   secondaryMuscles: string[];
   instructions: string[];
+  /** Picture file URIs, first shown. Left out on an edit, the pictures stay as they are. */
+  images?: string[];
 };
 
 /**
@@ -1231,8 +1237,14 @@ export async function updateCustomExercise(
       primaryMuscles: JSON.stringify(input.primaryMuscles),
       secondaryMuscles: JSON.stringify(input.secondaryMuscles),
       instructions: JSON.stringify(input.instructions),
+      ...(input.images ? { images: JSON.stringify(input.images) } : {}),
     })
     .where(eq(exercises.id, id));
+}
+
+/** Sets the pictures of an exercise you own, and nothing else. */
+export async function setCustomExerciseImages(id: string, images: string[]): Promise<void> {
+  await db.update(exercises).set({ images: JSON.stringify(images) }).where(eq(exercises.id, id));
 }
 
 export async function createCustomExercise(input: CustomExerciseInput): Promise<string> {
@@ -1245,7 +1257,7 @@ export async function createCustomExercise(input: CustomExerciseInput): Promise<
     primaryMuscles: JSON.stringify(input.primaryMuscles),
     secondaryMuscles: JSON.stringify(input.secondaryMuscles),
     instructions: JSON.stringify(input.instructions),
-    images: '[]',
+    images: JSON.stringify(input.images ?? []),
   });
   return id;
 }

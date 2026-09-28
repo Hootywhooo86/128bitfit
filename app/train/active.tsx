@@ -30,6 +30,7 @@ import {
 import type { WorkoutSet } from '@/db/schema';
 import { getAppSettings, type WeightUnit } from '@/db/settings-queries';
 import { exerciseImageSource } from '@/lib/exercise-images';
+import { isUserExercise } from '@/lib/exercise-sources';
 import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
@@ -243,6 +244,7 @@ export default function ActiveWorkoutScreen() {
                 isCurrent={se.id === currentExerciseId}
                 onSetCurrent={() => setCurrentExerciseId(se.id)}
                 onHow={() => router.push({ pathname: '/exercise/[id]', params: { id: se.exerciseId } })}
+                onAddPhoto={() => router.push({ pathname: '/exercise/new', params: { id: se.exerciseId } })}
                 onSwap={() =>
                   router.push({ pathname: '/train/add-exercise', params: { sessionId, swap: se.id } })
                 }
@@ -328,6 +330,7 @@ function ExerciseCard({
   isCurrent,
   onSetCurrent,
   onHow,
+  onAddPhoto,
   onSwap,
   onOptions,
   onSaveNote,
@@ -349,6 +352,8 @@ function ExerciseCard({
   isCurrent: boolean;
   onSetCurrent: () => void;
   onHow: () => void;
+  /** Your own exercise with no picture: open it to take or pick one. */
+  onAddPhoto: () => void;
   onSwap: () => void;
   onOptions: () => void;
   onSaveNote: (note: string) => void;
@@ -380,6 +385,9 @@ function ExerciseCard({
     .join('')
     .toUpperCase();
   const imageSource = imageFailed ? null : exerciseImageSource(se.image);
+  // One you made, with no picture yet: offer to add one rather than show a
+  // grey tile with its initials.
+  const canAddPhoto = !imageSource && isUserExercise(se.category);
   const caption = [primaryMuscle.toUpperCase(), se.equipment?.toUpperCase()].filter(Boolean).join(' · ');
 
   return (
@@ -393,7 +401,11 @@ function ExerciseCard({
 
       <View style={styles.exTile}>
         <View style={styles.exThumb}>
-          <Text style={styles.exThumbText}>{initials}</Text>
+          {imageSource ? (
+            <Image source={imageSource} style={styles.exThumbImg} resizeMode="cover" onError={() => setImageFailed(true)} />
+          ) : (
+            <Text style={styles.exThumbText}>{initials}</Text>
+          )}
         </View>
         <Text style={styles.exName}>{se.exerciseName}</Text>
       </View>
@@ -431,7 +443,7 @@ function ExerciseCard({
 
       {/* The library's own picture of the movement, on the exercise in hand. */}
       {isCurrent ? (
-        <Pressable style={styles.photoPanel} onPress={onHow}>
+        <Pressable style={styles.photoPanel} onPress={canAddPhoto ? onAddPhoto : onHow}>
           {imageSource ? (
             <Image
               source={imageSource}
@@ -439,13 +451,19 @@ function ExerciseCard({
               resizeMode="contain"
               onError={() => setImageFailed(true)}
             />
+          ) : canAddPhoto ? (
+            <View style={[styles.photoPlaceholder, styles.photoAdd]}>
+              <Text style={styles.photoAddIcon}>＋</Text>
+            </View>
           ) : (
             <View style={styles.photoPlaceholder}>
               <Text style={styles.photoInitials}>{initials}</Text>
             </View>
           )}
           {caption ? <Text style={styles.photoCaption}>{caption}</Text> : null}
-          <Text style={styles.photoHint}>Tap for how to do it</Text>
+          <Text style={styles.photoHint}>
+            {canAddPhoto ? 'Add a photo of this machine — camera or gallery' : 'Tap for how to do it'}
+          </Text>
         </Pressable>
       ) : null}
 
@@ -759,7 +777,9 @@ const styles = themedStyles(() => StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.sm,
+    overflow: 'hidden',
   },
+  exThumbImg: { width: '100%', height: '100%', backgroundColor: '#ffffff' },
   exThumbText: {
     fontSize: 14,
     fontWeight: '700',
@@ -835,6 +855,8 @@ const styles = themedStyles(() => StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
+  photoAdd: { borderWidth: 2, borderStyle: 'dashed', borderColor: colors.accent },
+  photoAddIcon: { fontSize: 36, color: colors.accent, fontWeight: '300' },
   photoInitials: {
     fontSize: 24,
     fontWeight: '700',

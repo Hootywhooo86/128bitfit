@@ -16,7 +16,7 @@
  * API keys are never touched: they live in expo-secure-store, not in SQLite,
  * and nothing here reads them.
  */
-import { asc, eq } from 'drizzle-orm';
+import { asc, eq, inArray } from 'drizzle-orm';
 import { db } from '@/db/client';
 import {
   cardioPoints,
@@ -37,6 +37,7 @@ import {
   weightEntries,
   workoutSessions,
 } from '@/db/schema';
+import { USER_EXERCISE_CATEGORIES } from '@/lib/exercise-sources';
 import type { CsvRow } from './csv';
 
 /** One exported table: a name, its rows, and a stable column order. */
@@ -154,6 +155,12 @@ export async function collectExport(): Promise<ExportTable[]> {
     .orderBy(asc(coachMessages.createdAt));
   const injuryRows = await db.select().from(injuries).orderBy(asc(injuries.startedAt));
   const photoRows = await db.select().from(progressPhotos).orderBy(asc(progressPhotos.takenAt));
+  // Exercises you made are your data, unlike the bundled catalogue.
+  const customRows = await db
+    .select()
+    .from(exercises)
+    .where(inArray(exercises.category, [...USER_EXERCISE_CATEGORIES]))
+    .orderBy(asc(exercises.name));
   const cardioRows = await db.select().from(cardioSessions).orderBy(asc(cardioSessions.startedAt));
   const pointRows = await db
     .select()
@@ -307,6 +314,38 @@ export async function collectExport(): Promise<ExportTable[]> {
       name: 'progress_photos',
       columns: ['id', 'pose', 'taken_at', 'file'],
       rows: photoRows.map((r) => ({ id: r.id, pose: r.pose, taken_at: r.takenAt, file: r.uri })),
+    },
+    {
+      name: 'custom_exercises',
+      columns: ['id', 'name', 'equipment', 'primary_muscles', 'secondary_muscles', 'instructions', 'category', 'photo'],
+      rows: customRows.map((r) => {
+        const list = (raw: string | null) => {
+          try {
+            const v = JSON.parse(raw ?? '[]');
+            return Array.isArray(v) ? v.join('; ') : '';
+          } catch {
+            return '';
+          }
+        };
+        return {
+          id: r.id,
+          name: r.name,
+          equipment: r.equipment,
+          primary_muscles: list(r.primaryMuscles),
+          secondary_muscles: list(r.secondaryMuscles),
+          instructions: list(r.instructions),
+          category: r.category,
+          // The photo stays on the phone; this is where.
+          photo: (() => {
+            try {
+              const v = JSON.parse(r.images ?? '[]');
+              return Array.isArray(v) && typeof v[0] === 'string' ? v[0] : null;
+            } catch {
+              return null;
+            }
+          })(),
+        };
+      }),
     },
     {
       name: 'cardio_sessions',

@@ -38,6 +38,8 @@ export function isRepdbExercise(id: string): boolean {
  */
 export function exerciseImageSource(stored: string | null | undefined): ImageSourcePropType | null {
   if (!stored) return null;
+  // A photo you took of your own machine, kept on this phone.
+  if (stored.startsWith('file:') || stored.startsWith('/')) return { uri: stored };
   if (stored.startsWith(REPDB_IMAGE_PREFIX)) {
     const asset = REPDB.images[stored.slice(REPDB_IMAGE_PREFIX.length)];
     return asset != null ? asset : null;
