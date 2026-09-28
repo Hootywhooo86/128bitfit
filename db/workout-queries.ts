@@ -4,6 +4,7 @@ import { newId } from './id';
 import { getDefaultRestSeconds } from './rest-settings';
 import { isUserExercise } from '@/lib/exercise-sources';
 import { resolveSetSeed, seedForNewSet, type LastPerformance } from '@/lib/set-prefill';
+import { repeatPlan } from '@/lib/repeat-workout';
 import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import {
   livePr,
@@ -370,6 +371,57 @@ export async function startRoutineWorkout(routineId: string): Promise<string> {
     }
   }
 
+  return id;
+}
+
+/**
+ * A new session with the same exercises, order and supersets as an old one.
+ * Weights pre-fill from each lift's last completed performance, as always.
+ */
+export async function repeatWorkout(sourceSessionId: string): Promise<string> {
+  const source = await loadActiveWorkout(sourceSessionId);
+  if (!source || source.exercises.length === 0) {
+    throw new Error('That workout has no exercises to repeat.');
+  }
+  const plan = repeatPlan(source.exercises, () => newId('ss'));
+
+  const id = newId('ws');
+  await db.insert(workoutSessions).values({
+    id,
+    routineId: source.session.routineId,
+    startedAt: new Date(),
+    endedAt: null,
+    status: 'in_progress',
+    notes: null,
+  });
+  const fallbackRest = await getDefaultRestSeconds();
+  for (const [i, item] of plan.entries()) {
+    const seId = newId('se');
+    await db.insert(sessionExercises).values({
+      id: seId,
+      sessionId: id,
+      exerciseId: item.exerciseId,
+      position: i,
+      restSeconds: item.restSeconds ?? fallbackRest,
+      notes: item.notes,
+      supersetGroup: item.supersetGroup,
+    });
+    const last = await getLastPerformance(item.exerciseId, id);
+    for (let s = 0; s < item.workingSets; s++) {
+      const seed = resolveSetSeed({ last, index: s });
+      await db.insert(sets).values({
+        id: newId('set'),
+        sessionExerciseId: seId,
+        setIndex: s,
+        reps: seed.reps,
+        weight: seed.weight,
+        weightUnit: seed.weightUnit,
+        completed: false,
+        isWarmup: false,
+        rpe: null,
+      });
+    }
+  }
   return id;
 }
 
