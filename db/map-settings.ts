@@ -1,5 +1,5 @@
 import { DEFAULT_SPORT, distanceUnitFor, sportById, type DistanceUnit, type SportId } from '@/lib/cardio';
-import type { MapStyleId } from '@/lib/map-style';
+import { routeColour, type MapStyleId } from '@/lib/map-style';
 import { getAppSettings, getSetting, setSetting } from './settings-queries';
 
 const KEYS = {
@@ -8,6 +8,8 @@ const KEYS = {
   lastSport: 'cardio_last_sport',
   keepAwake: 'cardio_keep_awake',
   distanceUnit: 'distance_unit',
+  dotColour: 'map_dot_colour',
+  lineColour: 'map_line_colour',
 } as const;
 
 export type CardioSettings = {
@@ -27,16 +29,22 @@ export type CardioSettings = {
    * before the setting existed.
    */
   distanceUnit: DistanceUnit;
+  /** The "you are here" dot. */
+  dotColour: string;
+  /** The line of where you've been. */
+  lineColour: string;
 };
 
 export async function getCardioSettings(): Promise<CardioSettings> {
-  const [style, autoPause, lastSport, keepAwake, unit, app] = await Promise.all([
+  const [style, autoPause, lastSport, keepAwake, unit, app, dot, line] = await Promise.all([
     getSetting(KEYS.style),
     getSetting(KEYS.autoPause),
     getSetting(KEYS.lastSport),
     getSetting(KEYS.keepAwake),
     getSetting(KEYS.distanceUnit),
     getAppSettings(),
+    getSetting(KEYS.dotColour),
+    getSetting(KEYS.lineColour),
   ]);
   return {
     mapStyle: style === 'light' ? 'light' : 'dark',
@@ -44,6 +52,8 @@ export async function getCardioSettings(): Promise<CardioSettings> {
     lastSport: lastSport ? sportById(lastSport).id : DEFAULT_SPORT,
     keepAwake: keepAwake === '1',
     distanceUnit: unit === 'km' || unit === 'mi' ? unit : distanceUnitFor(app.units),
+    dotColour: routeColour(dot),
+    lineColour: routeColour(line),
   };
 }
 
@@ -52,3 +62,5 @@ export const setAutoPause = (on: boolean) => setSetting(KEYS.autoPause, on ? '1'
 export const setLastSport = (id: SportId) => setSetting(KEYS.lastSport, id);
 export const setCardioKeepAwake = (on: boolean) => setSetting(KEYS.keepAwake, on ? '1' : '0');
 export const setDistanceUnit = (unit: DistanceUnit) => setSetting(KEYS.distanceUnit, unit);
+export const setDotColour = (hex: string) => setSetting(KEYS.dotColour, routeColour(hex));
+export const setLineColour = (hex: string) => setSetting(KEYS.lineColour, routeColour(hex));

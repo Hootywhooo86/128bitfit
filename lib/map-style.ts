@@ -19,14 +19,37 @@ export function mapStyleUrl(id: MapStyleId): string {
 /**
  * The "you are here" dot and the line of where you've been.
  *
- * Blue because the user asked for exactly that, and because it is what every
- * map app uses for your own position and track. It is fixed: not the accent
- * (which the user can set to anything, including red) and not a data colour
- * (the heat scale is yellow → orange → red and means training load).
+ * Blue by default, the colour every map app uses for your own position and
+ * track. The user can pick others in Settings → Map. These live on the map
+ * only: they are not the accent, and not the training-load heat scale, which
+ * stays fixed wherever it appears.
  */
 export const MAP_ROUTE_BLUE = '#2F80ED';
 
-/** Drawn under the blue line so it reads on both the dark and the light map. */
+export const ROUTE_COLOURS: readonly { name: string; hex: string }[] = [
+  { name: 'Blue', hex: MAP_ROUTE_BLUE },
+  { name: 'Cyan', hex: '#22D3EE' },
+  { name: 'Green', hex: '#22C55E' },
+  { name: 'Lime', hex: '#A3E635' },
+  { name: 'Yellow', hex: '#FACC15' },
+  { name: 'Orange', hex: '#FB923C' },
+  { name: 'Red', hex: '#EF4444' },
+  { name: 'Pink', hex: '#EC4899' },
+  { name: 'Purple', hex: '#A855F7' },
+  { name: 'White', hex: '#FFFFFF' },
+];
+
+/** A stored colour if it is one of ours, else blue. */
+export function routeColour(raw: string | null | undefined): string {
+  return ROUTE_COLOURS.find((c) => c.hex.toLowerCase() === raw?.toLowerCase())?.hex ?? MAP_ROUTE_BLUE;
+}
+
+/** Drawn under the line and round the dot so they read on both the dark and the light map. */
 export const MAP_ROUTE_CASING = '#FFFFFF';
+
+/** White on a white casing would vanish: a white line gets a dark one. */
+export function casingFor(hex: string): string {
+  return hex.toUpperCase() === '#FFFFFF' ? '#111111' : MAP_ROUTE_CASING;
+}
 
 export const MAP_ATTRIBUTION = '© OpenStreetMap contributors · OpenFreeMap';

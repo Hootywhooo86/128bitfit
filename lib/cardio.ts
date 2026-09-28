@@ -88,13 +88,25 @@ export type Fix = {
   accuracy: number | null;
   /** Manual pause starts a new segment; no distance is drawn across the gap. */
   segment: number;
+  /**
+   * Speed the phone itself reports, m/s. It comes from the GPS Doppler shift,
+   * not from comparing positions, so it stays steady when the position
+   * wobbles by metres — which on a walk is as much as the walk itself.
+   */
+  speed?: number | null;
 };
 
-/** A fix vaguer than this is not drawn or counted. */
-export const MAX_ACCURACY_M = 30;
+/**
+ * A fix vaguer than this is not drawn or counted. Phones routinely report
+ * 25–35 m in a suburb; 30 dropped too many real fixes on a first walk test.
+ */
+export const MAX_ACCURACY_M = 40;
 
 /** "GPS acquired" once a fix is at least this good. */
-export const GOOD_FIX_M = 20;
+export const GOOD_FIX_M = 25;
+
+/** Current speed from the phone's own reading averages over this many seconds. */
+export const REPORTED_SPEED_WINDOW_S = 8;
 
 const EARTH_RADIUS_M = 6_371_008.8;
 
@@ -155,7 +167,11 @@ export type CardioStats = {
   avgPace: number | null;
   /** m/s; null until there is enough to say. */
   avgSpeed: number | null;
-  /** m/s over the last CURRENT_WINDOW_S of movement; null when stopped or too little. */
+  /**
+   * m/s now: the phone's reported speed over the last few seconds, else
+   * position change over the last CURRENT_WINDOW_S. 0 means standing still;
+   * null means too little to say.
+   */
   currentSpeed: number | null;
   splits: Split[];
 };
@@ -237,13 +253,32 @@ export function cardioStats(
   const wD = window.reduce((s, r) => s + r.d, 0);
 
   const enough = distanceM >= MIN_DISTANCE_FOR_PACE_M && movingS > 0;
+
+  // Current speed: the phone's own reading where it gives one, averaged over
+  // a few seconds; otherwise distance over time from the positions.
+  const lastSeg = fixes.length ? fixes[fixes.length - 1].segment : 0;
+  const reported = fixes.filter(
+    (f) =>
+      f.segment === lastSeg &&
+      lastT - f.t <= REPORTED_SPEED_WINDOW_S * 1000 &&
+      f.speed != null &&
+      Number.isFinite(f.speed) &&
+      f.speed >= 0
+  );
+  let currentSpeed: number | null = wT >= 5 && wD > 0 ? wD / wT : null;
+  if (reported.length >= 2) {
+    const avg = reported.reduce((a, f) => a + (f.speed as number), 0) / reported.length;
+    // Under the sport's stopping speed is standing still: say so, rather than
+    // show a pace of forty minutes a mile.
+    currentSpeed = avg < sport.stopSpeed ? 0 : avg;
+  }
   return {
     distanceM,
     movingS,
     elevGainM: elevationGain(fixes),
     avgPace: enough ? movingS / (distanceM / unitM) : null,
     avgSpeed: enough ? distanceM / movingS : null,
-    currentSpeed: wT >= 5 && wD > 0 ? wD / wT : null,
+    currentSpeed,
     splits,
   };
 }
