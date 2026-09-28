@@ -30,6 +30,7 @@ import {
   type WorkoutSet,
 } from './schema';
 import { moveInOrder } from '@/lib/reorder';
+import { groupForLink } from '@/lib/superset';
 
 export type SessionExerciseWithMeta = SessionExercise & {
   exerciseName: string;
@@ -161,6 +162,7 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       position: sessionExercises.position,
       restSeconds: sessionExercises.restSeconds,
       notes: sessionExercises.notes,
+      supersetGroup: sessionExercises.supersetGroup,
       exerciseName: exercises.name,
       primaryMuscles: exercises.primaryMuscles,
       equipment: exercises.equipment,
@@ -219,6 +221,7 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       position: se.position,
       restSeconds: se.restSeconds,
       notes: se.notes,
+      supersetGroup: se.supersetGroup,
       exerciseName: se.exerciseName,
       primaryMuscles: JSON.parse(se.primaryMuscles ?? '[]'),
       equipment: se.equipment,
@@ -521,6 +524,40 @@ export async function moveSessionExercise(sessionExerciseId: string, by: -1 | 1)
   for (let i = 0; i < order.length; i++) {
     await db.update(sessionExercises).set({ position: i }).where(eq(sessionExercises.id, order[i]));
   }
+}
+
+/**
+ * Links an exercise with the next one in the workout as a superset, or takes
+ * it out of its superset. A group left with one member is dissolved, so no
+ * exercise is ever "a superset of one".
+ */
+export async function toggleSupersetWithNext(sessionExerciseId: string): Promise<void> {
+  const [owner] = await db
+    .select({ sessionId: sessionExercises.sessionId, group: sessionExercises.supersetGroup })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.id, sessionExerciseId))
+    .limit(1);
+  if (!owner) throw new Error('That exercise is no longer in the workout.');
+  const rows = await db
+    .select({ id: sessionExercises.id, supersetGroup: sessionExercises.supersetGroup })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.sessionId, owner.sessionId))
+    .orderBy(asc(sessionExercises.position), asc(sessionExercises.id));
+
+  if (owner.group) {
+    await db.update(sessionExercises).set({ supersetGroup: null }).where(eq(sessionExercises.id, sessionExerciseId));
+    const left = rows.filter((r) => r.supersetGroup === owner.group && r.id !== sessionExerciseId);
+    if (left.length === 1) {
+      await db.update(sessionExercises).set({ supersetGroup: null }).where(eq(sessionExercises.id, left[0].id));
+    }
+    return;
+  }
+  const i = rows.findIndex((r) => r.id === sessionExerciseId);
+  const next = rows[i + 1];
+  if (!next) throw new Error('This is the last exercise — there is nothing after it to pair with.');
+  const group = groupForLink(rows[i], next, newId('ss'));
+  await db.update(sessionExercises).set({ supersetGroup: group }).where(eq(sessionExercises.id, sessionExerciseId));
+  await db.update(sessionExercises).set({ supersetGroup: group }).where(eq(sessionExercises.id, next.id));
 }
 
 export async function setSessionExerciseNote(sessionExerciseId: string, note: string): Promise<void> {

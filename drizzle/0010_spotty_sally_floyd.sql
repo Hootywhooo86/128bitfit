@@ -1,0 +1,1 @@
+ALTER TABLE `session_exercises` ADD `superset_group` text;
