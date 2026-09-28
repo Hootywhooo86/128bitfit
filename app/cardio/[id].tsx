@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { HeartRateCard } from '@/components/HeartRateCard';
 import { RouteMap } from '@/components/RouteMap';
 import { Card, CardHead, Label, MenuRow, Note, Screen } from '@/components/ui';
 import { deleteCardioSession, getCardioFixes, getCardioSession } from '@/db/cardio-queries';
@@ -186,6 +187,8 @@ export default function CardioSummaryScreen() {
           </Card>
         </>
       ) : null}
+
+      {!session.manual ? <HeartRateCard startedAt={session.startedAt} endedAt={session.endedAt} /> : null}
 
       <EnergyCard energy={energy} />
 

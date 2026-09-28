@@ -132,6 +132,8 @@ export type WithClientId = {
  * it is diluted by sixteen hours of sitting still. Attributing effort to a
  * workout needs the window, not the day.
  */
+export type HeartRateSample = { t: number; bpm: number };
+
 export type HealthWindow = {
   heartRateAvg: number | null;
   heartRateMax: number | null;
@@ -218,6 +220,12 @@ export interface HealthProvider {
 
   /** Metrics between two exact instants, for attributing them to one session. */
   readWindow(startMs: number, endMs: number): Promise<HealthWindow>;
+
+  /**
+   * Every heart-rate sample between two instants, oldest first, for the graph.
+   * Empty when nothing was recorded or it cannot be read — never made up.
+   */
+  readHeartRateSeries(startMs: number, endMs: number): Promise<HeartRateSample[]>;
 
   writeEntries(entries: HealthWorkoutEntry[]): Promise<number>;
   writeNutrition(entries: HealthNutritionEntry[]): Promise<HealthWriteResult>;

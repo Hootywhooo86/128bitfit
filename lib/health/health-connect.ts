@@ -38,6 +38,7 @@ import {
   type HealthScope,
   type HealthWeightEntry,
   type HealthWindow,
+  type HeartRateSample,
   type HealthWorkoutEntry,
   type HealthWriteResult,
 } from './types';
@@ -403,6 +404,31 @@ export const healthConnectProvider: HealthProvider = {
     latest('respiratoryRate', resp, (r: { rate?: number }) => num(r.rate));
 
     return days.map((d) => byDate.get(d)!);
+  },
+
+  async readHeartRateSeries(startMs: number, endMs: number): Promise<HeartRateSample[]> {
+    if (!(endMs > startMs)) return [];
+    try {
+      if (!(await ensureInitialized())) return [];
+      const { records } = await readRecords('HeartRate' as never, {
+        timeRangeFilter: {
+          operator: 'between',
+          startTime: new Date(startMs).toISOString(),
+          endTime: new Date(endMs).toISOString(),
+        },
+      });
+      const out: HeartRateSample[] = [];
+      for (const r of records as { samples?: { time?: string; beatsPerMinute?: number }[] }[]) {
+        for (const s of r.samples ?? []) {
+          const t = s.time ? Date.parse(s.time) : NaN;
+          const bpm = num(s.beatsPerMinute);
+          if (Number.isFinite(t) && bpm != null && t >= startMs && t <= endMs) out.push({ t, bpm });
+        }
+      }
+      return out.sort((a, b) => a.t - b.t);
+    } catch {
+      return [];
+    }
   },
 
   async readWindow(startMs: number, endMs: number): Promise<HealthWindow> {
