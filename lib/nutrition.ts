@@ -142,3 +142,31 @@ export function optionalNutrientsPerServing(
     carb: scale(n.carb),
   };
 }
+
+/** What a meal logged before needs to be logged again. */
+export type LoggedPortion = {
+  servings: number;
+  calories: number;
+  protein: number | null;
+  fat: number | null;
+  carb: number | null;
+};
+
+/**
+ * A past log scaled to a new amount: `portions` 1 is exactly what was logged
+ * last time, 0.5 half of it.
+ *
+ * Unknown stays unknown. A meal the AI could not put a fat figure on was
+ * logged with none, and eating it again does not make that 0 g.
+ */
+export function scaleLoggedPortion(log: LoggedPortion, portions: number): LoggedPortion {
+  const f = Number.isFinite(portions) && portions > 0 ? portions : 0;
+  const scale = (v: number | null) => (v == null ? null : v * f);
+  return {
+    servings: log.servings * f,
+    calories: log.calories * f,
+    protein: scale(log.protein),
+    fat: scale(log.fat),
+    carb: scale(log.carb),
+  };
+}
