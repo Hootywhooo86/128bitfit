@@ -12,7 +12,7 @@ import {
   type MealType,
   type WaterLog,
 } from './schema';
-import { dayBounds, nutrientsForServings, type Nutrients } from '@/lib/nutrition';
+import { dayBounds, nutrientsForServings, scaleLoggedPortion, type Nutrients } from '@/lib/nutrition';
 import { dayKey } from '@/lib/fuel-day';
 import {
   mirrorMeal,
@@ -371,6 +371,36 @@ export async function logFoodFromCatalog(
   });
 }
 
+/**
+ * Logs a meal again from an earlier log of it: `portions` 1 is the same amount
+ * as last time.
+ *
+ * For meals with no food behind them — described to or photographed for the
+ * AI — the earlier log is the only record of what they were, so it is copied
+ * rather than looked up. Unknown macros stay unknown.
+ */
+export async function logFoodAgain(
+  logId: string,
+  opts: { portions: number; mealType: MealType; loggedAt?: Date }
+): Promise<string> {
+  const [row] = await db.select().from(foodLogs).where(eq(foodLogs.id, logId)).limit(1);
+  if (!row) throw new Error('That meal is no longer in your log, so there is nothing to copy.');
+  const scaled = scaleLoggedPortion(row, opts.portions);
+  return insertFoodLog({
+    foodId: row.foodId,
+    customName: row.customName,
+    mealType: opts.mealType,
+    loggedAt: opts.loggedAt,
+    servings: scaled.servings,
+    servingSize: row.servingSize,
+    servingUnit: row.servingUnit,
+    calories: scaled.calories,
+    protein: scaled.protein,
+    fat: scaled.fat,
+    carb: scaled.carb,
+  });
+}
+
 export async function updateFoodLog(
   id: string,
   patch: Partial<
@@ -430,11 +460,27 @@ export async function getFoodLogById(id: string): Promise<FoodLog | null> {
 }
 
 /** Distinct recently logged foods (by food_id or custom_name), newest first. */
-export async function listRecentFoods(limit = 20): Promise<
-  { key: string; foodId: string | null; name: string; calories: number; servings: number; servingUnit: string | null }[]
-> {
+export type RecentFood = {
+  key: string;
+  /** The most recent log of it, which "log again" copies. */
+  logId: string;
+  foodId: string | null;
+  name: string;
+  calories: number;
+  protein: number | null;
+  fat: number | null;
+  carb: number | null;
+  servings: number;
+  servingUnit: string | null;
+};
+
+export async function listRecentFoods(limit = 20): Promise<RecentFood[]> {
   const rows = await db
     .select({
+      logId: foodLogs.id,
+      protein: foodLogs.protein,
+      fat: foodLogs.fat,
+      carb: foodLogs.carb,
       foodId: foodLogs.foodId,
       customName: foodLogs.customName,
       calories: foodLogs.calories,
@@ -449,14 +495,7 @@ export async function listRecentFoods(limit = 20): Promise<
     .limit(200);
 
   const seen = new Set<string>();
-  const out: {
-    key: string;
-    foodId: string | null;
-    name: string;
-    calories: number;
-    servings: number;
-    servingUnit: string | null;
-  }[] = [];
+  const out: RecentFood[] = [];
 
   for (const r of rows) {
     const name = r.customName || r.foodName || 'Food';
@@ -465,9 +504,13 @@ export async function listRecentFoods(limit = 20): Promise<
     seen.add(key);
     out.push({
       key,
+      logId: r.logId,
       foodId: r.foodId,
       name,
       calories: r.calories ?? 0,
+      protein: r.protein,
+      fat: r.fat,
+      carb: r.carb,
       servings: r.servings ?? 1,
       servingUnit: r.servingUnit,
     });

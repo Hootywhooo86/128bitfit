@@ -2,6 +2,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   ScrollView,
@@ -13,8 +14,10 @@ import {
 import {
   getFoodById,
   listRecentFoods,
+  logFoodAgain,
   logFoodFromCatalog,
   searchFoods,
+  type RecentFood,
 } from '@/db/food-queries';
 import { MEAL_TYPES, type Food, type MealType } from '@/db/schema';
 import { MealSlot } from '@/components/MealSlot';
@@ -30,19 +33,13 @@ import {
   nutrientsForServings,
   nutrientsPerServing,
   parseNutrients,
+  scaleLoggedPortion,
 } from '@/lib/nutrition';
 import { OFF_LICENSE_NOTE } from '@/lib/open-food-facts';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 
-type RecentItem = {
-  key: string;
-  foodId: string | null;
-  name: string;
-  calories: number;
-  servings: number;
-  servingUnit: string | null;
-};
+type RecentItem = RecentFood;
 
 export default function AddFoodScreen() {
   const router = useRouter();
@@ -63,6 +60,10 @@ export default function AddFoodScreen() {
   // Absent or malformed means today.
   const [mealDay, setMealDay] = useState<MealDay>(() => parseDayKey(params.day) ?? 'today');
   const [saving, setSaving] = useState(false);
+  // A recent meal with no food behind it (described to or photographed for
+  // the AI), being logged again from its last log.
+  const [again, setAgain] = useState<RecentItem | null>(null);
+  const [portions, setPortions] = useState('1');
 
   useEffect(() => {
     void listRecentFoods(15).then(setRecent);
@@ -116,9 +117,39 @@ export default function AddFoodScreen() {
   };
 
   const pickRecent = async (item: RecentItem) => {
-    if (!item.foodId) return;
-    const food = await getFoodById(item.foodId);
-    if (food) pickFood(food);
+    // A food from the database opens as usual, per serving of that food.
+    const food = item.foodId ? await getFoodById(item.foodId) : null;
+    if (food) {
+      pickFood(food);
+      return;
+    }
+    // Anything else — an AI meal, or a food since deleted — is logged again
+    // from what was logged last time. These rows used to be disabled, so
+    // tapping them did nothing at all.
+    setAgain(item);
+    setPortions('1');
+  };
+
+  const portionsNum = useMemo(() => {
+    const n = Number(portions);
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }, [portions]);
+
+  const saveAgain = async () => {
+    if (!again || saving || portionsNum <= 0) return;
+    setSaving(true);
+    try {
+      await logFoodAgain(again.logId, {
+        portions: portionsNum,
+        mealType,
+        loggedAt: mealTimestamp(mealType, mealDay),
+      });
+      router.back();
+    } catch (e) {
+      Alert.alert('Could not log it', e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const save = async () => {
@@ -136,6 +167,67 @@ export default function AddFoodScreen() {
       setSaving(false);
     }
   };
+
+  if (again) {
+    const portion = scaleLoggedPortion(again, portionsNum);
+    const lastAmount = `${Math.round(again.servings * 100) / 100} ${again.servingUnit ?? (again.servings === 1 ? 'serving' : 'servings')}`;
+    return (
+      <Screen section="Add food" back>
+        <Pressable onPress={() => setAgain(null)} style={styles.backLink}>
+          <Text style={styles.backLinkText}>← Back to search</Text>
+        </Pressable>
+        <Text style={styles.title}>{again.name}</Text>
+        <Text style={styles.muted}>
+          Last time: {formatKcal(again.calories)} kcal · {lastAmount}
+        </Text>
+
+        <Text style={styles.section}>Portions</Text>
+        <View style={styles.servingRow}>
+          <Pressable
+            style={styles.stepBtn}
+            onPress={() =>
+              setPortions(String(Math.max(0.25, Math.round((portionsNum - 0.25) * 100) / 100)))
+            }
+          >
+            <Text style={styles.stepBtnText}>−</Text>
+          </Pressable>
+          <TextInput
+            style={styles.servingsInput}
+            value={portions}
+            onChangeText={setPortions}
+            keyboardType="decimal-pad"
+            selectTextOnFocus
+          />
+          <Pressable
+            style={styles.stepBtn}
+            onPress={() => setPortions(String(Math.round((portionsNum + 0.25) * 100) / 100))}
+          >
+            <Text style={styles.stepBtnText}>+</Text>
+          </Pressable>
+        </View>
+        <Text style={styles.rowMeta}>1 is the same amount as last time.</Text>
+
+        <Text style={styles.section}>Meal</Text>
+        <MealSlot mealType={mealType} onChangeMeal={setMealType} day={mealDay} onChangeDay={setMealDay} />
+
+        <View style={styles.previewCard}>
+          <Text style={styles.previewCal}>{formatKcal(portion.calories)} kcal</Text>
+          <Text style={styles.previewMacros}>
+            P {formatOptionalGrams(portion.protein)} · C {formatOptionalGrams(portion.carb)} · F{' '}
+            {formatOptionalGrams(portion.fat)}
+          </Text>
+        </View>
+
+        <Pressable
+          style={[styles.saveBtn, (saving || portionsNum <= 0) && styles.saveBtnDisabled]}
+          onPress={() => void saveAgain()}
+          disabled={saving || portionsNum <= 0}
+        >
+          <Text style={styles.saveBtnText}>{saving ? 'Saving…' : 'Log food'}</Text>
+        </Pressable>
+      </Screen>
+    );
+  }
 
   if (selected) {
     const per = nutrientsPerServing(selected);
@@ -244,16 +336,18 @@ export default function AddFoodScreen() {
               data={recent}
               keyExtractor={(item) => item.key}
               contentContainerStyle={{ paddingBottom: 40 }}
+              // The search box opens the keyboard, and by default the first
+              // tap on a row only closes it — the row looked dead.
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => (
                 <Pressable
                   style={styles.row}
                   onPress={() => void pickRecent(item)}
-                  disabled={!item.foodId}
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.rowTitle}>{item.name}</Text>
                     <Text style={styles.rowMeta}>
-                      Last log ~{formatKcal(item.calories)} kcal
+                      Last time {formatKcal(item.calories)} kcal
                       {item.servingUnit ? ` · ${item.servingUnit}` : ''}
                     </Text>
                   </View>
@@ -275,6 +369,9 @@ export default function AddFoodScreen() {
               data={results}
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingBottom: 40 }}
+              // The search box opens the keyboard, and by default the first
+              // tap on a row only closes it — the row looked dead.
+              keyboardShouldPersistTaps="handled"
               renderItem={({ item }) => {
                 const per = nutrientsPerServing(item);
                 const unit =

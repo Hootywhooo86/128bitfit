@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { optionalNutrientsPerServing, nutrientsPerServing } from './nutrition';
+import { optionalNutrientsPerServing, nutrientsPerServing, scaleLoggedPortion } from './nutrition';
 
 function food(nutrients: Record<string, number | null>, over: Partial<{ servingSize: number; nutritionBasis: string }> = {}) {
   return {
@@ -48,5 +48,21 @@ describe('optionalNutrientsPerServing', () => {
     } as never);
     expect(p.calories).toBeNull();
     expect(p.protein).toBeNull();
+  });
+});
+
+describe('logging a past meal again', () => {
+  const meal = { servings: 1.5, calories: 650, protein: 40, fat: null, carb: 70 };
+
+  it('is the same meal at 1 portion', () => {
+    expect(scaleLoggedPortion(meal, 1)).toEqual(meal);
+  });
+
+  it('scales what is known and keeps unknown unknown', () => {
+    expect(scaleLoggedPortion(meal, 0.5)).toEqual({ servings: 0.75, calories: 325, protein: 20, fat: null, carb: 35 });
+  });
+
+  it('is nothing for a nonsense amount', () => {
+    expect(scaleLoggedPortion(meal, Number.NaN).calories).toBe(0);
   });
 });
