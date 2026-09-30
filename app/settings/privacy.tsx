@@ -25,7 +25,7 @@ export default function PrivacyScreen() {
         <Text style={styles.h1}>Your data stays on your phone</Text>
         <Text style={styles.body}>
           There is no 128BIT FIT account, server or database. Everything you log lives in a
-          SQLite database on this device. No analytics, no telemetry, no crash reporting —
+          database on this device. No analytics, no telemetry, no crash reporting —
           the app has no backend to send anything to.
         </Text>
       </View>

@@ -4,7 +4,6 @@ import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { Label, MenuRow, Screen, SessionCard } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { listActiveInjuries } from '@/db/injury-queries';
-import { getRestPrefs } from '@/db/rest-settings';
 import { getWeekPlan } from '@/db/schedule-settings';
 import { getSetting } from '@/db/settings-queries';
 import { countLibraryExercises } from '@/db/queries';
@@ -38,7 +37,6 @@ export default function TrainScreen() {
   const [inProgress, setInProgress] = useState<WorkoutSession | null>(null);
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState<WeekPlan | null>(null);
-  const [restSecs, setRestSecs] = useState<number | null>(null);
   const [activeInjuries, setActiveInjuries] = useState(0);
   const [hasPass, setHasPass] = useState(false);
 
@@ -47,12 +45,11 @@ export default function TrainScreen() {
     setLoading(true);
     try {
       await ensureStarterRoutines();
-      const [r, session, exCount, week, rest, hurts, pass] = await Promise.all([
+      const [r, session, exCount, week, hurts, pass] = await Promise.all([
         listRoutines(),
         getInProgressSession(),
         countLibraryExercises(),
         getWeekPlan(),
-        getRestPrefs(),
         listActiveInjuries(),
         getSetting('gym_pass'),
       ]);
@@ -60,7 +57,6 @@ export default function TrainScreen() {
       setInProgress(session);
       setExerciseCount(exCount);
       setPlan(week);
-      setRestSecs(rest.defaultSeconds);
       setActiveInjuries(hurts.length);
       setHasPass(gymPassSaved(pass));
     } finally {
@@ -194,13 +190,6 @@ export default function TrainScreen() {
         onPress={() => router.push('/train/schedule')}
       />
       <MenuRow
-        icon="◷"
-        name="Rest timer"
-        sub="Default length, sound, vibration"
-        value={restSecs != null ? `${restSecs}s` : undefined}
-        onPress={() => router.push('/train/timer')}
-      />
-      <MenuRow
         icon="◈"
         name="What have I skipped?"
         sub="Builds a session from muscles with no sets in 30 days"
@@ -210,35 +199,10 @@ export default function TrainScreen() {
       <Label>TOOLS</Label>
       <MenuRow
         icon="◉"
-        name="Plate calculator"
-        sub="What to put on each side of the bar"
-        onPress={() => router.push('/train/plates')}
-      />
-      <MenuRow
-        icon="▲"
-        name="Warm-up sets"
-        sub="Ramp to your working weight"
-        onPress={() => router.push('/train/warmup')}
-      />
-
-      <Label>BODY</Label>
-      <MenuRow
-        icon="◐"
-        name="Readiness"
-        sub="Sleep and heart rate"
-        onPress={() => router.push('/train/readiness')}
-      />
-      <MenuRow
-        icon="▣"
-        name="Progress photos"
-        sub="On this phone only"
-        onPress={() => router.push('/train/photos')}
-      />
-      <MenuRow
-        icon="✛"
-        name="Pain & injury log"
-        sub={activeInjuries > 0 ? `${activeInjuries} active` : 'Nothing logged'}
-        onPress={() => router.push('/train/injury')}
+        name="Tools"
+        sub="Plates, warm-ups, rest timer, readiness, photos, injuries"
+        value={activeInjuries > 0 ? `${activeInjuries} injur${activeInjuries === 1 ? 'y' : 'ies'}` : undefined}
+        onPress={() => router.push('/train/tools')}
       />
 
       <Label>REVIEW</Label>
