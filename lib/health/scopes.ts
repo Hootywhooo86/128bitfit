@@ -19,16 +19,16 @@ export type ScopeSpec = {
 };
 
 export const SCOPE_RECORDS: Record<HealthScope, ScopeSpec> = {
-  steps: { recordType: 'Steps', directions: ['read', 'write'] },
-  heartRate: { recordType: 'HeartRate', directions: ['read', 'write'] },
+  steps: { recordType: 'Steps', directions: ['read'] },
+  heartRate: { recordType: 'HeartRate', directions: ['read'] },
   restingHeartRate: { recordType: 'RestingHeartRate', directions: ['read'] },
-  activeCalories: { recordType: 'ActiveCaloriesBurned', directions: ['read', 'write'] },
+  activeCalories: { recordType: 'ActiveCaloriesBurned', directions: ['read'] },
   totalCalories: { recordType: 'TotalCaloriesBurned', directions: ['read'] },
-  distance: { recordType: 'Distance', directions: ['read', 'write'] },
+  distance: { recordType: 'Distance', directions: ['read'] },
   sleep: { recordType: 'SleepSession', directions: ['read'] },
   weight: { recordType: 'Weight', directions: ['read', 'write'] },
   height: { recordType: 'Height', directions: ['read'] },
-  bodyFat: { recordType: 'BodyFat', directions: ['read', 'write'] },
+  bodyFat: { recordType: 'BodyFat', directions: ['read'] },
   exercise: { recordType: 'ExerciseSession', directions: ['read', 'write'] },
   nutrition: { recordType: 'Nutrition', directions: ['read', 'write'] },
   hydration: { recordType: 'Hydration', directions: ['read', 'write'] },
