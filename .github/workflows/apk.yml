@@ -61,12 +61,54 @@ jobs:
       - name: Prebuild android/
         run: npx expo prebuild --platform android --no-install
 
+      # The app's own signing key, from the repository's encrypted secrets.
+      # Refuses to go on without it: an APK signed with any other key will not
+      # install over the app on the phone, and one signed with the public
+      # React Native debug key is the hole this key exists to close.
+      - name: Release signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_B64" ] || [ -z "$KEYSTORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ]; then
+            echo "::error::The release signing key is missing. Add ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD and ANDROID_KEY_ALIAS under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/release.keystore"
+          echo "BITFIT_KEYSTORE=$RUNNER_TEMP/release.keystore" >> "$GITHUB_ENV"
+          echo "BITFIT_KEY_ALIAS=$KEY_ALIAS" >> "$GITHUB_ENV"
+
       # x86 and x86_64 are emulator architectures and account for ~58 MB of the
       # universal APK. Both ARM targets are kept so the build installs on 32-bit
       # phones as well as modern 64-bit ones.
       - name: Build release APK
         working-directory: android
+        env:
+          BITFIT_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: ./gradlew assembleRelease -PreactNativeArchitectures=arm64-v8a,armeabi-v7a --console=plain
+
+      - name: Check the APK is signed with the release key
+        env:
+          EXPECTED_SHA256: 51eb5cc56cb038cca0f55ebb484221b72996be33e19beb2a4595c3451178d9ad
+        run: |
+          set -euo pipefail
+          signer=$(ls "$ANDROID_SDK_ROOT"/build-tools/*/apksigner | sort -V | tail -1)
+          certs=$("$signer" verify --print-certs android/app/build/outputs/apk/release/app-release.apk)
+          echo "$certs" | grep -E "Signer #1 certificate (DN|SHA-256)"
+          if echo "$certs" | grep -q "CN=Android Debug"; then
+            echo "::error::The APK is signed with the public debug key. Refusing to publish it."
+            exit 1
+          fi
+          # The fingerprint of the key made for 128BIT FIT. A different key —
+          # a pasted secret that decodes to something else — would install as
+          # a stranger to the app on the phone, so it is refused too.
+          if ! echo "$certs" | grep -qi "SHA-256 digest: $EXPECTED_SHA256"; then
+            echo "::error::The APK is signed, but not with 128BIT FIT's release key. Check ANDROID_KEYSTORE_BASE64."
+            exit 1
+          fi
+          rm -f "$RUNNER_TEMP/release.keystore"
 
       - name: Name the artifact
         id: apk
@@ -97,9 +139,9 @@ jobs:
             Install: open this page on the phone, tap the `.apk`, and allow
             installing from your browser when Android asks.
 
-            Signed with the React Native template's **debug keystore**. That is
-            fine for sideloading and is not acceptable for a Play submission —
-            a real upload key has to replace it first.
+            Signed with 128BIT FIT's own release key. Installing this over a
+            build from alpha.45 or earlier needs one uninstall first — back up
+            in Settings > Export, uninstall, install this, then restore.
 
             arm64-v8a and armeabi-v7a only. x86 emulator images are not
             included.

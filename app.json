@@ -188,7 +188,8 @@
           ]
         }
       ],
-      "./plugins/with-gym-pass-shortcut"
+      "./plugins/with-gym-pass-shortcut",
+      "./plugins/with-release-signing"
     ],
     "experiments": {
       "typedRoutes": true
