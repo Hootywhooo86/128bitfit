@@ -8,7 +8,7 @@
  * Does not invent fake replies — errors surface to the UI.
  */
 import { AI_TIMEOUT_MS, AI_WEB_TIMEOUT_MS, fetchWithTimeout } from './net';
-import { describeKeyProblem } from './api-key';
+import { baseUrlProblem, describeKeyProblem } from './api-key';
 
 export type AiProviderId =
   | 'anthropic'
@@ -86,9 +86,11 @@ export const AI_PROVIDERS: AiProviderMeta[] = [
     id: 'custom',
     label: 'Custom (OpenAI-compatible)',
     defaultModel: 'llama3.1',
-    defaultBaseUrl: 'http://localhost:11434/v1',
+    defaultBaseUrl: null,
+    // No default: the old one was Ollama's http://localhost, which on a phone
+    // is the phone itself and is plain http besides — it could never connect.
     needsBaseUrl: true,
-    hint: 'Ollama, LM Studio, Azure, etc. — /v1 chat completions',
+    hint: 'Any OpenAI-compatible server at an https:// address — Azure, Together, or Ollama / LM Studio on your computer behind an HTTPS tunnel.',
   },
 ];
 
@@ -325,6 +327,8 @@ async function chatOpenAiCompatible(
   baseUrl: string,
   web: boolean
 ): Promise<Reply> {
+  const problem = baseUrlProblem(baseUrl);
+  if (problem) throw new AiCoachError(problem);
   const url = `${stripTrailingSlash(baseUrl)}/chat/completions`;
   const body: Record<string, unknown> = {
     model: req.model,

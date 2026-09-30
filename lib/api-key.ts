@@ -79,3 +79,30 @@ export function describeKeyProblem(key: string | null | undefined): string | nul
 export function sanitizeBaseUrl(raw: string | null | undefined): string {
   return sanitizeApiKey(raw) ?? '';
 }
+
+/**
+ * Why a custom AI address cannot work from a phone, in one sentence, or null
+ * when it can. Empty is fine: it means "use the provider's own address".
+ *
+ * Two traps. Android refuses plain http:// in a release build, and the key
+ * would travel unencrypted if it did not. And "localhost" on a phone is the
+ * phone itself — not the computer running Ollama.
+ */
+export function baseUrlProblem(raw: string | null | undefined): string | null {
+  const url = sanitizeBaseUrl(raw);
+  if (!url) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return 'That address is not a web address. It should start with https://';
+  }
+  if (parsed.protocol !== 'https:') {
+    return 'Use an https:// address. Android blocks plain http://, and your key would be sent unencrypted.';
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '[::1]') {
+    return '"localhost" on a phone means the phone itself, not your computer. Use the https:// address your server is reachable at.';
+  }
+  return null;
+}

@@ -51,12 +51,16 @@ export default function ThemeScreen() {
       {error ? <Text style={s.err}>{error}</Text> : null}
 
       <Label>PREVIEW</Label>
-      <SessionCard
-        title="PUSH DAY A"
-        sub="This is what the accent looks like on a primary card"
-        action="START WORKOUT"
-        onPress={() => undefined}
-      />
+      {/* A picture of a card, not a button: taps pass through rather than
+          landing on a "START WORKOUT" that does nothing. */}
+      <View pointerEvents="none">
+        <SessionCard
+          title="PUSH DAY A"
+          sub="Preview: this is what the accent looks like on a primary card"
+          action="START WORKOUT"
+          onPress={() => undefined}
+        />
+      </View>
       <Card>
         <View style={s.seg}>
           {['SELECTED', 'UNSELECTED'].map((t, i) => (

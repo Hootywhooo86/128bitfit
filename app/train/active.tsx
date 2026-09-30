@@ -302,7 +302,13 @@ export default function ActiveWorkoutScreen() {
                     { text: 'Remove', style: 'destructive', onPress: () => void act(() => deleteSet(last.id)) },
                   ]);
                 }}
-                onComplete={(set, values) => void onMarkComplete(se, set, values)}
+                onComplete={(set, values) =>
+                  void onMarkComplete(se, set, values).catch((e) =>
+                    // Rare — SQLite on the phone — but a tick that did not
+                    // save must not look like one that did.
+                    Alert.alert('That set did not save', e instanceof Error ? e.message : String(e))
+                  )
+                }
                 onUncomplete={(set) => {
                   setPrSets((prev) => {
                     const next = new Set(prev);

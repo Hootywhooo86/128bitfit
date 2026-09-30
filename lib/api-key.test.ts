@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeKeyProblem, sanitizeApiKey } from './api-key';
+import { baseUrlProblem, describeKeyProblem, sanitizeApiKey } from './api-key';
 
 const TOKEN = 'hf_abcdefghijklmnopqrstuvwxyz01234567';
 
@@ -70,5 +70,18 @@ describe('describeKeyProblem', () => {
     for (const bad of [`${TOKEN}\n`, 'hf_abc def12345', 'hf_abc']) {
       expect(describeKeyProblem(bad)).not.toContain('hf_');
     }
+  });
+});
+
+describe('custom AI address', () => {
+  it('accepts https and empty', () => {
+    expect(baseUrlProblem('')).toBeNull();
+    expect(baseUrlProblem('https://my-box.example.com/v1')).toBeNull();
+  });
+
+  it('refuses plain http, localhost and junk', () => {
+    expect(baseUrlProblem('http://192.168.1.20:11434/v1')).toMatch(/https/);
+    expect(baseUrlProblem('https://localhost:11434/v1')).toMatch(/phone itself/);
+    expect(baseUrlProblem('not a url')).toMatch(/not a web address/);
   });
 });
