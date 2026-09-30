@@ -14,6 +14,7 @@ import {
 import { DateField } from '@/components/DateField';
 import { useDb } from '@/db/DatabaseProvider';
 import { previewCalorieTarget, updateAppSettings } from '@/db/settings-queries';
+import { RestoreButton } from '@/components/BackupRestore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { addWeightEntry } from '@/db/weight-queries';
 import {
@@ -172,6 +173,15 @@ export default function OnboardingScreen() {
 
         {step === 'Basics' && (
           <View>
+            {/* Straight after a reinstall or on a new phone, this is the
+                first screen — so the way back to your data starts here too. */}
+            <RestoreButton
+              label="Restore from a backup instead"
+              onRestored={() =>
+                void updateAppSettings({ onboardingComplete: true }).then(() => router.replace('/(tabs)'))
+              }
+            />
+
             <Text style={styles.label}>Display name</Text>
             <TextInput
               style={styles.input}

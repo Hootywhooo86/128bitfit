@@ -97,7 +97,7 @@ async function resolveExerciseId(spec: SeedExercise): Promise<string | null> {
  * condition to be maintained — an empty routine list is a legitimate state and
  * the app has no business arguing with it.
  */
-const SEEDED_KEY = 'starter_routines_seeded';
+export const SEEDED_KEY = 'starter_routines_seeded';
 
 export async function ensureStarterRoutines(): Promise<{ seeded: boolean; count: number }> {
   const [row] = await db.select({ n: count() }).from(routines);
@@ -143,3 +143,6 @@ export async function ensureStarterRoutines(): Promise<{ seeded: boolean; count:
   const [after] = await db.select({ n: count() }).from(routines);
   return { seeded: true, count: after?.n ?? 0 };
 }
+
+/** The starter routines' fixed ids, so a restore can tell them from yours. */
+export const STARTER_ROUTINE_IDS: readonly string[] = STARTER.map((r) => r.id);
