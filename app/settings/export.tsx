@@ -13,6 +13,7 @@ import * as Sharing from 'expo-sharing';
 import { runExport, type ExportResult } from '@/lib/export';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
+import { BackupButton, RestoreButton } from '@/components/BackupRestore';
 
 function formatSize(bytes: number | null): string {
   if (bytes == null) return '';
@@ -56,11 +57,21 @@ export default function ExportScreen() {
     <Screen section="Export" back>
       <Stack.Screen options={{ title: 'Export data' }} />
 
+      <Text style={styles.section}>BACKUP</Text>
       <Text style={styles.muted}>
-        Everything you have logged: workouts, sets, food, water, weight, injury log, settings and
-        coach threads. JSON is the complete, re-importable copy; the CSVs are one table each for
-        spreadsheets. Progress photos are listed with where each file is on the phone; the
-        pictures themselves are not copied into the export.
+        One file with everything, photos included, to keep somewhere safe — Drive, Files or an
+        email to yourself. Uninstalling the app deletes everything on the phone; this file brings
+        it back, here or on a new phone.
+      </Text>
+      <BackupButton />
+      <RestoreButton />
+
+      <Text style={styles.section}>EXPORT</Text>
+      <Text style={styles.muted}>
+        Everything you have logged, for other apps and spreadsheets: workouts, sets, food, water,
+        weight, cardio, injury log, settings and coach threads. The JSON is complete and can also be
+        restored; the CSVs are one table each. Photos are listed but not included — use the
+        backup for those.
       </Text>
       <Text style={styles.muted}>
         Bundled exercise and food reference data is left out — it ships with the app and is not

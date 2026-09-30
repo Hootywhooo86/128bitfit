@@ -5,6 +5,7 @@
  *
  * - `exercises`, `foods` — public-domain reference data that ships inside the
  *   app (~9 MB). It is not the user's data and including it would bury theirs.
+ *   The ones the user made are exported, as custom_exercises and custom_foods.
  *   Rows that point at it carry the resolved name instead, so every exported
  *   file stands alone.
  * - `off_food_cache` — a reconstructible cache of Open Food Facts lookups.
@@ -38,6 +39,7 @@ import {
   workoutSessions,
 } from '@/db/schema';
 import { USER_EXERCISE_CATEGORIES } from '@/lib/exercise-sources';
+import { USER_FOOD_SOURCES } from '@/lib/food-sources';
 import type { CsvRow } from './csv';
 
 /** One exported table: a name, its rows, and a stable column order. */
@@ -89,6 +91,7 @@ export async function collectExport(): Promise<ExportTable[]> {
       position: sessionExercises.position,
       rest_seconds: sessionExercises.restSeconds,
       notes: sessionExercises.notes,
+      superset_group: sessionExercises.supersetGroup,
     })
     .from(sessionExercises)
     .leftJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
@@ -161,6 +164,12 @@ export async function collectExport(): Promise<ExportTable[]> {
     .from(exercises)
     .where(inArray(exercises.category, [...USER_EXERCISE_CATEGORIES]))
     .orderBy(asc(exercises.name));
+  // Foods and recipes you made are yours too; the bundled catalogue is not.
+  const customFoodRows = await db
+    .select()
+    .from(foods)
+    .where(inArray(foods.source, [...USER_FOOD_SOURCES]))
+    .orderBy(asc(foods.name));
   const cardioRows = await db.select().from(cardioSessions).orderBy(asc(cardioSessions.startedAt));
   const pointRows = await db
     .select()
@@ -208,6 +217,7 @@ export async function collectExport(): Promise<ExportTable[]> {
         'position',
         'rest_seconds',
         'notes',
+        'superset_group',
       ],
       rows: sessionExerciseRows,
     },
@@ -239,6 +249,7 @@ export async function collectExport(): Promise<ExportTable[]> {
         'meal_type',
         'food_id',
         'food_name',
+        'custom_name',
         'servings',
         'serving_size',
         'serving_unit',
@@ -251,6 +262,10 @@ export async function collectExport(): Promise<ExportTable[]> {
       rows: foodLogRows.map((r) => ({
         ...r,
         food_name: r.food_name ?? r.catalog_name ?? null,
+        // The name as typed or given by the AI, before falling back to the
+        // catalogue's — what a restore needs. Not selected twice in SQL: the
+        // same column under two names can shift every value after it.
+        custom_name: r.food_name,
         catalog_name: undefined,
       })),
     },
@@ -346,6 +361,36 @@ export async function collectExport(): Promise<ExportTable[]> {
           })(),
         };
       }),
+    },
+    {
+      name: 'custom_foods',
+      columns: [
+        'id',
+        'name',
+        'brand',
+        'description',
+        'source',
+        'barcode',
+        'serving_size',
+        'serving_unit',
+        'nutrition_basis',
+        'nutrients',
+        'photo',
+      ],
+      rows: customFoodRows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        brand: r.brand,
+        description: r.description,
+        source: r.source,
+        barcode: r.barcode,
+        serving_size: r.servingSize,
+        serving_unit: r.servingUnit,
+        nutrition_basis: r.nutritionBasis,
+        // As stored: a JSON map of nutrient to amount, null meaning unknown.
+        nutrients: r.nutrients,
+        photo: r.photoUri,
+      })),
     },
     {
       name: 'cardio_sessions',
