@@ -202,12 +202,6 @@ export async function updateAppSettings(patch: {
   activity?: ActivityLevel;
   goal?: Goal;
 }): Promise<AppSettings> {
-  if (patch.calorieTarget != null) {
-    // Non-negotiable #6: the floor is applied here, at the only path into the
-    // database, so no screen and no future caller can write below it.
-    const clamped = clampCalorieTarget(patch.calorieTarget, await getCalorieProfile());
-    await setSetting('calorie_target', String(clamped.value));
-  }
   if (patch.proteinTarget != null) {
     await setSetting('protein_target', String(Math.round(patch.proteinTarget)));
   }
@@ -239,7 +233,33 @@ export async function updateAppSettings(patch: {
   }
   if (patch.activity != null) await setSetting('activity_level', patch.activity);
   if (patch.goal != null) await setSetting('goal', patch.goal);
+
+  // Non-negotiable #6, applied last: sex, birthday, height and activity above
+  // all move the floor, and onboarding sends them in the same call as the
+  // target. Clamping first measured the target against the profile as it was
+  // before this save — for a new user, an empty one, so a target far below
+  // their BMR went straight in.
+  if (patch.calorieTarget != null) {
+    const clamped = clampCalorieTarget(patch.calorieTarget, await getCalorieProfile());
+    await setSetting('calorie_target', String(clamped.value));
+  } else {
+    await reapplyCalorieFloor();
+  }
   return getAppSettings();
+}
+
+/**
+ * Raises the stored target if the profile has moved the floor above it — a
+ * weigh-in, a birthday, a change of activity. The floor is a property of the
+ * person, not of the moment the target was typed, so it is checked again
+ * whenever the person changes. Returns the result, or null with no target.
+ */
+export async function reapplyCalorieFloor(): Promise<ClampedTarget | null> {
+  const raw = await getSetting('calorie_target');
+  if (raw == null || raw === '') return null;
+  const clamped = clampCalorieTarget(Number(raw), await getCalorieProfile());
+  if (clamped.clamped) await setSetting('calorie_target', String(clamped.value));
+  return clamped;
 }
 
 export { DEFAULT_GOALS, parseIntSetting };

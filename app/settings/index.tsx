@@ -47,6 +47,7 @@ import {
   type CalorieProfile,
   type Goal,
 } from '@/lib/body';
+import { baseUrlProblem } from '@/lib/api-key';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { HfModelPicker } from '@/components/HfModelPicker';
 import { Screen } from '@/components/ui';
@@ -146,12 +147,15 @@ export default function SettingsScreen() {
 
   const onSave = async () => {
     if (saving) return;
+    // Before anything is written: an address that can never connect should
+    // be caught here, not on the first question to the coach.
+    const urlProblem = baseUrlProblem(aiBaseUrl);
+    if (urlProblem) {
+      Alert.alert('Base URL not saved', urlProblem);
+      return;
+    }
     setSaving(true);
     try {
-      // The floor is enforced in updateAppSettings regardless; this is only so
-      // the change is explained rather than applied silently.
-      const floorCheck = await previewCalorieTarget(Number(calorieTarget) || 2200);
-
       const nextApp = await updateAppSettings({
         displayName,
         calorieTarget: Number(calorieTarget) || 2200,
@@ -163,6 +167,9 @@ export default function SettingsScreen() {
         goal,
       });
       applyApp(nextApp);
+      // Checked after the save, against the profile this save just wrote
+      // (activity included) — the floor the target was actually held to.
+      const floorCheck = await previewCalorieTarget(Number(calorieTarget) || 2200);
       if (floorCheck.clamped) {
         setCalorieTarget(String(floorCheck.value));
         Alert.alert('Calorie target adjusted', explainFloor(floorCheck));
@@ -199,6 +206,8 @@ export default function SettingsScreen() {
 
       setSavedFlash(true);
       setTimeout(() => setSavedFlash(false), 1500);
+    } catch (e) {
+      Alert.alert('Settings not saved', e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -231,8 +240,8 @@ export default function SettingsScreen() {
   return (
     <Screen section="Settings" back>
       <Text style={styles.muted}>
-        Goals and preferences persist in the local settings table. AI keys use
-        Secure Store on device — never committed or logged.
+        Everything here stays on this phone. An AI key is kept in the phone's secure
+        storage and only ever sent to the AI provider you pick.
       </Text>
 
       <Pressable style={styles.charCard} onPress={() => router.push('/settings/privacy')}>
@@ -507,7 +516,7 @@ export default function SettingsScreen() {
           textContentType="password"
         />
         <Text style={styles.hint}>
-          Status: {aiHasKey ? 'Key saved on device' : 'No key configured — Coach stays in stub mode'}
+          Status: {aiHasKey ? 'Key saved on device' : 'No key yet — the coach needs one to answer'}
         </Text>
 
         {aiHasKey ? (
@@ -533,7 +542,7 @@ export default function SettingsScreen() {
         <Text style={styles.muted}>
           USDA FoodData Central powers the offline food database. Barcode products may also come
           from Open Food Facts and are available under the Open Database License (ODbL). Cached
-          barcode results stay on-device only — no bulk OFF import.
+          barcode results are stored on this phone only.
         </Text>
         <Text style={styles.muted}>
           Exercises: free-exercise-db (public domain).

@@ -33,11 +33,27 @@ export async function offerBreakdown(router: Router, opts: { cardioId?: string }
     { text: 'Not now', style: 'cancel' },
     {
       text: 'Yes',
-      onPress: () =>
+      onPress: () => {
+        autoAskArmed = true;
         router.push({
           pathname: '/coach/[mode]',
           params: { mode: 'debrief', auto: '1', ...(opts.cardioId ? { cardio: opts.cardioId } : {}) },
-        }),
+        });
+      },
     },
   ]);
+}
+
+/**
+ * Whether the coach may ask on its own, once. Set only by tapping "Yes"
+ * above: `auto=1` in the address alone is not enough, because a link from any
+ * website or app (bitfit://coach/debrief?auto=1) could otherwise make the app
+ * send your training summary and spend your AI credit without a tap.
+ */
+let autoAskArmed = false;
+
+export function consumeAutoAsk(): boolean {
+  const armed = autoAskArmed;
+  autoAskArmed = false;
+  return armed;
 }

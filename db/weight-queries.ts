@@ -2,7 +2,7 @@ import { desc, eq } from 'drizzle-orm';
 import { db } from './client';
 import { newId } from './id';
 import { weightEntries, type WeightEntry } from './schema';
-import type { WeightUnit } from './settings-queries';
+import { reapplyCalorieFloor, type WeightUnit } from './settings-queries';
 import { mirrorWeight, mirrorWeightRemoved } from '@/lib/health/mirror';
 
 /** Health Connect stores kilograms, whatever the user types in. */
@@ -26,6 +26,8 @@ export async function addWeightEntry(input: {
     note: input.note ?? null,
   });
   mirrorWeight(id, loggedAt.getTime(), weightInKg({ kgOrLb: input.value, unit: input.unit }));
+  // A new weight moves BMR, so it can move the calorie floor.
+  await reapplyCalorieFloor();
   return id;
 }
 
@@ -45,6 +47,7 @@ export async function getLatestWeightEntry(): Promise<WeightEntry | null> {
 export async function deleteWeightEntry(id: string): Promise<void> {
   await db.delete(weightEntries).where(eq(weightEntries.id, id));
   mirrorWeightRemoved(id);
+  await reapplyCalorieFloor();
 }
 
 export function formatWeight(entry: Pick<WeightEntry, 'kgOrLb' | 'unit'>): string {

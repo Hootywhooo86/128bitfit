@@ -64,7 +64,7 @@ export default function ExportScreen() {
       </Text>
       <Text style={styles.muted}>
         Bundled exercise and food reference data is left out — it ships with the app and is not
-        yours. API keys are never included; they live in Secure Store, not the database.
+        yours. API keys are never included; they live in the phone's secure storage, not with your data.
       </Text>
 
       <Pressable style={[styles.button, busy && styles.buttonBusy]} onPress={onExport} disabled={busy}>

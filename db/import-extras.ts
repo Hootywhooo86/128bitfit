@@ -20,6 +20,7 @@ import { fieldsToFill } from '@/lib/import/merge';
 import { mirrorWeights } from '@/lib/health/mirror';
 import { db } from './client';
 import { newId } from './id';
+import { reapplyCalorieFloor } from './settings-queries';
 import { exercises, routineExercises, routines, weightEntries } from './schema';
 
 export type ExtrasOutcome = {
@@ -207,6 +208,7 @@ export async function importExtras(extras: ImportExtras): Promise<ExtrasOutcome>
   // Inserted directly rather than through addWeightEntry, so the whole history
   // goes to Health Connect as one write instead of one call per weigh-in.
   mirrorWeights(pushed);
+  if (weightsAdded > 0) await reapplyCalorieFloor();
 
   return {
     routinesAdded,

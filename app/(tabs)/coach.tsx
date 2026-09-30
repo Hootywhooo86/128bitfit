@@ -21,7 +21,7 @@ const CARDS = [
   {
     mode: 'checkin' as const,
     title: 'Weekly check-in',
-    blurb: 'Week-ready summary from SQLite for priorities and course-correction.',
+    blurb: 'Your week in one summary: what went well and what to change.',
   },
 ];
 
@@ -51,8 +51,8 @@ export default function CoachScreen() {
         <View style={{ flex: 1 }}>
           <Text style={styles.muted}>
             {hasKey
-              ? `Bring your own key · ${providerLine}. Context is built from local SQLite before each request.`
-              : 'Bring your own key — add a provider + API key in Settings. Until then, sessions show local context only.'}
+              ? `Bring your own key · ${providerLine}. Each question sends a short summary of your logs, never the whole history.`
+              : 'Bring your own key — add a provider and API key in Settings. Until then, the coach shows the summary it would send.'}
           </Text>
         </View>
         <Pressable style={styles.gear} onPress={() => router.push('/settings')}>
@@ -64,8 +64,8 @@ export default function CoachScreen() {
         <Pressable style={styles.byoCard} onPress={() => router.push('/settings')}>
           <Text style={styles.byoTitle}>Bring your own key</Text>
           <Text style={styles.blurb}>
-            Anthropic, OpenAI, Gemini, OpenRouter, or a custom OpenAI-compatible endpoint. Keys
-            stay on device via Secure Store.
+            Anthropic, OpenAI, Gemini, OpenRouter, Groq, Hugging Face, or your own server. Your key
+            stays in this phone's secure storage.
           </Text>
           <Text style={styles.cta}>Configure in Settings →</Text>
         </Pressable>

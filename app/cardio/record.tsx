@@ -116,7 +116,16 @@ export default function RecordCardioScreen() {
   // A session left open by an app kill has lost its tracker: start it again.
   useEffect(() => {
     if (session && session.status !== 'finished' && access === 'granted') {
-      void startTracking(sportById(session.sport).label, session.startedAt).catch(() => undefined);
+      void startTracking(sportById(session.sport).label, session.startedAt).catch((e) =>
+        // Said out loud: a tracker that did not restart looks exactly like one
+        // that did, until the route comes back with a hole in it.
+        Alert.alert(
+          'GPS did not restart',
+          `This session is still open, but the route is not being recorded. Pause and resume to try again. (${
+            e instanceof Error ? e.message : String(e)
+          })`
+        )
+      );
     }
   }, [session?.id, access]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -236,9 +245,15 @@ export default function RecordCardioScreen() {
     setBusy(true);
     try {
       if (recording) await pauseCardioSession(session.id);
-      else await resumeCardioSession(session.id);
+      else {
+        await resumeCardioSession(session.id);
+        // A no-op while GPS is running; restarts it if Android stopped it.
+        await startTracking(sportById(session.sport).label, session.startedAt);
+      }
       const open = await getOpenCardioSession();
       if (open) setSession(open);
+    } catch (e) {
+      Alert.alert('Could not resume', e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }

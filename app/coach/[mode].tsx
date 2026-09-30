@@ -37,6 +37,7 @@ import {
   threadTitle,
   type CoachTurn,
 } from '@/lib/coach-thread';
+import { consumeAutoAsk } from '@/lib/ai-breakdown';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 
 function isCoachMode(v: string): v is CoachMode {
@@ -172,7 +173,7 @@ export default function CoachSessionScreen() {
   useEffect(() => {
     if (auto !== '1' || autoRan.current || !ctx || asking || turns.length > 0) return;
     autoRan.current = true;
-    void onAsk();
+    if (consumeAutoAsk()) void onAsk();
   }, [auto, ctx, asking, turns.length, onAsk]);
 
   /**
@@ -323,7 +324,7 @@ export default function CoachSessionScreen() {
 
         {turns.length === 0 ? (
           <>
-            <Text style={styles.section}>Assembled context (SQLite)</Text>
+            <Text style={styles.section}>What the coach will be sent</Text>
             <View style={styles.contextCard}>
               <Text style={styles.mono}>{ctx.promptBlock}</Text>
             </View>
