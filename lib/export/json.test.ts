@@ -64,7 +64,7 @@ describe('envelope metadata', () => {
   it('identifies the format and version', () => {
     const env = buildEnvelope([], exportedAt);
     expect(env.format).toBe('128bitfit-export');
-    expect(env.formatVersion).toBe(2);
+    expect(env.formatVersion).toBe(3);
     expect(env.exportedAt).toBe('2026-09-21T03:04:05.000Z');
   });
 

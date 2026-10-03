@@ -38,6 +38,7 @@ export type RestorePlan = {
     targetReps: number | null;
     restSeconds: number | null;
     notes: string | null;
+    track: 'reps' | 'distance' | null;
   }[];
   workoutSessions: {
     id: string;
@@ -56,6 +57,7 @@ export type RestorePlan = {
     restSeconds: number | null;
     notes: string | null;
     supersetGroup: string | null;
+    track: 'reps' | 'distance';
   }[];
   sets: {
     id: string;
@@ -68,6 +70,7 @@ export type RestorePlan = {
     isWarmup: boolean;
     setType: 'normal' | 'drop' | 'rp';
     rpe: number | null;
+    distanceM: number | null;
   }[];
   foodLogs: {
     id: string;
@@ -204,7 +207,7 @@ export function planRestore(text: string, documentDir: string): RestorePlan {
     throw new RestoreError('That file is not a 128BIT FIT backup. Choose the .json file the app exported.');
   }
   const version = num(env.formatVersion) ?? 0;
-  if (version < 1 || version > 2) {
+  if (version < 1 || version > 3) {
     throw new RestoreError(
       'That backup was made by a newer version of 128BIT FIT. Update the app, then restore it.'
     );
@@ -268,6 +271,7 @@ export function planRestore(text: string, documentDir: string): RestorePlan {
         targetReps: num(r.target_reps),
         restSeconds: num(r.rest_seconds),
         notes: str(r.notes),
+        track: r.track === 'reps' || r.track === 'distance' ? r.track : null,
       };
     }),
     workoutSessions: take('workout_sessions', (r) => {
@@ -297,6 +301,7 @@ export function planRestore(text: string, documentDir: string): RestorePlan {
         restSeconds: num(r.rest_seconds),
         notes: str(r.notes),
         supersetGroup: str(r.superset_group),
+        track: r.track === 'distance' ? ('distance' as const) : ('reps' as const),
       };
     }),
     sets: take('sets', (r) => {
@@ -315,6 +320,7 @@ export function planRestore(text: string, documentDir: string): RestorePlan {
         isWarmup: bool(r.is_warmup),
         setType: oneOf(r.set_type, ['normal', 'drop', 'rp'] as const, 'normal'),
         rpe: num(r.rpe),
+        distanceM: num(r.distance_m),
       };
     }),
     foodLogs: take('food_logs', (r) => {

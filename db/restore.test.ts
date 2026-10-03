@@ -55,7 +55,7 @@ function freshInstall() {
   for (const m of migrations) {
     for (const stmt of m.split('--> statement-breakpoint')) if (stmt.trim()) sqlite.exec(stmt);
   }
-  sqlite.exec(`insert into exercises (id, name, category) values ('Bench_Press', 'Bench Press', 'strength')`);
+  sqlite.exec(`insert into exercises (id, name, category) values ('Bench_Press', 'Bench Press', 'strength'), ('Farmers_Walk', 'Farmers Walk', 'strongman')`);
   sqlite.exec(`insert into foods (id, name, source, nutrients) values ('usda_oats', 'Oats', 'usda', '{}')`);
 }
 
@@ -77,6 +77,11 @@ function seedEverything() {
      values ('se1', 'w1', 'Bench_Press', 0, 90, null, 'ss1'), ('se2', 'w1', 'custom_row', 1, 90, 'seat 4', 'ss1')`);
   q(`insert into sets (id, session_exercise_id, set_index, reps, weight, weight_unit, completed, is_warmup, set_type, rpe)
      values ('s1', 'se1', 0, 8, 185, 'lb', 1, 0, 'normal', 8), ('s2', 'se2', 0, 10, 120, 'lb', 1, 0, 'normal', null)`);
+  // A carry logged by distance, and a routine that remembers it.
+  q(`insert into session_exercises (id, session_id, exercise_id, position, track) values ('se3', 'w1', 'Farmers_Walk', 2, 'distance')`);
+  q(`insert into sets (id, session_exercise_id, set_index, reps, weight, weight_unit, completed, is_warmup, set_type, distance_m)
+     values ('s3', 'se3', 0, null, 90, 'lb', 1, 0, 'normal', 40)`);
+  q(`insert into routine_exercises (id, routine_id, exercise_id, position, target_sets, track) values ('re2', 'r1', 'Farmers_Walk', 1, 3, 'distance')`);
   q(`insert into foods (id, name, source, serving_size, serving_unit, nutrition_basis, nutrients, photo_uri)
      values ('custom_shake', 'Shake', 'custom', 1, 'bottle', 'per_serving', '{"calories":300,"protein":40,"fat":null}', ?)`,
     `${OLD_DIR}food-photos/custom_shake.jpg`);
@@ -130,6 +135,8 @@ describe('backup and restore', () => {
     });
 
     expect(await snapshot()).toEqual(before);
+    expect(before.sets).toContainEqual(expect.objectContaining({ id: 's3', distance_m: 40, reps: null }));
+    expect(before.session_exercises).toContainEqual(expect.objectContaining({ id: 'se3', track: 'distance' }));
     expect(written.sort()).toEqual(['gym-pass/pass-1.jpg', 'progress-photos/p1.jpg']);
     expect(result.photos).toBe(2);
     expect(result.unreadable).toBe(0);

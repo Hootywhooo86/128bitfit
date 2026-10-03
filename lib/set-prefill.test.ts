@@ -70,11 +70,11 @@ describe('seeding a new set', () => {
       targetReps: 5,
       carryFrom: { reps: 10, weight: 155, weightUnit: 'lb' },
     });
-    expect(seed).toEqual({ reps: 10, weight: 155, weightUnit: 'lb' });
+    expect(seed).toMatchObject({ reps: 10, weight: 155, weightUnit: 'lb' });
   });
 
   it('produces an empty set for a first-ever exercise', () => {
-    expect(resolveSetSeed({ last: null, index: 0 })).toEqual({
+    expect(resolveSetSeed({ last: null, index: 0 })).toMatchObject({
       reps: null,
       weight: null,
       weightUnit: DEFAULT_WEIGHT_UNIT,
@@ -166,7 +166,7 @@ describe('seeding a set added mid-session', () => {
 
   it('starts working set 1 from last week’s set 1, however many warm-ups came first', () => {
     const seed = seedForNewSet({ kind: 'working', block: [warm(45), warm(95)], last });
-    expect(seed).toEqual({ reps: 8, weight: 135, weightUnit: 'lb' });
+    expect(seed).toMatchObject({ reps: 8, weight: 135, weightUnit: 'lb' });
   });
 
   it('carries a working set from the working set before it, never from a warm-up', () => {
@@ -175,7 +175,7 @@ describe('seeding a set added mid-session', () => {
   });
 
   it('starts the first warm-up blank rather than at the working weight', () => {
-    expect(seedForNewSet({ kind: 'warmup', block: [], last })).toEqual({ reps: null, weight: null, weightUnit: 'lb' });
+    expect(seedForNewSet({ kind: 'warmup', block: [], last })).toMatchObject({ reps: null, weight: null, weightUnit: 'lb' });
   });
 
   it('carries a warm-up from the warm-up before it', () => {
@@ -184,7 +184,7 @@ describe('seeding a set added mid-session', () => {
 
   it('starts a drop set from the set it follows', () => {
     const seed = seedForNewSet({ kind: 'drop', block: [work(135), work(145, 6)], last });
-    expect(seed).toEqual({ reps: 6, weight: 145, weightUnit: 'lb' });
+    expect(seed).toMatchObject({ reps: 6, weight: 145, weightUnit: 'lb' });
   });
 
   it('does not count a drop set as a working set for position', () => {

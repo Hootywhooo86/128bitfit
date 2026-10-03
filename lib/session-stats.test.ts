@@ -81,3 +81,13 @@ describe('the elapsed clock', () => {
     expect(formatElapsed(-5000)).toBe('0:00');
   });
 });
+
+describe('carries and sleds', () => {
+  it('are left out of lb volume without marking it partial', () => {
+    const s = sessionStats([
+      { completed: true, reps: 10, weight: 100, isWarmup: false },
+      { completed: true, reps: null, weight: 90, isWarmup: false, distanceM: 40 },
+    ]);
+    expect(s).toMatchObject({ setsDone: 2, volume: 1000, volumePartial: false });
+  });
+});

@@ -11,6 +11,7 @@ export type RepeatSource = {
   restSeconds: number | null;
   notes: string | null;
   supersetGroup: string | null;
+  track?: 'reps' | 'distance';
   sets: { completed: boolean; isWarmup: boolean; setType: string }[];
 };
 
@@ -19,6 +20,7 @@ export type RepeatItem = {
   restSeconds: number | null;
   notes: string | null;
   supersetGroup: string | null;
+  track: 'reps' | 'distance';
   workingSets: number;
 };
 
@@ -41,6 +43,7 @@ export function repeatPlan(source: readonly RepeatSource[], newGroupId: () => st
       restSeconds: ex.restSeconds,
       notes: ex.notes,
       supersetGroup: group,
+      track: ex.track ?? 'reps',
       // What was done; if it was skipped entirely, what was planned; never none.
       workingSets: Math.max(1, done || working.length),
     };

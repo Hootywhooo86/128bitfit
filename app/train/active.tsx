@@ -29,6 +29,7 @@ import {
   setSessionExerciseNote,
   updateSet,
   type ActiveWorkout,
+  setSessionExerciseTrack,
   type SessionExerciseWithMeta,
 } from '@/db/workout-queries';
 import type { WorkoutSet } from '@/db/schema';
@@ -42,10 +43,12 @@ import { DEFAULT_REST_SECONDS, useRestTimer } from '@/lib/rest-timer';
 import { shouldKeepAwake } from '@/lib/session-awake';
 import { useSessionAwake } from '@/lib/use-session-awake';
 import { describeLastPerformance } from '@/lib/set-prefill';
+import { formatLoadDistance, loadDistance, type TrackMode } from '@/lib/track-mode';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 import { formatElapsed, sessionStats } from '@/lib/session-stats';
 
-type SetPatch = Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed'>>;
+type SetPatch = Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed' | 'distanceM'>>;
+type SetValues = { reps: number | null; weight: number | null; distanceM: number | null };
 
 export default function ActiveWorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -106,7 +109,7 @@ export default function ActiveWorkoutScreen() {
   const onMarkComplete = async (
     se: SessionExerciseWithMeta,
     set: WorkoutSet,
-    values: { reps: number | null; weight: number | null }
+    values: SetValues
   ) => {
     await completeSet(set.id, values);
     if (values.weight != null) await updateSet(set.id, { weightUnit: units });
@@ -314,6 +317,7 @@ export default function ActiveWorkoutScreen() {
                   void act(() => updateSet(set.id, { completed: false }));
                 }}
                 prSets={prSets}
+                onTrack={(mode) => void act(() => setSessionExerciseTrack(se.id, mode))}
                 onSave={(setId, patch) => {
                   // Written straight through without a reload, so stepping a
                   // weight never waits on the whole workout being re-read.
@@ -367,6 +371,7 @@ function ExerciseCard({
   onComplete,
   onUncomplete,
   onSave,
+  onTrack,
   prSets,
 }: {
   prSets: ReadonlySet<string>;
@@ -391,9 +396,10 @@ function ExerciseCard({
   onAddDropSet: () => void;
   onAddRestPause: () => void;
   onRemoveLastSet: () => void;
-  onComplete: (set: WorkoutSet, values: { reps: number | null; weight: number | null }) => void;
+  onComplete: (set: WorkoutSet, values: SetValues) => void;
   onUncomplete: (set: WorkoutSet) => void;
   onSave: (setId: string, patch: SetPatch) => void;
+  onTrack: (mode: TrackMode) => void;
 }) {
   const [noteOpen, setNoteOpen] = useState(false);
   const [note, setNote] = useState(se.notes ?? '');
@@ -549,6 +555,22 @@ function ExerciseCard({
         />
       ) : null}
 
+      {/* Weight x reps or weight x distance, for any exercise; remembered. */}
+      <View style={styles.trackRow}>
+        {(['reps', 'distance'] as const).map((m) => (
+          <Pressable
+            key={m}
+            style={[styles.trackChip, se.track === m && styles.trackChipOn]}
+            onPress={() => se.track !== m && onTrack(m)}
+            hitSlop={4}
+          >
+            <Text style={[styles.trackChipText, se.track === m && styles.trackChipTextOn]}>
+              {m === 'reps' ? 'Weight × reps' : 'Weight × distance'}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       <View style={styles.setHeader}>
         {/* Same columns as the rows below, and shrink-to-fit so a large
             system font cannot run SET into WEIGHT. */}
@@ -559,7 +581,7 @@ function ExerciseCard({
           WEIGHT ({units.toUpperCase()})
         </Text>
         <Text style={[styles.col, styles.colNum, styles.headText]} numberOfLines={1} adjustsFontSizeToFit>
-          REPS
+          {se.track === 'distance' ? 'METRES' : 'REPS'}
         </Text>
         <View style={styles.colDone} />
       </View>
@@ -582,6 +604,7 @@ function ExerciseCard({
             label={label}
             step={units === 'kg' ? 2.5 : 5}
             units={units}
+            track={se.track}
             onComplete={(values) => onComplete(set, values)}
             onUncomplete={() => onUncomplete(set)}
             onSave={onSave}
@@ -589,6 +612,10 @@ function ExerciseCard({
           />
         );
       })}
+
+      {se.track === 'distance' ? (
+        <Text style={styles.loadLine}>{loadDistanceLine(se, units)}</Text>
+      ) : null}
 
       {plateLine ? (
         <Pressable onPress={() => onPlates(plateWeight!)} hitSlop={6} style={styles.plateHint}>
@@ -633,6 +660,19 @@ function parseNum(text: string): number | null {
 
 const show = (n: number | null | undefined) => (n == null ? '' : String(n));
 
+/** "Load × distance 10,800 lb·m · last time 9,600 lb·m", or what is still needed. */
+function loadDistanceLine(se: SessionExerciseWithMeta, units: WeightUnit): string {
+  const today = loadDistance(se.sets);
+  const last = se.lastPerformance
+    ? loadDistance(se.lastPerformance.sets.map((s) => ({ ...s, distanceM: s.distanceM ?? null, completed: true })))
+    : null;
+  const parts = [
+    today != null ? `Load × distance ${formatLoadDistance(today, units)}` : 'Load × distance: tick a set with weight and metres',
+  ];
+  if (last != null) parts.push(`last time ${formatLoadDistance(last, units)}`);
+  return parts.join(' · ');
+}
+
 /**
  * The elapsed clock, ticking on its own. It used to be state on the whole
  * screen, so every exercise card and number box redrew once a second — and a
@@ -657,23 +697,27 @@ function SetRow({
   onUncomplete,
   onSave,
   isPr,
+  track,
 }: {
   isPr: boolean;
+  track: TrackMode;
   set: WorkoutSet;
   label: string;
   step: number;
   units: WeightUnit;
-  onComplete: (values: { reps: number | null; weight: number | null }) => void;
+  onComplete: (values: SetValues) => void;
   onUncomplete: () => void;
   onSave: (setId: string, patch: SetPatch) => void;
 }) {
   const [weight, setWeight] = useState(show(set.weight));
-  const [reps, setReps] = useState(show(set.reps));
+  // The second number: reps, or metres for a carry or sled.
+  const byDistance = track === 'distance';
+  const [reps, setReps] = useState(show(byDistance ? set.distanceM : set.reps));
 
   // A reload that changes the stored numbers (a swap re-seeds them) must show
   // through; typing does not trigger it because it only fires on a new value.
   useEffect(() => setWeight(show(set.weight)), [set.weight]);
-  useEffect(() => setReps(show(set.reps)), [set.reps]);
+  useEffect(() => setReps(show(byDistance ? set.distanceM : set.reps)), [set.reps, set.distanceM, byDistance]);
 
   const saveWeight = (next: number | null) => {
     setWeight(show(next));
@@ -681,8 +725,10 @@ function SetRow({
   };
   const saveReps = (next: number | null) => {
     setReps(show(next));
-    onSave(set.id, { reps: next });
+    onSave(set.id, byDistance ? { distanceM: next } : { reps: next });
   };
+  // Metres step by 5; reps by 1.
+  const secondStep = byDistance ? 5 : 1;
   const round = (n: number) => Math.round(n * 100) / 100;
 
   return (
@@ -722,7 +768,7 @@ function SetRow({
           hitSlop={4}
           onPress={() => {
             const n = parseNum(reps);
-            if (n != null) saveReps(Math.max(0, n - 1));
+            if (n != null) saveReps(Math.max(0, n - secondStep));
           }}
         >
           <Text style={styles.stepperBtn}>−</Text>
@@ -732,8 +778,9 @@ function SetRow({
           value={reps}
           onChangeText={setReps}
           onDone={(text) => saveReps(parseNum(text))}
+          decimal={byDistance}
         />
-        <Pressable style={styles.stepBtn} hitSlop={4} onPress={() => saveReps((parseNum(reps) ?? 0) + 1)}>
+        <Pressable style={styles.stepBtn} hitSlop={4} onPress={() => saveReps((parseNum(reps) ?? 0) + secondStep)}>
           <Text style={styles.stepperBtn}>+</Text>
         </Pressable>
       </View>
@@ -742,7 +789,13 @@ function SetRow({
         hitSlop={6}
         accessibilityLabel={set.completed ? 'Un-tick set' : 'Log set'}
         onPress={() =>
-          set.completed ? onUncomplete() : onComplete({ weight: parseNum(weight), reps: parseNum(reps) })
+          set.completed
+            ? onUncomplete()
+            : onComplete(
+                byDistance
+                  ? { weight: parseNum(weight), reps: null, distanceM: parseNum(reps) }
+                  : { weight: parseNum(weight), reps: parseNum(reps), distanceM: null }
+              )
         }
       >
         <Text style={[styles.tickText, set.completed && styles.tickTextOn]}>✓</Text>
@@ -1020,6 +1073,19 @@ const styles = themedStyles(() => StyleSheet.create({
   },
   // The set number was unstyled, so it drew near-black on the dark card.
   setLabel: { color: colors.textMuted, fontSize: 14, fontWeight: '700', textAlign: 'center' },
+  trackRow: { flexDirection: 'row', gap: 8, marginBottom: spacing.sm },
+  trackChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  trackChipOn: { borderColor: colors.accent, backgroundColor: colors.surfaceAlt },
+  trackChipText: { color: colors.textMuted, fontSize: 13, fontFamily: fonts.bodySemi },
+  trackChipTextOn: { color: colors.text },
+  loadLine: { color: colors.textMuted, fontSize: 12.5, marginTop: spacing.sm, fontFamily: fonts.body },
   headText: {
     color: colors.textMuted,
     fontSize: 11,

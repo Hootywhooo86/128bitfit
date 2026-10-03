@@ -13,6 +13,8 @@ export type StatSet = {
   reps: number | null;
   weight: number | null;
   isWarmup: boolean;
+  /** Set for a weight x distance set; those are left out of volume. */
+  distanceM?: number | null;
 };
 
 export type SessionStats = {
@@ -47,6 +49,9 @@ export function sessionStats(sets: readonly StatSet[]): SessionStats {
     setsDone += 1;
     if (s.isWarmup) continue;
 
+    // A carry or sled set is load x distance, not load x reps: it has its own
+    // figure on its card and is not part of this one.
+    if (s.distanceM != null) continue;
     const reps = typeof s.reps === 'number' && Number.isFinite(s.reps) ? s.reps : null;
     const weight = typeof s.weight === 'number' && Number.isFinite(s.weight) ? s.weight : null;
     if (reps == null || weight == null) {
