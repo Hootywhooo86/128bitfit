@@ -139,6 +139,20 @@ export type HealthWindow = {
   heartRateMax: number | null;
   /** Measured, by whatever recorded it. Never our own estimate. */
   activeCalories: number | null;
+  /** Metres, summed from Distance records; null when nothing recorded any. */
+  distanceM?: number | null;
+};
+
+/** A workout another app or a watch wrote to the health store. */
+export type HealthWorkoutSession = {
+  id: string;
+  /** The platform's exercise type number. */
+  type: number;
+  title: string | null;
+  startMs: number;
+  endMs: number;
+  /** Package of the app that wrote it. */
+  source: string | null;
 };
 
 /** A completed workout to push back to the platform's health store. */
@@ -226,6 +240,8 @@ export interface HealthProvider {
    * Empty when nothing was recorded or it cannot be read — never made up.
    */
   readHeartRateSeries(startMs: number, endMs: number): Promise<HeartRateSample[]>;
+  /** Exercise sessions in the store from any app, oldest first. */
+  readWorkouts(startMs: number, endMs: number): Promise<HealthWorkoutSession[]>;
 
   writeEntries(entries: HealthWorkoutEntry[]): Promise<number>;
   writeNutrition(entries: HealthNutritionEntry[]): Promise<HealthWriteResult>;

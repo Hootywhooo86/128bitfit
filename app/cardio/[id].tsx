@@ -3,6 +3,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { EnergyCard } from '@/components/EnergyCard';
 import { HeartRateCard } from '@/components/HeartRateCard';
 import { RouteMap } from '@/components/RouteMap';
 import { Card, CardHead, Label, MenuRow, Note, Screen } from '@/components/ui';
@@ -191,7 +192,8 @@ export default function CardioSummaryScreen() {
         </>
       ) : null}
 
-      {!session.manual ? <HeartRateCard startedAt={session.startedAt} endedAt={session.endedAt} /> : null}
+      {/* Typed-in sessions too: a watch worn on the treadmill recorded the real thing. */}
+      <HeartRateCard startedAt={session.startedAt} endedAt={session.endedAt} />
 
       <EnergyCard energy={energy} />
 
@@ -211,35 +213,6 @@ export default function CardioSummaryScreen() {
         <Text style={s.deleteT}>Delete session</Text>
       </Pressable>
     </Screen>
-  );
-}
-
-/** Active calories, and whether they were measured or worked out — never shown the same way. */
-function EnergyCard({ energy }: { energy: EnergyResult | null }) {
-  if (!energy) return null;
-  if (energy.status === 'unknown') {
-    return (
-      <Card>
-        <CardHead title="CALORIES" />
-        <Text style={s.energyNote}>
-          No figure yet — needs {energy.missing.join(' and ')}.
-          {energy.missing.includes('your body weight') ? ' Log a weigh-in and this fills in.' : ''}
-        </Text>
-      </Card>
-    );
-  }
-  const measured = energy.status === 'measured';
-  return (
-    <Card>
-      <CardHead title="ACTIVE CALORIES" note={measured ? 'measured' : 'estimate'} />
-      <Text style={s.energyValue}>
-        {measured ? '' : '~'}
-        {energy.kcal.toLocaleString()} kcal
-      </Text>
-      <Text style={s.energyNote}>
-        {measured ? `Measured by ${energy.source} for this session.` : `${energy.basis}. ${energy.caveat}`}
-      </Text>
-    </Card>
   );
 }
 
@@ -292,7 +265,5 @@ const s = themedStyles(() =>
       alignItems: 'center',
     },
     deleteT: { color: colors.danger, fontFamily: fonts.bodySemi },
-    energyValue: { color: colors.text, fontSize: 26, fontFamily: fonts.bodyBold, marginTop: 4 },
-    energyNote: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18, marginTop: 6, fontFamily: fonts.body },
   })
 );
