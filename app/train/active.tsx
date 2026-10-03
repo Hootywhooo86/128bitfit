@@ -10,7 +10,9 @@ import {
   Text,
   TextInput,
   View,
+  type TextStyle,
 } from 'react-native';
+import { NumberBox } from '@/components/NumberBox';
 import { PixelTrophy } from '@/components/PixelTrophy';
 import { RestTimerBar } from '@/components/RestTimerBar';
 import {
@@ -51,7 +53,6 @@ export default function ActiveWorkoutScreen() {
   const timer = useRestTimer();
   const [workout, setWorkout] = useState<ActiveWorkout | null>(null);
   const [loading, setLoading] = useState(true);
-  const [now, setNow] = useState(() => Date.now());
   const [keepAwake, setKeepAwake] = useState(false);
   const [units, setUnits] = useState<WeightUnit>('lb');
   const [currentExerciseId, setCurrentExerciseId] = useState<string | null>(null);
@@ -101,10 +102,6 @@ export default function ActiveWorkoutScreen() {
     }, [refresh])
   );
 
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   const onMarkComplete = async (
     se: SessionExerciseWithMeta,
@@ -197,7 +194,6 @@ export default function ActiveWorkoutScreen() {
 
   const allSets = workout.exercises.flatMap((ex) => ex.sets);
   const stats = sessionStats(allSets);
-  const elapsedMs = workout.session.startedAt ? now - workout.session.startedAt.getTime() : 0;
 
   return (
     <>
@@ -227,7 +223,7 @@ export default function ActiveWorkoutScreen() {
             <Text style={styles.statL}>{units.toUpperCase()} VOLUME</Text>
           </View>
           <View style={styles.stat}>
-            <Text style={styles.statV}>{formatElapsed(elapsedMs)}</Text>
+            <Elapsed since={workout.session.startedAt} style={styles.statV} />
             <Text style={styles.statL}>ELAPSED</Text>
           </View>
         </View>
@@ -637,6 +633,21 @@ function parseNum(text: string): number | null {
 
 const show = (n: number | null | undefined) => (n == null ? '' : String(n));
 
+/**
+ * The elapsed clock, ticking on its own. It used to be state on the whole
+ * screen, so every exercise card and number box redrew once a second — and a
+ * redraw landing just after a keypress, while the number was highlighted,
+ * threw the keypress away. Typing 50 over 45 took the 5 twice.
+ */
+function Elapsed({ since, style }: { since: Date | null; style: TextStyle }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  return <Text style={style}>{formatElapsed(since ? now - since.getTime() : 0)}</Text>;
+}
+
 function SetRow({
   set,
   label,
@@ -690,15 +701,12 @@ function SetRow({
         >
           <Text style={styles.stepperBtn}>−</Text>
         </Pressable>
-        <TextInput
+        <NumberBox
           style={styles.numInput}
           value={weight}
           onChangeText={setWeight}
-          onEndEditing={() => saveWeight(parseNum(weight))}
-          keyboardType="decimal-pad"
-          placeholder="–"
-          placeholderTextColor={colors.textDim}
-          selectTextOnFocus
+          onDone={(text) => saveWeight(parseNum(text))}
+          decimal
         />
         <Pressable
           style={styles.stepBtn}
@@ -719,15 +727,11 @@ function SetRow({
         >
           <Text style={styles.stepperBtn}>−</Text>
         </Pressable>
-        <TextInput
+        <NumberBox
           style={styles.numInput}
           value={reps}
           onChangeText={setReps}
-          onEndEditing={() => saveReps(parseNum(reps))}
-          keyboardType="number-pad"
-          placeholder="–"
-          placeholderTextColor={colors.textDim}
-          selectTextOnFocus
+          onDone={(text) => saveReps(parseNum(text))}
         />
         <Pressable style={styles.stepBtn} hitSlop={4} onPress={() => saveReps((parseNum(reps) ?? 0) + 1)}>
           <Text style={styles.stepperBtn}>+</Text>

@@ -38,6 +38,7 @@ import {
 import { OFF_LICENSE_NOTE } from '@/lib/open-food-facts';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
+import { NumberBox } from '@/components/NumberBox';
 
 type RecentItem = RecentFood;
 
@@ -191,12 +192,13 @@ export default function AddFoodScreen() {
           >
             <Text style={styles.stepBtnText}>−</Text>
           </Pressable>
-          <TextInput
+          <NumberBox
             style={styles.servingsInput}
             value={portions}
             onChangeText={setPortions}
-            keyboardType="decimal-pad"
-            selectTextOnFocus
+            onDone={setPortions}
+            decimal
+            placeholder="1"
           />
           <Pressable
             style={styles.stepBtn}
@@ -265,12 +267,13 @@ export default function AddFoodScreen() {
           >
             <Text style={styles.stepBtnText}>−</Text>
           </Pressable>
-          <TextInput
+          <NumberBox
             style={styles.servingsInput}
             value={servings}
             onChangeText={setServings}
-            keyboardType="decimal-pad"
-            selectTextOnFocus
+            onDone={setServings}
+            decimal
+            placeholder="1"
           />
           <Pressable
             style={styles.stepBtn}
