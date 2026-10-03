@@ -8,9 +8,11 @@ import type { ExportTable } from './collect';
 
 /**
  * 2: custom_foods, food_logs.custom_name and session_exercises.superset_group
- * added, so a restore loses nothing. Version 1 files still restore.
+ * added, so a restore loses nothing.
+ * 3: sets.distance_m and the weight x reps / weight x distance `track` on
+ * routine and session exercises. Older files still restore.
  */
-export const EXPORT_FORMAT_VERSION = 2;
+export const EXPORT_FORMAT_VERSION = 3;
 
 export type ExportEnvelope = {
   format: '128bitfit-export';

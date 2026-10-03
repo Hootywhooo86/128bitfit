@@ -25,6 +25,7 @@ import { SCOPE_RECORDS, healthConnectPermissions, type Direction } from './scope
 import { dayKey, eachDay, endOfLocalDay, previousDay, startOfLocalDay } from './dates';
 import { describeError, type DiagnosticStep } from './diagnose';
 import { sleepMinutesByWakeDay } from './sleep';
+import { readAllPages } from './paging';
 import {
   HEALTH_SCOPES,
   emptyHealthDay,
@@ -120,18 +121,27 @@ function stateFrom(granted: Granted): HealthPermissionState {
  */
 export const lastReadErrors = new Map<string, string>();
 
+/** One record type over a time range, every page of it. */
+function readAll<T>(recordType: string, startTime: string, endTime: string): Promise<T[]> {
+  return readAllPages<T>(async (pageToken) => {
+    const res = await readRecords(recordType as never, {
+      timeRangeFilter: { operator: 'between', startTime, endTime },
+      ...(pageToken ? { pageToken } : {}),
+    } as never);
+    return { records: res.records as T[], pageToken: (res as { pageToken?: string }).pageToken };
+  });
+}
+
 /** A read that was not granted must not come back as zero. */
 async function tryRead<T>(recordType: string, start: string, end: string): Promise<T[] | null> {
   try {
-    const { records } = await readRecords(recordType as never, {
-      timeRangeFilter: {
-        operator: 'between',
-        startTime: startOfLocalDay(start).toISOString(),
-        endTime: endOfLocalDay(end).toISOString(),
-      },
-    });
+    const records = await readAll<T>(
+      recordType,
+      startOfLocalDay(start).toISOString(),
+      endOfLocalDay(end).toISOString()
+    );
     lastReadErrors.delete(recordType);
-    return records as T[];
+    return records;
   } catch (e) {
     lastReadErrors.set(recordType, describeError(e));
     return null;
@@ -410,13 +420,11 @@ export const healthConnectProvider: HealthProvider = {
     if (!(endMs > startMs)) return [];
     try {
       if (!(await ensureInitialized())) return [];
-      const { records } = await readRecords('HeartRate' as never, {
-        timeRangeFilter: {
-          operator: 'between',
-          startTime: new Date(startMs).toISOString(),
-          endTime: new Date(endMs).toISOString(),
-        },
-      });
+      const records = await readAll<unknown>(
+        'HeartRate',
+        new Date(startMs).toISOString(),
+        new Date(endMs).toISOString()
+      );
       const out: HeartRateSample[] = [];
       for (const r of records as { samples?: { time?: string; beatsPerMinute?: number }[] }[]) {
         for (const s of r.samples ?? []) {
@@ -447,10 +455,7 @@ export const healthConnectProvider: HealthProvider = {
       };
       const read = async <T>(recordType: string): Promise<T[] | null> => {
         try {
-          const { records } = await readRecords(recordType as never, {
-            timeRangeFilter: range,
-          });
-          return records as T[];
+          return await readAll<T>(recordType, range.startTime, range.endTime);
         } catch {
           return null;
         }
@@ -701,9 +706,7 @@ export async function diagnoseHealthConnect(): Promise<DiagnosticStep[]> {
   if (!readsSteps) return out;
 
   try {
-    const { records } = await readRecords('Steps', {
-      timeRangeFilter: { operator: 'between', startTime: start.toISOString(), endTime: end.toISOString() },
-    });
+    const records = await readAll<unknown>('Steps', start.toISOString(), end.toISOString());
     const rows = (records ?? []) as { startTime?: string; count?: number }[];
     const total = rows.reduce((n, r) => n + (typeof r.count === 'number' ? r.count : 0), 0);
     add('Steps records', String(rows.length), rows.length > 0);

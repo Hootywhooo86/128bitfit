@@ -14,7 +14,11 @@ export type PrefillSet = {
   reps: number | null;
   weight: number | null;
   weightUnit: string | null;
+  /** Metres, for an exercise logged as weight x distance. */
+  distanceM?: number | null;
 };
+
+export type SetSeed = { reps: number | null; weight: number | null; weightUnit: string; distanceM: number | null };
 
 /** The most recent completed performance of one exercise. */
 export type LastPerformance = {
@@ -54,7 +58,7 @@ export function resolveSetSeed(opts: {
   index: number;
   targetReps?: number | null;
   carryFrom?: PrefillSet | null;
-}): { reps: number | null; weight: number | null; weightUnit: string } {
+}): SetSeed {
   const { last, index, targetReps, carryFrom } = opts;
   const template = prefillForIndex(last, index);
 
@@ -69,7 +73,9 @@ export function resolveSetSeed(opts: {
   const weightUnit =
     carryFrom?.weightUnit ?? template?.weightUnit ?? DEFAULT_WEIGHT_UNIT;
 
-  return { reps, weight, weightUnit };
+  const distanceM = carryFrom?.distanceM ?? template?.distanceM ?? null;
+
+  return { reps, weight, weightUnit, distanceM };
 }
 
 export type SetKind = 'working' | 'warmup' | 'drop' | 'rp';
@@ -98,7 +104,7 @@ export function seedForNewSet(opts: {
   kind: SetKind;
   block: BlockSet[];
   last: LastPerformance | null;
-}): { reps: number | null; weight: number | null; weightUnit: string } {
+}): SetSeed {
   const { kind, block, last } = opts;
   const lastOf = (pick: (s: BlockSet) => boolean) => [...block].reverse().find(pick) ?? null;
   const unit = (from: PrefillSet | null) =>
@@ -106,12 +112,12 @@ export function seedForNewSet(opts: {
 
   if (kind === 'warmup') {
     const prev = lastOf((s) => s.isWarmup);
-    return { reps: prev?.reps ?? null, weight: prev?.weight ?? null, weightUnit: unit(prev) };
+    return { reps: prev?.reps ?? null, weight: prev?.weight ?? null, weightUnit: unit(prev), distanceM: prev?.distanceM ?? null };
   }
 
   if (kind === 'drop' || kind === 'rp') {
     const prev = lastOf((s) => !s.isWarmup);
-    if (prev) return { reps: prev.reps, weight: prev.weight, weightUnit: unit(prev) };
+    if (prev) return { reps: prev.reps, weight: prev.weight, weightUnit: unit(prev), distanceM: prev.distanceM ?? null };
   }
 
   return resolveSetSeed({
@@ -148,6 +154,7 @@ export function describeLastPerformance(
 
   const shown = last.sets.slice(0, Math.max(1, maxSets));
   const parts = shown.map((set) => {
+    if (set.distanceM != null) return set.weight != null ? `${set.weight}\u00d7${set.distanceM}m` : `${set.distanceM}m`;
     if (set.weight != null && set.reps != null) return `${set.weight}\u00d7${set.reps}`;
     if (set.weight != null) return `${set.weight}`;
     if (set.reps != null) return `${set.reps} reps`;

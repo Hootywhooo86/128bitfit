@@ -49,3 +49,14 @@ export function summariseHeartRate(
     })),
   };
 }
+
+/** A watch more than this behind the end of the session is still syncing. */
+export const SYNC_GAP_MS = 3 * 60_000;
+
+/**
+ * Whether the readings stop well before the session did — the watch has not
+ * handed the rest to Health Connect yet, rather than having nothing to give.
+ */
+export function heartRateStillSyncing(lastSampleAt: number, endedAt: number): boolean {
+  return endedAt - lastSampleAt > SYNC_GAP_MS;
+}

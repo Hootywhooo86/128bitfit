@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { summariseHeartRate } from './heart-rate';
+import { heartRateStillSyncing, summariseHeartRate } from './heart-rate';
 
 const T0 = Date.UTC(2026, 8, 28, 22);
 const MIN = 60_000;
@@ -43,5 +43,12 @@ describe('heart rate over a session', () => {
 
   it('never has more slices than samples', () => {
     expect(summariseHeartRate([{ t: T0 + MIN, bpm: 90 }], T0, T0 + 60 * MIN)!.points).toHaveLength(1);
+  });
+});
+
+describe('a watch that has not finished syncing', () => {
+  it('is flagged when readings stop minutes before the end', () => {
+    expect(heartRateStillSyncing(T0 + 28 * MIN, T0 + 48 * MIN)).toBe(true);
+    expect(heartRateStillSyncing(T0 + 47 * MIN + 30_000, T0 + 48 * MIN)).toBe(false);
   });
 });

@@ -61,6 +61,8 @@ export const routineExercises = sqliteTable('routine_exercises', {
   targetReps: integer('target_reps'),
   restSeconds: integer('rest_seconds').default(60),
   notes: text('notes'),
+  /** 'reps' or 'distance'; null means whatever the exercise is remembered as. */
+  track: text('track', { enum: ['reps', 'distance'] }),
 });
 
 export const SESSION_STATUSES = ['in_progress', 'completed', 'discarded'] as const;
@@ -84,6 +86,8 @@ export const sessionExercises = sqliteTable('session_exercises', {
   notes: text('notes'),
   /** Exercises sharing a group are a superset: rest only after the last of them. */
   supersetGroup: text('superset_group'),
+  /** 'reps' or 'distance': how this exercise's sets are logged in this session. */
+  track: text('track', { enum: ['reps', 'distance'] }).notNull().default('reps'),
 });
 
 export const SET_TYPES = ['normal', 'drop', 'rp'] as const;
@@ -100,6 +104,8 @@ export const sets = sqliteTable('sets', {
   isWarmup: integer('is_warmup', { mode: 'boolean' }).notNull().default(false),
   setType: text('set_type', { enum: SET_TYPES }).notNull().default('normal'),
   rpe: real('rpe'),
+  /** Metres, for a set logged as weight x distance (a carry, a sled). Reps are null then. */
+  distanceM: real('distance_m'),
 });
 
 export const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snack'] as const;

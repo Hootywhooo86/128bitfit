@@ -26,6 +26,7 @@ import {
 import { clearNewExercise, takeNewExercise } from '@/lib/exercise-handoff';
 import { toggleById } from '@/lib/exercise-meta';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { defaultTrack } from '@/lib/track-mode';
 
 const DEFAULT_SETS = 3;
 const DEFAULT_REPS = 10;
@@ -79,6 +80,7 @@ export default function BuildRoutineScreen() {
             targetReps: e.targetReps,
             restSeconds: e.restSeconds,
             notes: e.notes,
+            track: e.track ?? defaultTrack(e.exerciseName),
           }))
         );
       }
@@ -99,6 +101,7 @@ export default function BuildRoutineScreen() {
         targetSets: DEFAULT_SETS,
         targetReps: DEFAULT_REPS,
         restSeconds: defaultRest,
+        track: defaultTrack(exercise.name),
       },
     ]);
   };
@@ -161,6 +164,7 @@ export default function BuildRoutineScreen() {
         targetReps: r.targetReps,
         restSeconds: r.restSeconds,
         notes: r.notes ?? null,
+        track: r.track ?? null,
       }));
       if (routineId) {
         await updateRoutine(routineId, { name, exercises });
@@ -225,17 +229,34 @@ export default function BuildRoutineScreen() {
             </View>
           </View>
 
+          {/* Logged as weight x reps, or weight x distance for carries and sleds. */}
+          <View style={s.trackRow}>
+            {(['reps', 'distance'] as const).map((m) => (
+              <Pressable
+                key={m}
+                style={[s.trackChip, (r.track ?? 'reps') === m && s.trackChipOn]}
+                onPress={() => patch(i, { track: m })}
+              >
+                <Text style={[s.trackChipT, (r.track ?? 'reps') === m && s.trackChipTOn]}>
+                  {m === 'reps' ? 'Weight × reps' : 'Weight × distance'}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
           <View style={s.fields}>
             <NumField
               label="Sets"
               value={r.targetSets}
               onChange={(v) => patch(i, { targetSets: v })}
             />
-            <NumField
-              label="Reps"
-              value={r.targetReps}
-              onChange={(v) => patch(i, { targetReps: v })}
-            />
+            {r.track === 'distance' ? null : (
+              <NumField
+                label="Reps"
+                value={r.targetReps}
+                onChange={(v) => patch(i, { targetReps: v })}
+              />
+            )}
             <NumField
               label="Rest (s)"
               value={r.restSeconds}
@@ -368,6 +389,18 @@ function PickExercise({
 }
 
 const s = themedStyles(() => StyleSheet.create({
+  trackRow: { flexDirection: 'row', gap: 8, marginTop: spacing.sm },
+  trackChip: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: 'center',
+  },
+  trackChipOn: { borderColor: colors.accent, backgroundColor: colors.surfaceAlt },
+  trackChipT: { color: colors.textMuted, fontSize: 12.5, fontFamily: fonts.bodySemi },
+  trackChipTOn: { color: colors.text },
   center: { paddingVertical: 80, alignItems: 'center' },
   input: {
     backgroundColor: colors.surface,

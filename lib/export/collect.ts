@@ -63,6 +63,7 @@ export async function collectExport(): Promise<ExportTable[]> {
       target_reps: routineExercises.targetReps,
       rest_seconds: routineExercises.restSeconds,
       notes: routineExercises.notes,
+      track: routineExercises.track,
     })
     .from(routineExercises)
     .leftJoin(exercises, eq(routineExercises.exerciseId, exercises.id))
@@ -92,6 +93,7 @@ export async function collectExport(): Promise<ExportTable[]> {
       rest_seconds: sessionExercises.restSeconds,
       notes: sessionExercises.notes,
       superset_group: sessionExercises.supersetGroup,
+      track: sessionExercises.track,
     })
     .from(sessionExercises)
     .leftJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
@@ -115,6 +117,7 @@ export async function collectExport(): Promise<ExportTable[]> {
       is_warmup: sets.isWarmup,
       set_type: sets.setType,
       rpe: sets.rpe,
+      distance_m: sets.distanceM,
     })
     .from(sets)
     .leftJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
@@ -199,6 +202,7 @@ export async function collectExport(): Promise<ExportTable[]> {
         'target_reps',
         'rest_seconds',
         'notes',
+        'track',
       ],
       rows: routineExerciseRows,
     },
@@ -218,6 +222,7 @@ export async function collectExport(): Promise<ExportTable[]> {
         'rest_seconds',
         'notes',
         'superset_group',
+        'track',
       ],
       rows: sessionExerciseRows,
     },
@@ -238,6 +243,7 @@ export async function collectExport(): Promise<ExportTable[]> {
         'is_warmup',
         'set_type',
         'rpe',
+        'distance_m',
       ],
       rows: setRows,
     },

@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import React, { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Line, Polyline } from 'react-native-svg';
 import { health } from '@/lib/health';
-import { summariseHeartRate, type HeartRateSummary } from '@/lib/heart-rate';
+import { heartRateStillSyncing, summariseHeartRate, type HeartRateSummary } from '@/lib/heart-rate';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 const CHART_H = 120;
@@ -16,22 +17,36 @@ const CHART_H = 120;
  */
 export function HeartRateCard({ startedAt, endedAt }: { startedAt: number; endedAt: number | null }) {
   const [hr, setHr] = useState<HeartRateSummary | null | undefined>(undefined);
+  /** When the last reading Health Connect has for this session was taken. */
+  const [lastAt, setLastAt] = useState<number | null>(null);
   const [width, setWidth] = useState(0);
+  const [checking, setChecking] = useState(false);
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     if (!endedAt) {
       setHr(null);
       return;
     }
-    let alive = true;
-    health
-      .readHeartRateSeries(startedAt, endedAt)
-      .then((samples) => alive && setHr(summariseHeartRate(samples, startedAt, endedAt)))
-      .catch(() => alive && setHr(null));
-    return () => {
-      alive = false;
-    };
+    setChecking(true);
+    try {
+      const samples = await health.readHeartRateSeries(startedAt, endedAt);
+      setHr(summariseHeartRate(samples, startedAt, endedAt));
+      setLastAt(samples.length ? samples[samples.length - 1].t : null);
+    } catch {
+      setHr(null);
+    } finally {
+      setChecking(false);
+    }
   }, [startedAt, endedAt]);
+
+  // On every visit, not once: a watch hands its readings to Health Connect in
+  // batches, often minutes after the workout ends, so a summary opened straight
+  // after Finish can be missing its last stretch. Coming back fills it in.
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load])
+  );
 
   if (hr === undefined) return null;
 
@@ -97,6 +112,15 @@ export function HeartRateCard({ startedAt, endedAt }: { startedAt: number; ended
         <Text style={s.small}>0 min</Text>
         <Text style={s.small}>{minutes} min</Text>
       </View>
+      {lastAt != null && endedAt != null && heartRateStillSyncing(lastAt, endedAt) ? (
+        <Pressable onPress={() => void load()} disabled={checking}>
+          <Text style={s.warn}>
+            {checking
+              ? 'Checking…'
+              : `No heart rate after ${new Date(lastAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} yet — your watch may still be syncing. Tap to check again.`}
+          </Text>
+        </Pressable>
+      ) : null}
       <Text style={s.note}>Recorded by your watch through Health Connect. Dashed line: average.</Text>
     </View>
   );
@@ -118,6 +142,7 @@ const s = themedStyles(() =>
     small: { color: colors.textMuted, fontSize: 12, fontFamily: fonts.body },
     chart: { height: CHART_H },
     axis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+    warn: { color: colors.text, fontSize: 12.5, lineHeight: 18, marginTop: 10, fontFamily: fonts.bodySemi },
     note: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginTop: 8, fontFamily: fonts.body },
   })
 );

@@ -5,6 +5,8 @@ import { getDefaultRestSeconds } from './rest-settings';
 import { isUserExercise } from '@/lib/exercise-sources';
 import { resolveSetSeed, seedForNewSet, type LastPerformance } from '@/lib/set-prefill';
 import { repeatPlan } from '@/lib/repeat-workout';
+import { distanceRecord, trackFor, type TrackMode } from '@/lib/track-mode';
+import { getTrackPrefs, rememberTrack } from './track-prefs';
 import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import {
   livePr,
@@ -127,6 +129,7 @@ export async function getRoutineExercises(routineId: string): Promise<(RoutineEx
       targetReps: routineExercises.targetReps,
       restSeconds: routineExercises.restSeconds,
       notes: routineExercises.notes,
+      track: routineExercises.track,
       exerciseName: exercises.name,
     })
     .from(routineExercises)
@@ -164,6 +167,7 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       restSeconds: sessionExercises.restSeconds,
       notes: sessionExercises.notes,
       supersetGroup: sessionExercises.supersetGroup,
+      track: sessionExercises.track,
       exerciseName: exercises.name,
       primaryMuscles: exercises.primaryMuscles,
       equipment: exercises.equipment,
@@ -223,6 +227,7 @@ export async function loadActiveWorkout(sessionId: string): Promise<ActiveWorkou
       restSeconds: se.restSeconds,
       notes: se.notes,
       supersetGroup: se.supersetGroup,
+      track: se.track,
       exerciseName: se.exerciseName,
       primaryMuscles: JSON.parse(se.primaryMuscles ?? '[]'),
       equipment: se.equipment,
@@ -298,6 +303,7 @@ export async function getLastPerformance(
       reps: sets.reps,
       weight: sets.weight,
       weightUnit: sets.weightUnit,
+      distanceM: sets.distanceM,
     })
     .from(sets)
     .where(
@@ -340,9 +346,11 @@ export async function startRoutineWorkout(routineId: string): Promise<string> {
 
   const rex = await getRoutineExercises(routineId);
   const fallbackRest = await getDefaultRestSeconds();
+  const prefs = await getTrackPrefs();
   for (const [i, re] of rex.entries()) {
     const seId = newId('se');
     const rest = re.restSeconds ?? fallbackRest;
+    const track = re.track ?? trackFor(re.exerciseId, re.exerciseName, prefs);
     await db.insert(sessionExercises).values({
       id: seId,
       sessionId: id,
@@ -350,6 +358,7 @@ export async function startRoutineWorkout(routineId: string): Promise<string> {
       position: i,
       restSeconds: rest,
       notes: re.notes,
+      track,
     });
     // Non-negotiable #1: start from what was lifted last time, so the first
     // action of the session is confirming a number rather than typing one.
@@ -361,7 +370,7 @@ export async function startRoutineWorkout(routineId: string): Promise<string> {
         id: newId('set'),
         sessionExerciseId: seId,
         setIndex: s,
-        reps: seed.reps ?? 10,
+        ...forTrack(track, { reps: seed.reps ?? 10, distanceM: seed.distanceM }),
         weight: seed.weight,
         weightUnit: seed.weightUnit,
         completed: false,
@@ -405,6 +414,7 @@ export async function repeatWorkout(sourceSessionId: string): Promise<string> {
       restSeconds: item.restSeconds ?? fallbackRest,
       notes: item.notes,
       supersetGroup: item.supersetGroup,
+      track: item.track,
     });
     const last = await getLastPerformance(item.exerciseId, id);
     for (let s = 0; s < item.workingSets; s++) {
@@ -413,7 +423,7 @@ export async function repeatWorkout(sourceSessionId: string): Promise<string> {
         id: newId('set'),
         sessionExerciseId: seId,
         setIndex: s,
-        reps: seed.reps,
+        ...forTrack(item.track, seed),
         weight: seed.weight,
         weightUnit: seed.weightUnit,
         completed: false,
@@ -428,7 +438,7 @@ export async function repeatWorkout(sourceSessionId: string): Promise<string> {
 export async function addExerciseToSession(
   sessionId: string,
   exerciseId: string,
-  opts?: { restSeconds?: number; targetSets?: number; targetReps?: number }
+  opts?: { restSeconds?: number; targetSets?: number; targetReps?: number; track?: TrackMode }
 ): Promise<string> {
   const existing = await db
     .select({ n: count() })
@@ -437,6 +447,8 @@ export async function addExerciseToSession(
   const position = existing[0]?.n ?? 0;
   const seId = newId('se');
   const rest = opts?.restSeconds ?? (await getDefaultRestSeconds());
+  const [ex] = await db.select({ name: exercises.name }).from(exercises).where(eq(exercises.id, exerciseId)).limit(1);
+  const track = opts?.track ?? trackFor(exerciseId, ex?.name ?? '', await getTrackPrefs());
   await db.insert(sessionExercises).values({
     id: seId,
     sessionId,
@@ -444,6 +456,7 @@ export async function addExerciseToSession(
     position,
     restSeconds: rest,
     notes: null,
+    track,
   });
 
   const last = await getLastPerformance(exerciseId, sessionId);
@@ -454,7 +467,7 @@ export async function addExerciseToSession(
       id: newId('set'),
       sessionExerciseId: seId,
       setIndex: s,
-      reps: seed.reps,
+      ...forTrack(track, seed),
       weight: seed.weight,
       weightUnit: seed.weightUnit,
       completed: false,
@@ -471,6 +484,7 @@ export async function addSet(
     reps?: number | null
     weight?: number | null
     weightUnit?: string
+    distanceM?: number | null
     isWarmup?: boolean
     setType?: 'normal' | 'drop' | 'rp'
   }
@@ -486,7 +500,11 @@ export async function addSet(
   // Carrying from this session wins; otherwise reach back to the last one,
   // which is what makes the first set of an exercise pre-filled too.
   const owner = await db
-    .select({ exerciseId: sessionExercises.exerciseId, sessionId: sessionExercises.sessionId })
+    .select({
+      exerciseId: sessionExercises.exerciseId,
+      sessionId: sessionExercises.sessionId,
+      track: sessionExercises.track,
+    })
     .from(sessionExercises)
     .where(eq(sessionExercises.id, sessionExerciseId))
     .limit(1);
@@ -506,7 +524,10 @@ export async function addSet(
     id: newId('set'),
     sessionExerciseId,
     setIndex,
-    reps: defaults?.reps ?? seed.reps,
+    ...forTrack(owner[0]?.track ?? 'reps', {
+      reps: defaults?.reps ?? seed.reps,
+      distanceM: defaults?.distanceM ?? seed.distanceM,
+    }),
     weight: defaults?.weight ?? seed.weight,
     weightUnit: defaults?.weightUnit ?? seed.weightUnit,
     completed: false,
@@ -520,14 +541,14 @@ export async function addSet(
 
 export async function updateSet(
   setId: string,
-  patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed' | 'isWarmup' | 'setType' | 'rpe'>>
+  patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed' | 'isWarmup' | 'setType' | 'rpe' | 'distanceM'>>
 ): Promise<void> {
   await db.update(sets).set(patch).where(eq(sets.id, setId));
 }
 
 export async function completeSet(
   setId: string,
-  values?: { reps?: number | null; weight?: number | null }
+  values?: { reps?: number | null; weight?: number | null; distanceM?: number | null }
 ): Promise<WorkoutSet | null> {
   const rows = await db.select().from(sets).where(eq(sets.id, setId)).limit(1);
   const row = rows[0];
@@ -536,6 +557,7 @@ export async function completeSet(
     completed: true as const,
     ...(values?.reps !== undefined ? { reps: values.reps } : {}),
     ...(values?.weight !== undefined ? { weight: values.weight } : {}),
+    ...(values?.distanceM !== undefined ? { distanceM: values.distanceM } : {}),
   };
   await db.update(sets).set(patch).where(eq(sets.id, setId));
   return { ...row, ...patch };
@@ -635,7 +657,9 @@ export async function swapSessionExercise(sessionExerciseId: string, exerciseId:
     .where(eq(sessionExercises.id, sessionExerciseId))
     .limit(1);
   if (!owner[0]) throw new Error('That exercise is no longer in the workout.');
-  await db.update(sessionExercises).set({ exerciseId }).where(eq(sessionExercises.id, sessionExerciseId));
+  const [ex] = await db.select({ name: exercises.name }).from(exercises).where(eq(exercises.id, exerciseId)).limit(1);
+  const track = trackFor(exerciseId, ex?.name ?? '', await getTrackPrefs());
+  await db.update(sessionExercises).set({ exerciseId, track }).where(eq(sessionExercises.id, sessionExerciseId));
 
   const last = await getLastPerformance(exerciseId, owner[0].sessionId);
   const block = await db
@@ -650,11 +674,67 @@ export async function swapSessionExercise(sessionExerciseId: string, exerciseId:
       if (isWorking) working++;
       continue;
     }
-    const seed = isWorking ? resolveSetSeed({ last, index: working }) : { reps: null, weight: null, weightUnit: set.weightUnit ?? 'lb' };
+    const seed = isWorking
+      ? resolveSetSeed({ last, index: working })
+      : { reps: null, weight: null, weightUnit: set.weightUnit ?? 'lb', distanceM: null };
     if (isWorking) working++;
     await db
       .update(sets)
-      .set({ reps: seed.reps ?? set.reps, weight: seed.weight, weightUnit: seed.weightUnit })
+      .set({
+        ...forTrack(track, { reps: seed.reps ?? set.reps, distanceM: seed.distanceM }),
+        weight: seed.weight,
+        weightUnit: seed.weightUnit,
+      })
+      .where(eq(sets.id, set.id));
+  }
+}
+
+/**
+ * A set's reps or metres, whichever its exercise is logged by — the other is
+ * null, so a distance set never counts as reps (or towards lb volume).
+ */
+function forTrack(
+  track: TrackMode,
+  v: { reps?: number | null; distanceM?: number | null }
+): { reps: number | null; distanceM: number | null } {
+  return track === 'distance'
+    ? { reps: null, distanceM: v.distanceM ?? null }
+    : { reps: v.reps ?? null, distanceM: null };
+}
+
+/**
+ * Switches an exercise in a live workout between weight x reps and weight x
+ * distance, and remembers the choice for next time. Sets already ticked keep
+ * what was logged; the rest are re-seeded from last time in the new mode.
+ */
+export async function setSessionExerciseTrack(sessionExerciseId: string, track: TrackMode): Promise<void> {
+  const [se] = await db
+    .select({ exerciseId: sessionExercises.exerciseId, sessionId: sessionExercises.sessionId })
+    .from(sessionExercises)
+    .where(eq(sessionExercises.id, sessionExerciseId))
+    .limit(1);
+  if (!se) throw new Error('That exercise is no longer in the workout.');
+  await db.update(sessionExercises).set({ track }).where(eq(sessionExercises.id, sessionExerciseId));
+  await rememberTrack(se.exerciseId, track);
+
+  const last = await getLastPerformance(se.exerciseId, se.sessionId);
+  const block = await db
+    .select()
+    .from(sets)
+    .where(eq(sets.sessionExerciseId, sessionExerciseId))
+    .orderBy(asc(sets.setIndex));
+  let working = 0;
+  for (const set of block) {
+    const isWorking = !set.isWarmup && set.setType === 'normal';
+    if (set.completed) {
+      if (isWorking) working++;
+      continue;
+    }
+    const seed = isWorking ? resolveSetSeed({ last, index: working }) : null;
+    if (isWorking) working++;
+    await db
+      .update(sets)
+      .set(forTrack(track, { reps: seed?.reps ?? null, distanceM: seed?.distanceM ?? null }))
       .where(eq(sets.id, set.id));
   }
 }
@@ -911,6 +991,8 @@ export type RoutineDraftExercise = {
   targetReps: number | null;
   restSeconds: number | null;
   notes?: string | null;
+  /** Weight x reps or weight x distance; null leaves it to the exercise. */
+  track?: TrackMode | null;
 };
 
 /**
@@ -948,6 +1030,7 @@ export async function createRoutine(input: {
       targetReps: ex.targetReps,
       restSeconds: ex.restSeconds,
       notes: ex.notes ?? null,
+      track: ex.track ?? null,
     });
   }
   return routineId;
@@ -983,6 +1066,7 @@ export async function updateRoutine(
         targetReps: ex.targetReps,
         restSeconds: ex.restSeconds,
         notes: ex.notes ?? null,
+        track: ex.track ?? null,
       });
     }
   }
@@ -1129,6 +1213,7 @@ export async function liveRecordFor(setId: string): Promise<PrResult> {
     .select({
       weight: sets.weight,
       reps: sets.reps,
+      distanceM: sets.distanceM,
       unit: sets.weightUnit,
       isWarmup: sets.isWarmup,
       setType: sets.setType,
@@ -1142,6 +1227,26 @@ export async function liveRecordFor(setId: string): Promise<PrResult> {
     .where(eq(sets.id, setId))
     .limit(1);
   if (!row || row.isWarmup || row.setType !== 'normal') return { kinds: [], note: null };
+
+  // A carry or sled: heaviest load moved, or furthest at that load.
+  if (row.distanceM != null) {
+    const before = await db
+      .select({ weight: sets.weight, distanceM: sets.distanceM, completed: sets.completed, isWarmup: sets.isWarmup })
+      .from(sets)
+      .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+      .innerJoin(workoutSessions, eq(sessionExercises.sessionId, workoutSessions.id))
+      .where(
+        and(
+          eq(sessionExercises.exerciseId, row.exerciseId),
+          eq(sets.completed, true),
+          eq(sets.setType, 'normal'),
+          ne(sets.id, setId),
+          ne(workoutSessions.status, 'discarded')
+        )
+      );
+    const note = distanceRecord(row, before, row.unit ?? 'lb');
+    return note ? { kinds: ['weight'], note } : { kinds: [], note: null };
+  }
 
   const today = await db
     .select({ weight: sets.weight, reps: sets.reps, unit: sets.weightUnit })

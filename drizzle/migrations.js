@@ -12,6 +12,7 @@ import m0007 from './0007_tired_captain_universe.sql';
 import m0008 from './0008_foamy_azazel.sql';
 import m0009 from './0009_keen_cammi.sql';
 import m0010 from './0010_spotty_sally_floyd.sql';
+import m0011 from './0011_round_sunset_bain.sql';
 
   export default {
     journal,
@@ -26,7 +27,8 @@ m0006,
 m0007,
 m0008,
 m0009,
-m0010
+m0010,
+m0011
     }
   }
   
