@@ -25,6 +25,7 @@ import type {
   HealthWeightEntry,
   HealthWindow,
   HeartRateSample,
+  HealthWorkoutSession,
   HealthWorkoutEntry,
   HealthWriteResult,
 } from './types';
@@ -73,6 +74,9 @@ export const health: HealthProvider = {
   },
   readHeartRateSeries(startMs: number, endMs: number): Promise<HeartRateSample[]> {
     return provider().readHeartRateSeries(startMs, endMs);
+  },
+  readWorkouts(startMs: number, endMs: number): Promise<HealthWorkoutSession[]> {
+    return provider().readWorkouts(startMs, endMs);
   },
   writeEntries(entries: HealthWorkoutEntry[]): Promise<number> {
     return provider().writeEntries(entries);

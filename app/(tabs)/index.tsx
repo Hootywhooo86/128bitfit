@@ -1,6 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { DetectedWorkouts } from '@/components/DetectedWorkouts';
 import { MuscleLoadCard } from '@/components/MuscleLoadCard';
 import { ReadinessCard } from '@/components/ReadinessCard';
 import { StepsCard } from '@/components/StepsCard';
@@ -274,6 +275,8 @@ export default function HomeScreen() {
         }
         onPress={() => router.push('/(tabs)/coach')}
       />
+
+      <DetectedWorkouts />
     </Screen>
   );
 }

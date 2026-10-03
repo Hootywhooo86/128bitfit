@@ -40,7 +40,8 @@ export function useCardioEnergy(
         getAppSettings(),
         getLatestWeightEntry(),
         healthWeight(),
-        input.manual || !input.endedAt
+        // Typed-in sessions too: a watch worn on the treadmill measured it.
+        !input.endedAt
           ? Promise.resolve(NO_READINGS)
           : health.readWindow(input.startedAt, input.endedAt).catch(() => NO_READINGS),
       ]);

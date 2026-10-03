@@ -13,6 +13,7 @@ import {
   type HealthGrants,
   type HealthPermissionState,
   type HealthProvider,
+  type HealthWorkoutSession,
   type HealthWindow,
   type HeartRateSample,
   type HealthWriteResult,
@@ -50,6 +51,10 @@ export const unavailableProvider: HealthProvider = {
   },
 
   async readHeartRateSeries(): Promise<HeartRateSample[]> {
+    return [];
+  },
+
+  async readWorkouts(): Promise<HealthWorkoutSession[]> {
     return [];
   },
 

@@ -36,6 +36,7 @@ import {
   type HealthNutritionEntry,
   type HealthPermissionState,
   type HealthProvider,
+  type HealthWorkoutSession,
   type HealthScope,
   type HealthWeightEntry,
   type HealthWindow,
@@ -461,9 +462,10 @@ export const healthConnectProvider: HealthProvider = {
         }
       };
 
-      const [hr, active] = await Promise.all([
+      const [hr, active, distance] = await Promise.all([
         read<{ samples?: { beatsPerMinute?: number }[] }>('HeartRate'),
         read<{ energy?: { inKilocalories?: number } }>('ActiveCaloriesBurned'),
+        read<{ distance?: { inMeters?: number } }>('Distance'),
       ]);
 
       const out = { ...none };
@@ -497,9 +499,48 @@ export const healthConnectProvider: HealthProvider = {
         out.activeCalories = kcal;
       }
 
+      // Unlike calories, no distance records is not 0 m: most workouts have no
+      // distance at all, and "0 m" would claim one was measured.
+      if (distance && distance.length > 0) {
+        out.distanceM = distance.reduce((m, r) => m + (num(r.distance?.inMeters) ?? 0), 0);
+      }
+
       return out;
     } catch {
       return none;
+    }
+  },
+
+  async readWorkouts(startMs: number, endMs: number): Promise<HealthWorkoutSession[]> {
+    if (!(endMs > startMs)) return [];
+    try {
+      if (!(await ensureInitialized())) return [];
+      const records = await readAll<{
+        exerciseType?: number;
+        title?: string;
+        startTime?: string;
+        endTime?: string;
+        metadata?: { id?: string; dataOrigin?: string };
+      }>('ExerciseSession', new Date(startMs).toISOString(), new Date(endMs).toISOString());
+      lastReadErrors.delete('ExerciseSession');
+      const out: HealthWorkoutSession[] = [];
+      for (const r of records) {
+        const start = r.startTime ? Date.parse(r.startTime) : NaN;
+        const end = r.endTime ? Date.parse(r.endTime) : NaN;
+        if (!Number.isFinite(start) || !Number.isFinite(end) || !(end > start)) continue;
+        out.push({
+          id: r.metadata?.id ?? `${start}-${r.exerciseType ?? 0}`,
+          type: r.exerciseType ?? 0,
+          title: r.title?.trim() || null,
+          startMs: start,
+          endMs: end,
+          source: r.metadata?.dataOrigin ?? null,
+        });
+      }
+      return out.sort((a, b) => a.startMs - b.startMs);
+    } catch (e) {
+      lastReadErrors.set('ExerciseSession', describeError(e));
+      return [];
     }
   },
 
