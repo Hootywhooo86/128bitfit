@@ -1,6 +1,6 @@
 import { and, eq, gte } from 'drizzle-orm';
 import { health } from '@/lib/health';
-import { pickDetected, type DetectedSession } from '@/lib/detected-workouts';
+import { sortDetected, type DetectedSession, type HiddenReason } from '@/lib/detected-workouts';
 import { db } from './client';
 import { cardioSessions, workoutSessions } from './schema';
 import { getSetting, setSetting } from './settings-queries';
@@ -9,18 +9,27 @@ import { getSetting, setSetting } from './settings-queries';
 export const OWN_PACKAGE = 'com.hootywhooo86.bit128fit';
 const DISMISSED_KEY = 'detected_dismissed';
 
-export type DetectedWorkout = DetectedSession & {
+/** What the recording measured. Each figure is null when it gave none. */
+export type DetectedReadings = {
   heartRateAvg: number | null;
   heartRateMax: number | null;
-  /** Measured by the watch or app that recorded it; null when it gave none. */
   activeCalories: number | null;
   distanceM: number | null;
 };
 
+export type DetectedWorkout = DetectedSession & {
+  /** Null when not read for this list (only the first few are, to spare Health Connect). */
+  readings: DetectedReadings | null;
+};
+
+export type HiddenDetected = { session: DetectedSession; reason: HiddenReason };
+
 export type DetectedState =
   | { status: 'unavailable' }
   | { status: 'not_connected' }
-  | { status: 'ready'; workouts: DetectedWorkout[] };
+  | { status: 'no_exercise_access' }
+  | { status: 'error'; message: string }
+  | { status: 'ready'; days: number; workouts: DetectedWorkout[]; hidden: HiddenDetected[] };
 
 async function dismissedIds(): Promise<Set<string>> {
   try {
@@ -39,19 +48,48 @@ export async function dismissDetected(id: string): Promise<void> {
   await setSetting(DISMISSED_KEY, JSON.stringify([...ids].slice(-300)));
 }
 
+/** "Show it again" for one hidden by mistake. */
+export async function undismissDetected(id: string): Promise<void> {
+  const ids = await dismissedIds();
+  ids.delete(id);
+  await setSetting(DISMISSED_KEY, JSON.stringify([...ids]));
+}
+
+async function readingsFor(s: DetectedSession): Promise<DetectedReadings> {
+  const w = await health.readWindow(s.startMs, s.endMs);
+  return {
+    heartRateAvg: w.heartRateAvg,
+    heartRateMax: w.heartRateMax,
+    // A zero from a window with no calorie records at all is "none given",
+    // not "burned nothing" — a 40-minute walk did not cost 0 kcal.
+    activeCalories: w.activeCalories != null && w.activeCalories > 0 ? Math.round(w.activeCalories) : null,
+    distanceM: w.distanceM ?? null,
+  };
+}
+
 /**
- * Workouts recorded by a watch or another app in the last `days`, with what
- * that recording measured: heart rate, active calories, distance. Workouts you
- * logged in this app, and ones it wrote itself, are left out.
+ * Every workout a watch or another app recorded in the last `days`, newest
+ * first, plus the ones held back and why. Only what this app wrote itself is
+ * left out entirely. Heart rate and calories are read for the first
+ * `readingsFor` workouts only; the rest are read when opened.
  */
-export async function getDetectedWorkouts(days = 7, now = Date.now(), limit = 8): Promise<DetectedState> {
+export async function getDetectedWorkouts(
+  opts: { days?: number; now?: number; readings?: number } = {}
+): Promise<DetectedState> {
+  const { days = 7, now = Date.now(), readings = 5 } = opts;
   if ((await health.getAvailability()) !== 'available') return { status: 'unavailable' };
   const perm = await health.getPermissionState();
   if (perm !== 'granted' && perm !== 'partial') return { status: 'not_connected' };
+  if (!(await health.getGrants()).read.includes('exercise')) return { status: 'no_exercise_access' };
 
   const since = now - days * 86_400_000;
-  const [sessions, dismissed, strength, cardio] = await Promise.all([
-    health.readWorkouts(since, now),
+  let sessions: DetectedSession[];
+  try {
+    sessions = await health.readWorkouts(since, now);
+  } catch (e) {
+    return { status: 'error', message: e instanceof Error ? e.message : String(e) };
+  }
+  const [dismissed, strength, cardio] = await Promise.all([
     dismissedIds(),
     db
       .select({ startedAt: workoutSessions.startedAt, endedAt: workoutSessions.endedAt })
@@ -70,20 +108,12 @@ export async function getDetectedWorkouts(days = 7, now = Date.now(), limit = 8)
     ...cardio.filter((c) => c.endedAt != null).map((c) => ({ startMs: c.startedAt, endMs: c.endedAt! })),
   ];
 
-  const picked = pickDetected(sessions, logged, { ownPackage: OWN_PACKAGE, dismissed }).slice(0, limit);
+  const sorted = sortDetected(sessions, logged, { ownPackage: OWN_PACKAGE, dismissed });
   const workouts = await Promise.all(
-    picked.map(async (s) => {
-      const w = await health.readWindow(s.startMs, s.endMs);
-      return {
-        ...s,
-        heartRateAvg: w.heartRateAvg,
-        heartRateMax: w.heartRateMax,
-        // A zero from a window with no calorie records at all is "none given",
-        // not "burned nothing" — a 40-minute walk did not cost 0 kcal.
-        activeCalories: w.activeCalories != null && w.activeCalories > 0 ? Math.round(w.activeCalories) : null,
-        distanceM: w.distanceM ?? null,
-      };
-    })
+    sorted.shown.map(async (s, i) => ({
+      ...s,
+      readings: i < readings ? await readingsFor(s).catch(() => null) : null,
+    }))
   );
-  return { status: 'ready', workouts };
+  return { status: 'ready', days, workouts, hidden: sorted.hidden };
 }
