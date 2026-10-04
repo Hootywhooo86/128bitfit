@@ -19,6 +19,7 @@ import { weightInKg } from '@/db/weight-queries';
 import { useLatestWeight } from '@/lib/health/use-weight';
 import { colors, fonts } from '@/lib/theme';
 import { formatKg } from '@/lib/weight-source';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 export function WeightCard({
   local,
@@ -58,7 +59,7 @@ export function WeightCard({
       <View style={styles.top}>
         <Text style={styles.value}>{formatKg(state.kg, units)}</Text>
         <Text style={styles.label}>
-          {state.source === 'health' ? 'From Health Connect' : 'Latest weigh-in'}
+          {state.source === 'health' ? `From ${HEALTH_APP}` : 'Latest weigh-in'}
         </Text>
       </View>
       <Text style={styles.note}>Two more weigh-ins and there is a trend worth showing.</Text>

@@ -109,6 +109,16 @@ export function isUnidentified(type: number): boolean {
   return type === 0 || !(type in TYPE_NAMES);
 }
 
+/**
+ * A title that actually says what it was ("Pickleball"), as opposed to one
+ * that just repeats that it was a workout. Apple Health names the types
+ * Health Connect has no number for; those need no nudge.
+ */
+export function hasRealTitle(title: string | null | undefined): boolean {
+  const t = title?.trim().toLowerCase();
+  return !!t && !['workout', 'other', 'exercise', 'activity', 'other workout'].includes(t);
+}
+
 /** What the "What was this?" picker offers, most common first. */
 export const LABEL_CHOICES: readonly number[] = [
   79, 56, 70, 81, 36, 37, 8, 9, 57, 25, 54, 69, 74, 83, 48, 16, 11, 44, 71, 68, 51, 0,
@@ -210,6 +220,8 @@ export function sortDetected<T extends DetectedSession>(
 /** "Fitbit" from com.fitbit.FitbitMobile; the package itself if unknown. */
 export function sourceName(pkg: string | null): string {
   if (!pkg) return 'another app';
+  // Apple Watch workouts come from com.apple.health.<device id>.
+  if (pkg.startsWith('com.apple.health')) return 'Apple Watch';
   const known: Record<string, string> = {
     'com.fitbit.FitbitMobile': 'Fitbit',
     'com.google.android.apps.fitness': 'Google Fit',
@@ -223,6 +235,10 @@ export function sourceName(pkg: string | null): string {
     'com.huawei.health': 'Huawei Health',
     'com.polar.polarflow': 'Polar Flow',
     'com.suunto.android': 'Suunto',
+    'com.apple.Fitness': 'Fitness',
+    'com.strava.stravaride': 'Strava',
+    'com.garmin.connect.mobile': 'Garmin Connect',
+    'com.fitbit.FitbitMobile.ios': 'Fitbit',
   };
   return known[pkg] ?? pkg;
 }

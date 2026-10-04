@@ -57,6 +57,7 @@ import { ToggleRow } from '@/components/ToggleRow';
 import { breakdownPromptOn, setBreakdownPrompt } from '@/lib/ai-breakdown';
 import { REPDB } from 'repdb-generated';
 import { REPDB_CREDIT, REPDB_URL } from '@/lib/exercise-images';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -268,7 +269,7 @@ export default function SettingsScreen() {
 
       <Pressable style={styles.charCard} onPress={() => router.push('/settings/health')}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.aiTitle}>Health Connect</Text>
+          <Text style={styles.aiTitle}>{HEALTH_APP}</Text>
           <Text style={styles.muted}>Check what it is actually reporting →</Text>
         </View>
       </Pressable>

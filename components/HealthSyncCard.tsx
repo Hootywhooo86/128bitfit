@@ -19,6 +19,7 @@ import {
 } from '@/lib/health/mirror';
 import { HEALTH_SCOPES, type HealthGrants, type HealthScope } from '@/lib/health/types';
 import { colors, spacing } from '@/lib/theme';
+import { HEALTH_APP, HEALTH_UNAVAILABLE } from '@/lib/health/platform';
 
 /** Plain names, because "restingHeartRate" is our word, not the user's. */
 const SCOPE_LABEL: Record<HealthScope, string> = {
@@ -82,12 +83,12 @@ export function HealthSyncCard() {
         <Text style={styles.body}>Checking…</Text>
       ) : status.kind === 'unavailable' ? (
         <Text style={styles.body}>
-          Health Connect is not available on this phone. Everything in the app still works;
+          {HEALTH_UNAVAILABLE} Everything in the app still works;
           steps, sleep and readiness simply have nowhere to come from.
         </Text>
       ) : status.kind === 'update' ? (
         <Text style={styles.body}>
-          Health Connect is installed but needs updating before this app can talk to it.
+          {HEALTH_APP} is installed but needs updating before this app can talk to it.
         </Text>
       ) : status.grants.read.length === 0 && status.grants.write.length === 0 ? (
         <>
@@ -95,7 +96,7 @@ export function HealthSyncCard() {
             Not connected. Nothing is read and nothing is written until you allow it.
           </Text>
           <Pressable style={styles.button} onPress={() => void connect()}>
-            <Text style={styles.buttonText}>Connect Health Connect</Text>
+            <Text style={styles.buttonText}>Connect {HEALTH_APP}</Text>
           </Pressable>
         </>
       ) : (
@@ -121,10 +122,10 @@ export function HealthSyncCard() {
       {failure ? (
         <View style={styles.error}>
           <Text style={styles.errorText}>
-            Could not send {failure.what} to Health Connect. {failure.message}
+            Could not send {failure.what} to {HEALTH_APP}. {failure.message}
           </Text>
           <Text style={styles.small}>
-            It is saved in the app either way — only the copy in Health Connect is missing.
+            It is saved in the app either way — only the copy in {HEALTH_APP} is missing.
           </Text>
           <Pressable onPress={clearMirrorFailure}>
             <Text style={styles.dismiss}>Dismiss</Text>

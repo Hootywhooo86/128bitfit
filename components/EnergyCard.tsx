@@ -3,6 +3,7 @@ import { StyleSheet, Text } from 'react-native';
 import { Card, CardHead } from '@/components/ui';
 import type { EnergyResult } from '@/lib/workout-energy';
 import { colors, fonts, themedStyles } from '@/lib/theme';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 /** Active calories, and whether they were measured or worked out — never shown the same way. */
 export function EnergyCard({ energy }: { energy: EnergyResult | null }) {
@@ -28,7 +29,7 @@ export function EnergyCard({ energy }: { energy: EnergyResult | null }) {
       </Text>
       <Text style={s.energyNote}>
         {measured
-          ? `Measured by ${energy.source} for this session — what you burned on top of what your body uses at rest.`
+          ? `Measured by ${energy.source === 'Health Connect' ? HEALTH_APP : energy.source} for this session — what you burned on top of what your body uses at rest.`
           : `${energy.basis}. ${energy.caveat}`}
       </Text>
     </Card>

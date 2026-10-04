@@ -1,15 +1,16 @@
 /**
  * Entry point for health data. Import from here, never from a platform module.
  *
- * Android gets Health Connect; everything else reports "unavailable". Swapping
- * in HealthKit later is a change to this file plus one new HealthProvider.
+ * Android gets Health Connect, iPhone gets Apple Health (HealthKit); everything
+ * else reports "unavailable".
  *
  * The Android module is loaded lazily and defensively on purpose:
  * react-native-health-connect resolves its native module with
  * TurboModuleRegistry.getEnforcing at import time, which *throws* wherever that
  * module is not registered — iOS, web, and Expo Go. A static import would take
  * the whole app down at launch, so we require it only on Android and fall back
- * to the unavailable provider if it is not there.
+ * to the unavailable provider if it is not there. HealthKit is loaded the same
+ * way for the same reason.
  */
 import { Platform } from 'react-native';
 import { unavailableProvider } from './unavailable';
@@ -41,6 +42,13 @@ function provider(): HealthProvider {
     } catch {
       // No native module in this binary (Expo Go, or a build predating the
       // config plugin). Health data is genuinely unavailable — say so.
+      resolved = unavailableProvider;
+    }
+  } else if (Platform.OS === 'ios') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      resolved = require('./healthkit').healthKitProvider as HealthProvider;
+    } catch {
       resolved = unavailableProvider;
     }
   } else {
@@ -108,8 +116,17 @@ export const health: HealthProvider = {
  * take the app down at launch anywhere the native module is not registered.
  */
 export async function diagnoseHealth(): Promise<DiagnosticStep[]> {
+  if (Platform.OS === 'ios') {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const mod = require('./healthkit') as typeof import('./healthkit');
+      return await mod.diagnoseHealthKit();
+    } catch (e) {
+      return [{ label: 'Native module', value: `not in this build — ${describeError(e)}`, ok: false }];
+    }
+  }
   if (Platform.OS !== 'android') {
-    return [{ label: 'Platform', value: `${Platform.OS} — Health Connect is Android only`, ok: false }];
+    return [{ label: 'Platform', value: `${Platform.OS} — no health store on this platform`, ok: false }];
   }
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

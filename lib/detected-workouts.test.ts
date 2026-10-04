@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyLabel, isUnidentified, LABEL_CHOICES, sortDetected, sourceName, sportForType, workoutTypeName, type DetectedSession } from './detected-workouts';
+import { applyLabel, hasRealTitle, isUnidentified, LABEL_CHOICES, sortDetected, sourceName, sportForType, workoutTypeName, type DetectedSession } from './detected-workouts';
 
 const MIN = 60_000;
 const T = Date.UTC(2026, 9, 3, 13);
@@ -94,7 +94,15 @@ describe('detected workouts', () => {
     expect(applyLabel(w, {})).toMatchObject({ type: 0, title: 'Workout', labelled: false });
   });
 
+  it('a real title needs no nudge; a generic one does', () => {
+    expect(hasRealTitle('Pickleball')).toBe(true);
+    expect(hasRealTitle('Workout')).toBe(false);
+    expect(hasRealTitle(' other ')).toBe(false);
+    expect(hasRealTitle(null)).toBe(false);
+  });
+
   it('names known sources', () => {
+    expect(sourceName('com.apple.health.81A2C3D4')).toBe('Apple Watch');
     expect(sourceName('com.fitbit.FitbitMobile')).toBe('Fitbit');
     expect(sourceName(null)).toBe('another app');
   });

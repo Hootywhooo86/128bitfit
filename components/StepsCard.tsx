@@ -3,6 +3,7 @@ import React from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTodaySteps } from '@/lib/health/use-health';
 import { colors, spacing, themedStyles } from '@/lib/theme';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 /**
  * Steps on Home.
@@ -22,8 +23,8 @@ export function StepsCard() {
    */
   function onConnect() {
     Alert.alert(
-      'Connect Health Connect?',
-      'Reads your step count to show on Home, and writes completed workouts back so your other apps can see them.\n\nNothing leaves your phone. You can revoke this any time in Health Connect.',
+      `Connect ${HEALTH_APP}?`,
+      `Reads your step count to show on Home, and writes completed workouts back so your other apps can see them.\n\nNothing leaves your phone. You can revoke this any time in ${HEALTH_APP}.`,
       [
         { text: 'Not now', style: 'cancel' },
         { text: 'What is read', onPress: () => router.push('/settings/privacy') },
@@ -56,7 +57,7 @@ export function StepsCard() {
       <Pressable style={styles.wrap} onPress={openSettings}>
         <Text style={styles.title}>Steps</Text>
         <Text style={styles.dash}>—</Text>
-        <Text style={styles.hint}>Health Connect needs updating — tap to open it.</Text>
+        <Text style={styles.hint}>{HEALTH_APP} needs updating — tap to open it.</Text>
       </Pressable>
     );
   }
@@ -70,7 +71,7 @@ export function StepsCard() {
             <Text style={styles.link}>Connect →</Text>
           </View>
           <Text style={styles.dash}>—</Text>
-          <Text style={styles.hint}>Not connected to Health Connect.</Text>
+          <Text style={styles.hint}>Not connected to {HEALTH_APP}.</Text>
         </Pressable>
         {/*
           This state covers more than a refused permission — Health Connect
@@ -91,7 +92,7 @@ export function StepsCard() {
         <Pressable onPress={openSettings}>
           <Text style={styles.title}>Steps</Text>
           <Text style={styles.dash}>—</Text>
-          <Text style={styles.hint}>No reading from Health Connect.</Text>
+          <Text style={styles.hint}>No reading from {HEALTH_APP}.</Text>
         </Pressable>
         <Pressable onPress={() => router.push('/settings/health')} hitSlop={8}>
           <Text style={styles.why}>Check what it reports →</Text>
@@ -104,7 +105,7 @@ export function StepsCard() {
     <View style={styles.wrap}>
       <View style={styles.row}>
         <Text style={styles.title}>Steps</Text>
-        <Text style={styles.source}>Health Connect</Text>
+        <Text style={styles.source}>{HEALTH_APP}</Text>
       </View>
       <Text style={styles.value}>{state.steps.toLocaleString()}</Text>
       <Text style={styles.hint}>Today</Text>

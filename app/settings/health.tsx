@@ -4,6 +4,7 @@ import { Card, Note, Screen } from '@/components/ui';
 import { diagnoseHealth, health } from '@/lib/health';
 import { formatReport, type DiagnosticStep } from '@/lib/health/diagnose';
 import { colors, fonts, spacing } from '@/lib/theme';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 /**
  * What Health Connect actually reports, step by step.
@@ -43,7 +44,7 @@ export default function HealthDiagnosticsScreen() {
   };
 
   return (
-    <Screen section="Health Connect" back onRefresh={() => void run()}>
+    <Screen section={HEALTH_APP} back onRefresh={() => void run()}>
       <Note>
         Each line is one step of reading today&apos;s steps. A line marked XX is the one that
         failed — everything below it did not run.
@@ -81,7 +82,7 @@ export default function HealthDiagnosticsScreen() {
           </Pressable>
 
           <Pressable style={s.btn} onPress={() => health.openSettings()}>
-            <Text style={s.btnT}>Open Health Connect</Text>
+            <Text style={s.btnT}>Open {HEALTH_APP}</Text>
           </Pressable>
         </>
       )}

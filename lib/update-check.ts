@@ -1,5 +1,10 @@
 /**
- * Is there a newer APK on GitHub Releases than the one installed?
+ * Is there a newer build on GitHub Releases than the one installed?
+ *
+ * Android and iPhone builds share the releases page but never each other's
+ * files: iPhone releases are tagged ios-v…, Android ones plain v…. Each phone
+ * only ever looks at its own, so an iPhone build can never be offered to an
+ * Android phone as an update, or the other way round.
  *
  * The app is sideloaded, so nothing tells it about new builds. The release
  * workflow bakes its tag in as EXPO_PUBLIC_RELEASE_TAG; this compares that
@@ -13,16 +18,25 @@
 import { LOOKUP_TIMEOUT_MS, fetchWithTimeout } from './net';
 import { describeNetworkFailure } from './net-errors';
 
-const RELEASES_URL = 'https://api.github.com/repos/Hootywhooo86/128bitfit/releases?per_page=10';
+const RELEASES_URL = 'https://api.github.com/repos/Hootywhooo86/128bitfit/releases?per_page=30';
 
 /** The releases page, for when the app cannot read the list itself. */
 export const RELEASES_PAGE = 'https://github.com/Hootywhooo86/128bitfit/releases/latest';
 
+export type ReleasePlatform = 'android' | 'ios';
+
+/** iPhone release tags carry this prefix; Android ones do not. */
+const IOS_PREFIX = 'ios-';
+
+export function releasePlatform(tag: string): ReleasePlatform {
+  return tag.trim().toLowerCase().startsWith(IOS_PREFIX) ? 'ios' : 'android';
+}
+
 export type Release = {
   tag: string;
   pageUrl: string;
-  /** Direct link to the .apk asset, when the release has one. */
-  apkUrl: string | null;
+  /** Direct link to the installable file (.apk or .ipa), when the release has one. */
+  fileUrl: string | null;
   publishedAt: string | null;
 };
 
@@ -55,7 +69,8 @@ export function installedReleaseTag(): string | null {
 type Parsed = { core: [number, number, number]; pre: string | null; preNum: number | null };
 
 function parseTag(tag: string): Parsed | null {
-  const m = tag.trim().match(/^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+?)\.?(\d+)?)?$/);
+  const bare = tag.trim().replace(/^ios-/i, '');
+  const m = bare.match(/^v?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z]+?)\.?(\d+)?)?$/);
   if (!m) return null;
   return {
     core: [Number(m[1]), Number(m[2]), Number(m[3])],
@@ -90,16 +105,27 @@ type ApiRelease = {
   assets?: { name?: string; browser_download_url?: string }[];
 };
 
-/** The newest release that can be installed, by tag order rather than list order. */
-export function newestRelease(list: ApiRelease[]): Release | null {
-  const usable = list.filter((r) => !r.draft && r.tag_name && r.html_url);
+/**
+ * The newest release for this platform, by tag order rather than list order.
+ * Tags it cannot read are skipped, never picked by accident.
+ */
+export function newestRelease(list: ApiRelease[], platform: ReleasePlatform = 'android'): Release | null {
+  const usable = list.filter(
+    (r) =>
+      !r.draft &&
+      r.tag_name &&
+      r.html_url &&
+      releasePlatform(r.tag_name) === platform &&
+      compareTags(r.tag_name, r.tag_name) != null
+  );
   if (usable.length === 0) return null;
   const best = usable.reduce((a, b) => ((compareTags(b.tag_name!, a.tag_name!) ?? 0) > 0 ? b : a));
-  const apk = best.assets?.find((x) => x.name?.toLowerCase().endsWith('.apk') && x.browser_download_url);
+  const ext = platform === 'ios' ? '.ipa' : '.apk';
+  const file = best.assets?.find((x) => x.name?.toLowerCase().endsWith(ext) && x.browser_download_url);
   return {
     tag: best.tag_name!,
     pageUrl: best.html_url!,
-    apkUrl: apk?.browser_download_url ?? null,
+    fileUrl: file?.browser_download_url ?? null,
     publishedAt: best.published_at ?? null,
   };
 }
@@ -115,7 +141,7 @@ export function decide(installed: string | null, latest: Release): UpdateCheck {
   return cmp > 0 ? { status: 'available', current: installed, latest } : { status: 'current', tag: installed };
 }
 
-export async function checkForUpdate(signal?: AbortSignal): Promise<UpdateCheck> {
+export async function checkForUpdate(platform: ReleasePlatform, signal?: AbortSignal): Promise<UpdateCheck> {
   try {
     const res = await fetchWithTimeout(
       RELEASES_URL,
@@ -123,8 +149,13 @@ export async function checkForUpdate(signal?: AbortSignal): Promise<UpdateCheck>
       { timeoutMs: LOOKUP_TIMEOUT_MS * 2, label: 'Update check' }
     );
     if (!res.ok) return failureFor(res.status);
-    const latest = newestRelease((await res.json()) as ApiRelease[]);
-    if (!latest) return { status: 'failed', message: 'No releases are published yet.' };
+    const latest = newestRelease((await res.json()) as ApiRelease[], platform);
+    if (!latest) {
+      return {
+        status: 'failed',
+        message: platform === 'ios' ? 'No iPhone releases are published yet.' : 'No releases are published yet.',
+      };
+    }
     return decide(installedReleaseTag(), latest);
   } catch (e) {
     return { status: 'failed', message: describeNetworkFailure(e, 'the update check') };

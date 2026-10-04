@@ -24,6 +24,7 @@ import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 import { healthWeight } from '@/lib/health/use-weight';
 import { formatKg, latestWeight, type WeightReading } from '@/lib/weight-source';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 export default function WeightLogScreen() {
   const { ready } = useDb();
@@ -124,7 +125,7 @@ export default function WeightLogScreen() {
         <View style={styles.hc}>
           <Text style={styles.hcValue}>{formatKg(merged.kg, units)}</Text>
           <Text style={styles.hcLabel}>
-            From Health Connect — your scale or another app recorded this. Add a weigh-in below
+            From {HEALTH_APP} — your scale or another app recorded this. Add a weigh-in below
             only if you want your own entry too.
           </Text>
         </View>
