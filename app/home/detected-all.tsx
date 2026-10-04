@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Alert } from 'react-native';
-import { DetectedStateNote, detectedMinutes, detectedWhen, openDetected } from '@/components/DetectedWorkouts';
+import { DetectedStateNote, detectedSub, openDetected } from '@/components/DetectedWorkouts';
 import { Label, MenuRow, Note, Screen } from '@/components/ui';
 import { getDetectedWorkouts, undismissDetected, type DetectedState, type HiddenDetected } from '@/db/detected-queries';
 import { HIDDEN_REASON_TEXT, sourceName, workoutTypeName } from '@/lib/detected-workouts';
@@ -20,7 +20,7 @@ export default function DetectedAllScreen() {
   const load = useCallback(() => {
     // No per-workout readings here: thirty days of heart-rate reads would hit
     // Health Connect's rate limit. Each one's are read when it is opened.
-    void getDetectedWorkouts({ days: DAYS, readings: 0 })
+    void getDetectedWorkouts({ days: DAYS })
       .then(setState)
       .catch((e) => setState({ status: 'error', message: e instanceof Error ? e.message : String(e) }));
   }, []);
@@ -59,7 +59,7 @@ export default function DetectedAllScreen() {
                 key={w.id}
                 icon="◉"
                 name={workoutTypeName(w.type, w.title)}
-                sub={[detectedWhen(w), detectedMinutes(w), sourceName(w.source)].join(' · ')}
+                sub={detectedSub(w, sourceName(w.source))}
                 onPress={() => openDetected(router, w)}
               />
             ))
@@ -73,7 +73,7 @@ export default function DetectedAllScreen() {
                   key={h.session.id}
                   icon="○"
                   name={workoutTypeName(h.session.type, h.session.title)}
-                  sub={[detectedWhen(h.session), detectedMinutes(h.session), HIDDEN_REASON_TEXT[h.reason]].join(' · ')}
+                  sub={detectedSub(h.session, HIDDEN_REASON_TEXT[h.reason])}
                   value={h.reason === 'dismissed' ? 'Show' : undefined}
                   onPress={() => onHidden(h)}
                 />

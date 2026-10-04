@@ -1,13 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Pressable, StyleSheet, Text } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { EnergyCard } from '@/components/EnergyCard';
 import { HeartRateCard } from '@/components/HeartRateCard';
 import { Card, CardHead, Note, Screen } from '@/components/ui';
 import { saveManualCardio } from '@/db/cardio-queries';
-import { dismissDetected } from '@/db/detected-queries';
+import { dismissDetected, labelDetected } from '@/db/detected-queries';
 import { sportById } from '@/lib/cardio';
-import { sourceName, sportForType, workoutTypeName } from '@/lib/detected-workouts';
+import { LABEL_CHOICES, sourceName, sportForType, workoutTypeName } from '@/lib/detected-workouts';
 import { useCardioEnergy } from '@/lib/health/use-cardio-energy';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
@@ -27,9 +27,13 @@ export default function DetectedWorkoutScreen() {
     end: string;
     source?: string;
     dist?: string;
+    unnamed?: string;
   }>();
   const [busy, setBusy] = useState(false);
-  const type = Number(p.type) || 0;
+  const [type, setType] = useState(() => Number(p.type) || 0);
+  const [title, setTitle] = useState<string | null>(p.title || null);
+  // Open straight away when the watch didn't say what it was.
+  const [picking, setPicking] = useState(p.unnamed === '1');
   const startMs = Number(p.start);
   const endMs = Number(p.end);
   const durationS = Math.max(0, Math.round((endMs - startMs) / 1000));
@@ -74,6 +78,17 @@ export default function DetectedWorkoutScreen() {
     }
   };
 
+  const pick = async (next: number) => {
+    try {
+      await labelDetected(p.id, next);
+      setType(next);
+      setTitle(null);
+      setPicking(false);
+    } catch (e) {
+      Alert.alert('Could not save that', e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const hide = async () => {
     try {
       await dismissDetected(p.id);
@@ -86,13 +101,39 @@ export default function DetectedWorkoutScreen() {
   const start = new Date(startMs);
   return (
     <Screen section="Detected workout" back>
-      <Text style={s.title}>{workoutTypeName(type, p.title || null)}</Text>
+      <Text style={s.title}>{workoutTypeName(type, title)}</Text>
       <Text style={s.when}>
         {start.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'short' })} ·{' '}
         {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · {Math.round(durationS / 60)} min
         {distanceM != null && distanceM > 0 ? ` · ${(distanceM / 1000).toFixed(2)} km` : ''}
       </Text>
       <Text style={s.when}>Recorded by {source} through Health Connect.</Text>
+
+      {picking ? (
+        <Card>
+          <CardHead title="WHAT WAS THIS?" />
+          <Text style={s.note}>
+            {p.unnamed === '1'
+              ? `${source} recorded a workout but not what kind. Pick one so it's named and counted right.`
+              : 'Pick what it really was.'}
+          </Text>
+          <View style={s.chips}>
+            {LABEL_CHOICES.map((t) => (
+              <Pressable key={t} style={[s.chip, t === type && s.chipOn]} onPress={() => void pick(t)}>
+                <Text style={[s.chipT, t === type && s.chipTOn]}>{workoutTypeName(t)}</Text>
+              </Pressable>
+            ))}
+          </View>
+          <Text style={s.note}>
+            Saved in 128BIT FIT. Health Connect only lets the app that recorded a workout change it, so{' '}
+            {source} keeps its own name for it.
+          </Text>
+        </Card>
+      ) : (
+        <Pressable onPress={() => setPicking(true)} hitSlop={8}>
+          <Text style={s.link}>Wrong type? Change it</Text>
+        </Pressable>
+      )}
 
       <HeartRateCard startedAt={startMs} endedAt={endMs} />
       <EnergyCard energy={shownEnergy} />
@@ -140,5 +181,17 @@ const s = themedStyles(() =>
       alignItems: 'center',
     },
     secondaryT: { color: colors.text, fontFamily: fonts.bodySemi, fontSize: 15 },
+    link: { color: colors.accent, fontFamily: fonts.bodySemi, fontSize: 13, marginBottom: spacing.sm },
+    chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginVertical: spacing.sm },
+    chip: {
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    chipOn: { borderColor: colors.accent, backgroundColor: colors.surfaceAlt },
+    chipT: { color: colors.textMuted, fontSize: 13, fontFamily: fonts.bodySemi },
+    chipTOn: { color: colors.text },
   })
 );

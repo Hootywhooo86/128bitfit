@@ -100,6 +100,30 @@ export function workoutTypeName(type: number, title?: string | null): string {
   return TYPE_NAMES[type] ?? 'Workout';
 }
 
+/**
+ * The watch recorded a workout but not what kind: Health Connect's "other
+ * workout" (0), or a number this app has no name for. These get a nudge to
+ * say what it was.
+ */
+export function isUnidentified(type: number): boolean {
+  return type === 0 || !(type in TYPE_NAMES);
+}
+
+/** What the "What was this?" picker offers, most common first. */
+export const LABEL_CHOICES: readonly number[] = [
+  79, 56, 70, 81, 36, 37, 8, 9, 57, 25, 54, 69, 74, 83, 48, 16, 11, 44, 71, 68, 51, 0,
+];
+
+/**
+ * Applies the type you gave a workout. A label replaces the watch's type and
+ * its title, which usually just repeats the type it got wrong.
+ */
+export function applyLabel<T extends DetectedSession>(s: T, labels: Readonly<Record<string, number>>): T & { labelled: boolean } {
+  const type = labels[s.id];
+  if (type == null || !Number.isInteger(type)) return { ...s, labelled: false };
+  return { ...s, type, title: null, labelled: true };
+}
+
 /** The app's own sport for a detected type, so it can be added as cardio. */
 const TYPE_TO_SPORT: Record<number, string> = {
   79: 'walk',
@@ -137,9 +161,9 @@ export const HIDDEN_REASON_TEXT: Record<HiddenReason, string> = {
   logged: 'Same time as a workout you logged here',
 };
 
-export type SortedDetected = {
-  shown: DetectedSession[];
-  hidden: { session: DetectedSession; reason: HiddenReason }[];
+export type SortedDetected<T extends DetectedSession = DetectedSession> = {
+  shown: T[];
+  hidden: { session: T; reason: HiddenReason }[];
 };
 
 type Span = { startMs: number; endMs: number };
@@ -155,18 +179,18 @@ type Span = { startMs: number; endMs: number };
  * strength session left running for three hours does not swallow the walk
  * the watch picked up inside it.
  */
-export function sortDetected(
-  sessions: readonly DetectedSession[],
+export function sortDetected<T extends DetectedSession>(
+  sessions: readonly T[],
   logged: readonly Span[],
   opts: { ownPackage: string; dismissed: ReadonlySet<string> }
-): SortedDetected {
+): SortedDetected<T> {
   const len = (a: Span) => a.endMs - a.startMs;
   const overlap = (a: Span, b: Span) => Math.max(0, Math.min(a.endMs, b.endMs) - Math.max(a.startMs, b.startMs));
   const sameWorkout = (a: Span, b: Span) => {
     const o = overlap(a, b);
     return o > len(a) / 2 && o > len(b) / 2;
   };
-  const out: SortedDetected = { shown: [], hidden: [] };
+  const out: SortedDetected<T> = { shown: [], hidden: [] };
   const newest = [...sessions].sort((a, b) => b.startMs - a.startMs);
   for (const s of newest) {
     if (s.source === opts.ownPackage) continue;

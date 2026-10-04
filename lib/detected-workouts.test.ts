@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sortDetected, sourceName, sportForType, workoutTypeName, type DetectedSession } from './detected-workouts';
+import { applyLabel, isUnidentified, LABEL_CHOICES, sortDetected, sourceName, sportForType, workoutTypeName, type DetectedSession } from './detected-workouts';
 
 const MIN = 60_000;
 const T = Date.UTC(2026, 9, 3, 13);
@@ -71,6 +71,27 @@ describe('detected workouts', () => {
     const out = sortDetected(many, [], opts).shown;
     expect(out).toHaveLength(20);
     expect(out[0].id).toBe('w19');
+  });
+
+  it('flags a workout the watch did not name, and nothing it did', () => {
+    expect(isUnidentified(0)).toBe(true);
+    expect(isUnidentified(45)).toBe(true); // a gap in Health Connect's numbering
+    expect(isUnidentified(999)).toBe(true);
+    expect(isUnidentified(79)).toBe(false);
+    expect(isUnidentified(70)).toBe(false);
+  });
+
+  it('every label choice has a name', () => {
+    for (const t of LABEL_CHOICES) expect(workoutTypeName(t)).not.toBe('');
+    expect(new Set(LABEL_CHOICES).size).toBe(LABEL_CHOICES.length);
+  });
+
+  it('a label replaces the type and the stale title', () => {
+    const w = s('x', 0, 30, { type: 0, title: 'Workout' });
+    const out = applyLabel(w, { x: 56 });
+    expect(out).toMatchObject({ type: 56, title: null, labelled: true });
+    expect(workoutTypeName(out.type, out.title)).toBe('Run');
+    expect(applyLabel(w, {})).toMatchObject({ type: 0, title: 'Workout', labelled: false });
   });
 
   it('names known sources', () => {
