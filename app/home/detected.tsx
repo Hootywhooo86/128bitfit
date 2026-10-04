@@ -10,6 +10,7 @@ import { sportById } from '@/lib/cardio';
 import { LABEL_CHOICES, sourceName, sportForType, workoutTypeName } from '@/lib/detected-workouts';
 import { useCardioEnergy } from '@/lib/health/use-cardio-energy';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 /**
  * One workout a watch or another app recorded: when, how long, heart rate
@@ -107,7 +108,7 @@ export default function DetectedWorkoutScreen() {
         {start.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · {Math.round(durationS / 60)} min
         {distanceM != null && distanceM > 0 ? ` · ${(distanceM / 1000).toFixed(2)} km` : ''}
       </Text>
-      <Text style={s.when}>Recorded by {source} through Health Connect.</Text>
+      <Text style={s.when}>Recorded by {source} through {HEALTH_APP}.</Text>
 
       {picking ? (
         <Card>
@@ -125,7 +126,7 @@ export default function DetectedWorkoutScreen() {
             ))}
           </View>
           <Text style={s.note}>
-            Saved in 128BIT FIT. Health Connect only lets the app that recorded a workout change it, so{' '}
+            Saved in 128BIT FIT. {HEALTH_APP} only lets the app that recorded a workout change it, so{' '}
             {source} keeps its own name for it.
           </Text>
         </Card>

@@ -2,8 +2,9 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { Label, MenuRow, Note } from '@/components/ui';
 import { getDetectedWorkouts, readDetectedReadings, type DetectedState, type DetectedWorkout } from '@/db/detected-queries';
-import { isUnidentified, sourceName, workoutTypeName, type DetectedSession } from '@/lib/detected-workouts';
+import { hasRealTitle, isUnidentified, sourceName, workoutTypeName, type DetectedSession } from '@/lib/detected-workouts';
 import { useHealthRefresh } from '@/lib/health/use-health-refresh';
+import { HEALTH_APP, HEALTH_UNAVAILABLE } from '@/lib/health/platform';
 
 /** How many Home shows before "See all". */
 const ON_HOME = 5;
@@ -28,7 +29,7 @@ export function detectedMinutes(w: DetectedSession): string {
 
 /** The watch didn't say what it was, and you haven't yet. */
 export function needsName(w: DetectedSession & { labelled?: boolean }): boolean {
-  return !w.labelled && isUnidentified(w.type);
+  return !w.labelled && isUnidentified(w.type) && !hasRealTitle(w.title);
 }
 
 /** The row's second line, leading with the nudge when it needs a name. */
@@ -65,13 +66,13 @@ export function DetectedStateNote({ state }: { state: DetectedState }) {
   switch (state.status) {
     case 'unavailable':
       return (
-        <Note>Health Connect isn&apos;t available on this phone, so workouts from a watch can&apos;t be picked up.</Note>
+        <Note>{HEALTH_UNAVAILABLE} Workouts from a watch can&apos;t be picked up without it.</Note>
       );
     case 'not_connected':
       return (
         <MenuRow
           icon="◐"
-          name="Connect Health Connect"
+          name={`Connect ${HEALTH_APP}`}
           sub="To see walks, runs and workouts your watch picks up on its own"
           onPress={() => router.push('/settings/health')}
         />
@@ -81,12 +82,12 @@ export function DetectedStateNote({ state }: { state: DetectedState }) {
         <MenuRow
           icon="◐"
           name="Allow exercise access"
-          sub="Health Connect is connected, but 128BIT FIT isn't allowed to read exercise, so it can't see your watch's workouts"
+          sub={`${HEALTH_APP} is connected, but 128BIT FIT isn't allowed to read exercise, so it can't see your watch's workouts`}
           onPress={() => router.push('/settings/health')}
         />
       );
     case 'error':
-      return <Note>Couldn&apos;t read workouts from Health Connect. {state.message}</Note>;
+      return <Note>Couldn&apos;t read workouts from {HEALTH_APP}. {state.message}</Note>;
     default:
       return null;
   }

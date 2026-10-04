@@ -1,0 +1,142 @@
+name: iPhone build
+
+# The iPhone version, "128BIT FIT iOS", for testers to sideload. Built on a
+# Mac runner and NOT signed: whoever installs it signs it with their own Apple
+# ID through Sideloadly or AltStore, which is the only way to install an app
+# outside the App Store without a paid developer account.
+#
+# Its releases are separate from the Android APK's: tag ios-v…, marked as
+# prereleases so GitHub's "Latest" stays the Android build, and the in-app
+# update check on each phone only looks at its own platform's tags.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. ios-v0.1.0-alpha.1)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  ipa:
+    name: build and release
+    runs-on: macos-latest
+    timeout-minutes: 90
+    env:
+      # Inlined into the JS bundle so Settings → Check for updates knows which
+      # release this is.
+      EXPO_PUBLIC_RELEASE_TAG: ${{ inputs.tag }}
+    steps:
+      - name: Check the tag
+        run: |
+          case "${{ inputs.tag }}" in
+            ios-v*) ;;
+            *) echo "iPhone release tags must start with ios-v (got '${{ inputs.tag }}')." >&2; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      # The newest stable Xcode on the runner; React Native moves its minimum
+      # up often, and the default image is not always the newest.
+      - name: Pick Xcode
+        run: |
+          ls -d /Applications/Xcode*.app
+          xc=$(ls -d /Applications/Xcode_*.app | grep -viE 'beta|rc' | sort -V | tail -1)
+          echo "Using $xc"
+          sudo xcode-select -s "$xc"
+          xcodebuild -version
+
+      - run: npm ci
+
+      - name: Build RepDB exercises
+        run: node scripts/build-repdb.mjs
+
+      - name: Verify bundled data
+        run: npm run verify:import
+
+      - name: Prebuild ios/
+        run: npx expo prebuild --platform ios --no-install
+
+      - name: Install pods
+        working-directory: ios
+        run: pod install
+
+      - name: Build the app (unsigned)
+        run: |
+          set -euo pipefail
+          ws=$(ls -d ios/*.xcworkspace | head -1)
+          scheme=$(basename "$ws" .xcworkspace)
+          echo "scheme=$scheme" >> "$GITHUB_ENV"
+          xcodebuild \
+            -workspace "$ws" \
+            -scheme "$scheme" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/app.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            archive | tee build.log | grep -E '^(\*\*|error:|.*error:)' || true
+          test -d "build/app.xcarchive/Products/Applications/$scheme.app" || { tail -200 build.log; exit 1; }
+
+      - name: Package the .ipa
+        id: ipa
+        run: |
+          set -euo pipefail
+          rm -rf Payload && mkdir Payload
+          cp -R "build/app.xcarchive/Products/Applications/$scheme.app" Payload/
+          out="128bitfit-${{ inputs.tag }}-unsigned.ipa"
+          zip -qry "$out" Payload
+          echo "path=$out" >> "$GITHUB_OUTPUT"
+          echo "size=$(du -h "$out" | cut -f1)" >> "$GITHUB_OUTPUT"
+          # "ios-v0.1.0-alpha.3" -> "alpha.3", for the release title.
+          tag="${{ inputs.tag }}"
+          short="${tag##*-}"
+          echo "title=128BIT FIT iOS — ${short}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ipa
+          path: ${{ steps.ipa.outputs.path }}
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: build-log
+          path: build.log
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          name: ${{ steps.ipa.outputs.title }}
+          prerelease: true
+          make_latest: false
+          files: ${{ steps.ipa.outputs.path }}
+          body: |
+            **iPhone** test build, ${{ steps.ipa.outputs.size }}, built from `${{ github.sha }}`. It shows up on the home screen as **128BIT FIT iOS**.
+
+            Android phones: this is not your file — use the newest `v0.1.0-alpha.N` release instead.
+
+            This `.ipa` is unsigned. Install it from a Mac or Windows computer with
+            [Sideloadly](https://sideloadly.io) (or AltStore), signing in with your own Apple ID:
+
+            1. Plug the iPhone into the computer and open Sideloadly.
+            2. Drag this `.ipa` in, enter your Apple ID, press Start.
+            3. On the iPhone: Settings → Privacy & Security → Developer Mode → on (it restarts).
+            4. Settings → General → VPN & Device Management → your Apple ID → Trust.
+
+            With a free Apple ID the app stops opening after 7 days — install it again the same
+            way (your data stays), and a free Apple ID can only have 3 sideloaded apps at once.
+
+            **Apple Health does not work in a copy signed with a free Apple ID.** Apple only
+            allows Apple Health in apps signed by a paid developer account. Everything else works;
+            the app says plainly where Apple Health data would have been.

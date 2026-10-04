@@ -5,6 +5,7 @@ import { Card, CardHead } from '@/components/ui';
 import { useReadiness } from '@/lib/health/use-readiness';
 import { GRADE_EMOJI, GRADE_LABEL, READINESS_BANDS } from '@/lib/readiness';
 import { colors, fonts, spacing } from '@/lib/theme';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 /**
  * Readiness and rest, side by side, each as a face.
@@ -24,7 +25,7 @@ export function ReadinessCard({ recentSets }: { recentSets: number | null }) {
       <Card onPress={() => router.push('/settings/privacy')}>
         <CardHead title="READINESS" note="Not connected" />
         <Text style={s.muted}>
-          Needs {state.missing.join(' and ')} from Health Connect. Nothing is scored without it.
+          Needs {state.missing.join(' and ')} from {HEALTH_APP}. Nothing is scored without it.
         </Text>
       </Card>
     );

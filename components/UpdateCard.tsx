@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { checkForUpdate, installedReleaseTag, type UpdateCheck } from '@/lib/update-check';
 import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
-/** Settings → which build this is, and whether GitHub has a newer one. */
+const IOS = Platform.OS === 'ios';
+
+/** Settings → which build this is, and whether GitHub has a newer one for this kind of phone. */
 export function UpdateCard() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<UpdateCheck | null>(null);
@@ -13,7 +15,7 @@ export function UpdateCard() {
     if (busy) return;
     setBusy(true);
     try {
-      setResult(await checkForUpdate());
+      setResult(await checkForUpdate(IOS ? 'ios' : 'android'));
     } finally {
       setBusy(false);
     }
@@ -48,13 +50,17 @@ export function UpdateCard() {
               : `The newest release is ${result.latest.tag}.`}
           </Text>
           <Text style={s.muted}>
-            Installing it keeps your data — it updates this app in place. Android will ask to allow
-            installs from your browser the first time.
+            {IOS
+              ? 'An iPhone build is installed from a computer: download the .ipa there and install it over this one with Sideloadly, using the same Apple ID. Your data stays.'
+              : 'Installing it keeps your data — it updates this app in place. Android will ask to allow installs from your browser the first time.'}
           </Text>
-          <Pressable style={s.btn} onPress={() => open(result.latest.apkUrl ?? result.latest.pageUrl)}>
-            <Text style={s.btnT}>{result.latest.apkUrl ? 'Download APK' : 'Open release page'}</Text>
+          <Pressable
+            style={s.btn}
+            onPress={() => open(!IOS && result.latest.fileUrl ? result.latest.fileUrl : result.latest.pageUrl)}
+          >
+            <Text style={s.btnT}>{!IOS && result.latest.fileUrl ? 'Download APK' : 'Open release page'}</Text>
           </Pressable>
-          {result.latest.apkUrl ? (
+          {!IOS && result.latest.fileUrl ? (
             <Pressable onPress={() => open(result.latest.pageUrl)} style={{ paddingVertical: 8 }}>
               <Text style={s.link}>Release notes →</Text>
             </Pressable>

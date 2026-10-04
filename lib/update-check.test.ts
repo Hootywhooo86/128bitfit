@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RELEASES_PAGE, compareTags, decide, failureFor, newestRelease } from './update-check';
+import { RELEASES_PAGE, compareTags, decide, failureFor, newestRelease, releasePlatform } from './update-check';
 
 describe('ordering release tags', () => {
   it('orders this repo’s alpha tags numerically, not as strings', () => {
@@ -29,11 +29,36 @@ describe('picking the newest release', () => {
   it('uses tag order, not the order GitHub listed them in', () => {
     const r = newestRelease([rel('v0.1.0-alpha.9'), rel('v0.1.0-alpha.27'), rel('v0.1.0-alpha.26')]);
     expect(r?.tag).toBe('v0.1.0-alpha.27');
-    expect(r?.apkUrl).toBe('https://dl/v0.1.0-alpha.27.apk');
+    expect(r?.fileUrl).toBe('https://dl/v0.1.0-alpha.27.apk');
   });
 
   it('skips drafts', () => {
     expect(newestRelease([rel('v0.2.0', { draft: true }), rel('v0.1.0')])?.tag).toBe('v0.1.0');
+  });
+
+  it('Android never picks an iPhone release, and the other way round', () => {
+    const ipa = (tag: string) =>
+      rel(tag, { assets: [{ name: `128bitfit-${tag}-unsigned.ipa`, browser_download_url: `https://dl/${tag}.ipa` }] });
+    // The iPhone release is newest and listed first, as it would be the day it ships.
+    const list = [ipa('ios-v0.1.0-alpha.1'), rel('v0.1.0-alpha.45'), rel('v0.1.0-alpha.44')];
+    expect(newestRelease(list)?.tag).toBe('v0.1.0-alpha.45');
+    expect(newestRelease(list, 'android')?.fileUrl).toBe('https://dl/v0.1.0-alpha.45.apk');
+    const ios = newestRelease([...list, ipa('ios-v0.1.0-alpha.2')], 'ios');
+    expect(ios?.tag).toBe('ios-v0.1.0-alpha.2');
+    expect(ios?.fileUrl).toBe('https://dl/ios-v0.1.0-alpha.2.ipa');
+    expect(newestRelease([rel('v0.1.0-alpha.45')], 'ios')).toBeNull();
+  });
+
+  it('reads iPhone tags as their own platform and orders them', () => {
+    expect(releasePlatform('ios-v0.1.0-alpha.1')).toBe('ios');
+    expect(releasePlatform('v0.1.0-alpha.1')).toBe('android');
+    expect(compareTags('ios-v0.1.0-alpha.2', 'ios-v0.1.0-alpha.10')).toBeLessThan(0);
+    expect(decide('ios-v0.1.0-alpha.1', { tag: 'ios-v0.1.0-alpha.2', pageUrl: 'p', fileUrl: null, publishedAt: null }))
+      .toMatchObject({ status: 'available' });
+  });
+
+  it('skips a tag it cannot read rather than picking it', () => {
+    expect(newestRelease([rel('nightly'), rel('v0.1.0-alpha.3')])?.tag).toBe('v0.1.0-alpha.3');
   });
 
   it('has nothing to offer when there are no releases', () => {
@@ -42,7 +67,7 @@ describe('picking the newest release', () => {
 });
 
 describe('deciding whether to offer an update', () => {
-  const latest = { tag: 'v0.1.0-alpha.28', pageUrl: 'p', apkUrl: 'a', publishedAt: null };
+  const latest = { tag: 'v0.1.0-alpha.28', pageUrl: 'p', fileUrl: 'a', publishedAt: null };
 
   it('offers a newer release', () => {
     expect(decide('v0.1.0-alpha.27', latest)).toMatchObject({ status: 'available', current: 'v0.1.0-alpha.27' });

@@ -6,6 +6,7 @@ import { countRecentSets } from '@/db/muscle-queries';
 import { useReadiness } from '@/lib/health/use-readiness';
 import { GRADE_EMOJI, GRADE_LABEL } from '@/lib/readiness';
 import { colors, fonts, themedStyles } from '@/lib/theme';
+import { HEALTH_APP, HEALTH_UNAVAILABLE } from '@/lib/health/platform';
 
 /**
  * Train → Readiness, from prototype/app-shell.html `train:readiness`.
@@ -30,14 +31,14 @@ export default function ReadinessScreen() {
           <ActivityIndicator color={colors.accent} />
         </View>
       ) : state.status === 'unavailable' ? (
-        <Note>Health Connect is not available on this phone, so there is nothing to score.</Note>
+        <Note>{HEALTH_UNAVAILABLE} There is nothing to score without it.</Note>
       ) : state.status === 'denied' ? (
         <>
           <Note>
-            Needs {state.missing.join(' and ')} from Health Connect. Nothing is scored without it.
+            Needs {state.missing.join(' and ')} from {HEALTH_APP}. Nothing is scored without it.
           </Note>
           <View style={{ height: 10 }} />
-          <MenuRow icon="◐" name="Connect Health Connect" onPress={() => router.push('/settings/health')} />
+          <MenuRow icon="◐" name={`Connect ${HEALTH_APP}`} onPress={() => router.push('/settings/health')} />
         </>
       ) : (
         <>

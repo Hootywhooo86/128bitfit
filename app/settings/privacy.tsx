@@ -5,6 +5,7 @@ import { health } from '@/lib/health';
 import { HealthSyncCard } from '@/components/HealthSyncCard';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 const POLICY_URL = 'https://github.com/Hootywhooo86/128bitfit/blob/main/docs/privacy-policy.md';
 
@@ -30,13 +31,13 @@ export default function PrivacyScreen() {
         </Text>
       </View>
 
-      <Text style={styles.section}>Health Connect</Text>
+      <Text style={styles.section}>{HEALTH_APP}</Text>
 
       <HealthSyncCard />
 
       <View style={styles.card}>
         <Text style={styles.body}>
-          Connecting Health Connect is optional. Every screen works without it, and the app
+          Connecting {HEALTH_APP} is optional. Every screen works without it, and the app
           shows &quot;Not connected&quot; rather than inventing numbers. Each permission is
           separate — granting one does not grant the rest, and refusing one only costs you
           the feature below it.
@@ -87,9 +88,9 @@ export default function PrivacyScreen() {
         <View style={styles.row}>
           <Text style={styles.perm}>Write exercise</Text>
           <Text style={styles.permWhy}>
-            Writes workouts you complete back to Health Connect so your other apps can see
+            Writes workouts you complete back to {HEALTH_APP} so your other apps can see
             them — when you trained and for how long. Calories are not written, because the
-            app&apos;s figure is usually an estimate and Health Connect has nowhere to say so.
+            app&apos;s figure is usually an estimate and {HEALTH_APP} has nowhere to say so.
           </Text>
         </View>
 
@@ -100,7 +101,7 @@ export default function PrivacyScreen() {
         </Text>
 
         <Pressable style={styles.button} onPress={() => health.openSettings()}>
-          <Text style={styles.buttonText}>Open Health Connect</Text>
+          <Text style={styles.buttonText}>Open {HEALTH_APP}</Text>
         </Pressable>
       </View>
 

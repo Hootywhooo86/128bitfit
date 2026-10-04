@@ -5,6 +5,7 @@ import Svg, { Line, Polyline } from 'react-native-svg';
 import { health } from '@/lib/health';
 import { heartRateStillSyncing, summariseHeartRate, type HeartRateSummary } from '@/lib/heart-rate';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { HEALTH_APP } from '@/lib/health/platform';
 
 const CHART_H = 120;
 
@@ -55,7 +56,7 @@ export function HeartRateCard({ startedAt, endedAt }: { startedAt: number; ended
       <View style={s.card}>
         <Text style={s.label}>HEART RATE</Text>
         <Text style={s.note}>
-          No heart rate recorded for this session. Wear a watch that syncs to Health Connect and it
+          No heart rate recorded for this session. Wear a watch that syncs to {HEALTH_APP} and it
           shows up here.
         </Text>
       </View>
@@ -121,7 +122,7 @@ export function HeartRateCard({ startedAt, endedAt }: { startedAt: number; ended
           </Text>
         </Pressable>
       ) : null}
-      <Text style={s.note}>Recorded by your watch through Health Connect. Dashed line: average.</Text>
+      <Text style={s.note}>Recorded by your watch through {HEALTH_APP}. Dashed line: average.</Text>
     </View>
   );
 }

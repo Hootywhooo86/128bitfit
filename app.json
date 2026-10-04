@@ -8,10 +8,13 @@
     "scheme": "bitfit",
     "userInterfaceStyle": "dark",
     "ios": {
+      "bundleIdentifier": "com.hootywhooo86.bit128fit",
       "supportsTablet": true,
       "infoPlist": {
+        "CFBundleDisplayName": "128BIT FIT iOS",
         "NSCameraUsageDescription": "Allow 128BIT FIT to scan food barcodes.",
-        "NSLocationWhenInUseUsageDescription": "Allow 128BIT FIT to record the route of your walks, runs and rides. It stays on this phone."
+        "NSLocationWhenInUseUsageDescription": "Allow 128BIT FIT to record the route of your walks, runs and rides. It stays on this phone.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -106,11 +109,20 @@
       "expo-secure-store",
       "react-native-health-connect",
       [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "128BIT FIT reads your steps, heart rate, calories burned, sleep, weight and workouts from Apple Health to show them next to your training and food. It stays on this phone.",
+          "NSHealthUpdateUsageDescription": "128BIT FIT saves the workouts, meals, weigh-ins and water you log here to Apple Health, so your other apps can see them.",
+          "background": false
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Allow 128BIT FIT to record the route of your walks, runs and rides. It stays on this phone.",
           "isAndroidForegroundServiceEnabled": true,
-          "isAndroidBackgroundLocationEnabled": false
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": true
         }
       ],
       "@maplibre/maplibre-react-native",
