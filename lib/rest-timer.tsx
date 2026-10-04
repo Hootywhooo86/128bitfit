@@ -11,6 +11,7 @@ import { Alert, AppState } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { adjustRest } from './rest-adjust';
+import { DEFAULT_REST_SECONDS as DEFAULT_REST_SECONDS_VALUE } from './rest-timer-defaults';
 import {
   cancelRestNotification,
   ensureRestNotificationSetup,
@@ -70,7 +71,7 @@ type RestTimerApi = RestTimerSnapshot & {
 
 const RestTimerContext = createContext<RestTimerApi | null>(null);
 
-const DEFAULT_REST = 60;
+const DEFAULT_REST = DEFAULT_REST_SECONDS_VALUE;
 
 /** Module flag: only prompt once per process for the educational Alert. */
 let permissionPromptShown = false;

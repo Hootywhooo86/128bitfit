@@ -15,15 +15,12 @@ import {
 } from '@/db/workout-queries';
 import type { Routine, WorkoutSession } from '@/db/schema';
 import { planFor, sessionsPerWeek, type WeekPlan } from '@/lib/schedule';
+import { parsePass } from '@/lib/gym-pass';
 import { colors } from '@/lib/theme';
 
 function gymPassSaved(raw: string | null): boolean {
-  try {
-    const v = raw ? JSON.parse(raw) : null;
-    return !!(v?.photoUri || v?.memberNumber);
-  } catch {
-    return false;
-  }
+  const p = parsePass(raw);
+  return !!(p.photoUri || p.memberNumber || p.barcode);
 }
 
 export default function TrainScreen() {

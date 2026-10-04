@@ -20,6 +20,7 @@ import {
   getDailyGoals,
   type DailyGoals,
 } from './food-queries';
+import { widgetsChanged } from '@/lib/widget-refresh';
 
 export type WeightUnit = 'kg' | 'lb';
 
@@ -202,6 +203,8 @@ export async function updateAppSettings(patch: {
   activity?: ActivityLevel;
   goal?: Goal;
 }): Promise<AppSettings> {
+  // Home-screen widgets show this; they redraw shortly after (lib/widget-refresh).
+  widgetsChanged();
   if (patch.proteinTarget != null) {
     await setSetting('protein_target', String(Math.round(patch.proteinTarget)));
   }

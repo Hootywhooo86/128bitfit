@@ -20,6 +20,7 @@ import {
   mirrorWater,
   mirrorWaterRemoved,
 } from '@/lib/health/mirror';
+import { widgetsChanged } from '@/lib/widget-refresh';
 
 export const DEFAULT_GOALS = {
   calorie_target: 2200,
@@ -285,6 +286,8 @@ export type LogFoodInput = {
 };
 
 export async function insertFoodLog(input: LogFoodInput): Promise<string> {
+  // Home-screen widgets show this; they redraw shortly after (lib/widget-refresh).
+  widgetsChanged();
   const id = newId('fl');
   const loggedAt = input.loggedAt ?? new Date();
 
@@ -383,6 +386,7 @@ export async function logFoodAgain(
   logId: string,
   opts: { portions: number; mealType: MealType; loggedAt?: Date }
 ): Promise<string> {
+  widgetsChanged();
   const [row] = await db.select().from(foodLogs).where(eq(foodLogs.id, logId)).limit(1);
   if (!row) throw new Error('That meal is no longer in your log, so there is nothing to copy.');
   const scaled = scaleLoggedPortion(row, opts.portions);
@@ -420,6 +424,7 @@ export async function updateFoodLog(
     >
   >
 ): Promise<void> {
+  widgetsChanged();
   await db.update(foodLogs).set(patch).where(eq(foodLogs.id, id));
 
   // Re-push rather than patch: the client id is the local row id, so Health
@@ -448,6 +453,7 @@ export async function updateFoodLog(
 }
 
 export async function deleteFoodLog(id: string): Promise<void> {
+  widgetsChanged();
   await db.delete(foodLogs).where(eq(foodLogs.id, id));
   // A meal the user took back should not stay in their health store, skewing
   // whatever else reads it.
@@ -529,6 +535,7 @@ export async function getWaterTotalForDay(day: Date = new Date()): Promise<numbe
 }
 
 export async function addWater(ml: number, loggedAt: Date = new Date()): Promise<string> {
+  widgetsChanged();
   const id = newId('wl');
   await db.insert(waterLogs).values({ id, ml, loggedAt });
   // Negative amounts are how the UI undoes a tap; there is nothing to mirror.
@@ -546,6 +553,7 @@ export async function listWaterLogsForDay(day: Date = new Date()): Promise<Water
 }
 
 export async function deleteWaterLog(id: string): Promise<void> {
+  widgetsChanged();
   await db.delete(waterLogs).where(eq(waterLogs.id, id));
   mirrorWaterRemoved(id);
 }

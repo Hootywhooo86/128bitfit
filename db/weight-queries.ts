@@ -4,6 +4,7 @@ import { newId } from './id';
 import { weightEntries, type WeightEntry } from './schema';
 import { reapplyCalorieFloor, type WeightUnit } from './settings-queries';
 import { mirrorWeight, mirrorWeightRemoved } from '@/lib/health/mirror';
+import { widgetsChanged } from '@/lib/widget-refresh';
 
 /** Health Connect stores kilograms, whatever the user types in. */
 export function weightInKg(entry: Pick<WeightEntry, 'kgOrLb' | 'unit'>): number {
@@ -16,6 +17,8 @@ export async function addWeightEntry(input: {
   loggedAt?: Date;
   note?: string | null;
 }): Promise<string> {
+  // Home-screen widgets show this; they redraw shortly after (lib/widget-refresh).
+  widgetsChanged();
   const id = newId('we');
   const loggedAt = input.loggedAt ?? new Date();
   await db.insert(weightEntries).values({
@@ -45,6 +48,7 @@ export async function getLatestWeightEntry(): Promise<WeightEntry | null> {
 }
 
 export async function deleteWeightEntry(id: string): Promise<void> {
+  widgetsChanged();
   await db.delete(weightEntries).where(eq(weightEntries.id, id));
   mirrorWeightRemoved(id);
   await reapplyCalorieFloor();
