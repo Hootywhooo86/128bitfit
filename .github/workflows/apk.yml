@@ -87,6 +87,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag }}
+          # The commit that was built — not whatever the default branch is now.
+          target_commitish: ${{ github.sha }}
           name: ${{ inputs.tag }}
           files: ${{ steps.apk.outputs.path }}
           body: |
