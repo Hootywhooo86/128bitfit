@@ -128,7 +128,67 @@
       "@maplibre/maplibre-react-native",
       "expo-sharing",
       "expo-build-properties",
-      "./plugins/with-latin-only-mlkit"
+      "./plugins/with-latin-only-mlkit",
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/silkscreen/400Regular/Silkscreen_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "Today",
+              "label": "128BIT FIT · Today",
+              "description": "Calories eaten against your target, protein left, and calories burned.",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "maxResizeWidth": "400dp",
+              "maxResizeHeight": "200dp",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "QuickLog",
+              "label": "128BIT FIT · Quick log",
+              "description": "Food, scan, train, weigh-in and gym pass, one tap each.",
+              "minWidth": "250dp",
+              "minHeight": "40dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 1,
+              "resizeMode": "horizontal",
+              "updatePeriodMillis": 0
+            },
+            {
+              "name": "Workout",
+              "label": "128BIT FIT · Workout",
+              "description": "Your next set while a workout is running, with DONE to log it.",
+              "minWidth": "250dp",
+              "minHeight": "60dp",
+              "targetCellWidth": 4,
+              "targetCellHeight": 1,
+              "maxResizeHeight": "160dp",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            },
+            {
+              "name": "Muscles",
+              "label": "128BIT FIT · This week",
+              "description": "Muscles trained in the last 7 days, on the heat scale.",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
+      ],
+      "./plugins/with-gym-pass-shortcut"
     ],
     "experiments": {
       "typedRoutes": true

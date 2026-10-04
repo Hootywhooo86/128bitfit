@@ -34,6 +34,7 @@ import {
 } from './schema';
 import { moveInOrder } from '@/lib/reorder';
 import { groupForLink } from '@/lib/superset';
+import { widgetsChanged } from '@/lib/widget-refresh';
 
 export type SessionExerciseWithMeta = SessionExercise & {
   exerciseName: string;
@@ -321,6 +322,7 @@ export async function getLastPerformance(
 }
 
 export async function startFreestyleWorkout(): Promise<string> {
+  widgetsChanged();
   const id = newId('ws');
   await db.insert(workoutSessions).values({
     id,
@@ -334,6 +336,7 @@ export async function startFreestyleWorkout(): Promise<string> {
 }
 
 export async function startRoutineWorkout(routineId: string): Promise<string> {
+  widgetsChanged();
   const id = newId('ws');
   await db.insert(workoutSessions).values({
     id,
@@ -388,6 +391,7 @@ export async function startRoutineWorkout(routineId: string): Promise<string> {
  * Weights pre-fill from each lift's last completed performance, as always.
  */
 export async function repeatWorkout(sourceSessionId: string): Promise<string> {
+  widgetsChanged();
   const source = await loadActiveWorkout(sourceSessionId);
   if (!source || source.exercises.length === 0) {
     throw new Error('That workout has no exercises to repeat.');
@@ -440,6 +444,7 @@ export async function addExerciseToSession(
   exerciseId: string,
   opts?: { restSeconds?: number; targetSets?: number; targetReps?: number; track?: TrackMode }
 ): Promise<string> {
+  widgetsChanged();
   const existing = await db
     .select({ n: count() })
     .from(sessionExercises)
@@ -489,6 +494,8 @@ export async function addSet(
     setType?: 'normal' | 'drop' | 'rp'
   }
 ): Promise<WorkoutSet> {
+  // Home-screen widgets show this; they redraw shortly after (lib/widget-refresh).
+  widgetsChanged();
   const block = await db
     .select()
     .from(sets)
@@ -543,6 +550,7 @@ export async function updateSet(
   setId: string,
   patch: Partial<Pick<WorkoutSet, 'reps' | 'weight' | 'weightUnit' | 'completed' | 'isWarmup' | 'setType' | 'rpe' | 'distanceM'>>
 ): Promise<void> {
+  widgetsChanged();
   await db.update(sets).set(patch).where(eq(sets.id, setId));
 }
 
@@ -550,6 +558,7 @@ export async function completeSet(
   setId: string,
   values?: { reps?: number | null; weight?: number | null; distanceM?: number | null }
 ): Promise<WorkoutSet | null> {
+  widgetsChanged();
   const rows = await db.select().from(sets).where(eq(sets.id, setId)).limit(1);
   const row = rows[0];
   if (!row) return null;
@@ -564,11 +573,13 @@ export async function completeSet(
 }
 
 export async function deleteSet(setId: string): Promise<void> {
+  widgetsChanged();
   await db.delete(sets).where(eq(sets.id, setId));
 }
 
 /** Takes an exercise, and its sets, out of today's session. */
 export async function removeSessionExercise(sessionExerciseId: string): Promise<void> {
+  widgetsChanged();
   await db.delete(sets).where(eq(sets.sessionExerciseId, sessionExerciseId));
   await db.delete(sessionExercises).where(eq(sessionExercises.id, sessionExerciseId));
 }
@@ -740,6 +751,7 @@ export async function setSessionExerciseTrack(sessionExerciseId: string, track: 
 }
 
 export async function setSessionStatus(sessionId: string, status: SessionStatus): Promise<void> {
+  widgetsChanged();
   const endedAt = status === 'in_progress' ? null : new Date();
   await db
     .update(workoutSessions)
@@ -748,6 +760,7 @@ export async function setSessionStatus(sessionId: string, status: SessionStatus)
 }
 
 export async function completeSession(sessionId: string): Promise<void> {
+  widgetsChanged();
   await setSessionStatus(sessionId, 'completed');
 
   // The phone's health store gets the session once it is actually finished —
@@ -775,6 +788,7 @@ export async function completeSession(sessionId: string): Promise<void> {
 }
 
 export async function discardSession(sessionId: string): Promise<void> {
+  widgetsChanged();
   await setSessionStatus(sessionId, 'discarded');
 }
 
@@ -967,6 +981,7 @@ export async function listSessions(limit = 100): Promise<SessionListItem[]> {
  * Sets go first so a failure part-way never orphans them.
  */
 export async function deleteSession(sessionId: string): Promise<void> {
+  widgetsChanged();
   const links = await db
     .select({ id: sessionExercises.id })
     .from(sessionExercises)
