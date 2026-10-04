@@ -539,8 +539,9 @@ export const healthConnectProvider: HealthProvider = {
       }
       return out.sort((a, b) => a.startMs - b.startMs);
     } catch (e) {
-      lastReadErrors.set('ExerciseSession', describeError(e));
-      return [];
+      const why = describeError(e);
+      lastReadErrors.set('ExerciseSession', why);
+      throw new Error(`Health Connect wouldn't share your workouts: ${why}`);
     }
   },
 

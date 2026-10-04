@@ -240,7 +240,10 @@ export interface HealthProvider {
    * Empty when nothing was recorded or it cannot be read — never made up.
    */
   readHeartRateSeries(startMs: number, endMs: number): Promise<HeartRateSample[]>;
-  /** Exercise sessions in the store from any app, oldest first. */
+  /**
+   * Exercise sessions in the store from any app, oldest first. Throws when the
+   * read fails, so a refused read is never shown as "no workouts".
+   */
   readWorkouts(startMs: number, endMs: number): Promise<HealthWorkoutSession[]>;
 
   writeEntries(entries: HealthWorkoutEntry[]): Promise<number>;

@@ -100,6 +100,30 @@ export function workoutTypeName(type: number, title?: string | null): string {
   return TYPE_NAMES[type] ?? 'Workout';
 }
 
+/**
+ * The watch recorded a workout but not what kind: Health Connect's "other
+ * workout" (0), or a number this app has no name for. These get a nudge to
+ * say what it was.
+ */
+export function isUnidentified(type: number): boolean {
+  return type === 0 || !(type in TYPE_NAMES);
+}
+
+/** What the "What was this?" picker offers, most common first. */
+export const LABEL_CHOICES: readonly number[] = [
+  79, 56, 70, 81, 36, 37, 8, 9, 57, 25, 54, 69, 74, 83, 48, 16, 11, 44, 71, 68, 51, 0,
+];
+
+/**
+ * Applies the type you gave a workout. A label replaces the watch's type and
+ * its title, which usually just repeats the type it got wrong.
+ */
+export function applyLabel<T extends DetectedSession>(s: T, labels: Readonly<Record<string, number>>): T & { labelled: boolean } {
+  const type = labels[s.id];
+  if (type == null || !Number.isInteger(type)) return { ...s, labelled: false };
+  return { ...s, type, title: null, labelled: true };
+}
+
 /** The app's own sport for a detected type, so it can be added as cardio. */
 const TYPE_TO_SPORT: Record<number, string> = {
   79: 'walk',
@@ -126,27 +150,61 @@ export type DetectedSession = {
 };
 
 /** Shorter than this is a false start, not a workout. */
-export const MIN_DETECTED_MS = 3 * 60_000;
+export const MIN_DETECTED_MS = 60_000;
+
+/** Why a recorded workout is not in the main list. */
+export type HiddenReason = 'dismissed' | 'short' | 'logged';
+
+export const HIDDEN_REASON_TEXT: Record<HiddenReason, string> = {
+  dismissed: 'You hid it',
+  short: 'Under a minute',
+  logged: 'Same time as a workout you logged here',
+};
+
+export type SortedDetected<T extends DetectedSession = DetectedSession> = {
+  shown: T[];
+  hidden: { session: T; reason: HiddenReason }[];
+};
+
+type Span = { startMs: number; endMs: number };
 
 /**
- * The ones worth showing: not written by this app, not hidden, long enough,
- * and not the same workout you already logged here. A watch often records a
- * session you also logged in the app; overlapping by more than half of the
- * detected session's length counts as the same workout.
+ * Splits what Health Connect returned into the ones to show and the ones held
+ * back, with the reason for each, so a missing workout can always be found
+ * and explained. Only what this app wrote itself is dropped outright: that is
+ * already in your log.
+ *
+ * A watch often records a session you also logged in the app. It counts as
+ * the same workout only when each covers more than half of the other — a
+ * strength session left running for three hours does not swallow the walk
+ * the watch picked up inside it.
  */
-export function pickDetected(
-  sessions: readonly DetectedSession[],
-  logged: readonly { startMs: number; endMs: number }[],
+export function sortDetected<T extends DetectedSession>(
+  sessions: readonly T[],
+  logged: readonly Span[],
   opts: { ownPackage: string; dismissed: ReadonlySet<string> }
-): DetectedSession[] {
-  const overlap = (a: { startMs: number; endMs: number }, b: { startMs: number; endMs: number }) =>
-    Math.max(0, Math.min(a.endMs, b.endMs) - Math.max(a.startMs, b.startMs));
-  return sessions
-    .filter((s) => s.source !== opts.ownPackage)
-    .filter((s) => !opts.dismissed.has(s.id))
-    .filter((s) => s.endMs - s.startMs >= MIN_DETECTED_MS)
-    .filter((s) => !logged.some((l) => overlap(s, l) > (s.endMs - s.startMs) / 2))
-    .sort((a, b) => b.startMs - a.startMs);
+): SortedDetected<T> {
+  const len = (a: Span) => a.endMs - a.startMs;
+  const overlap = (a: Span, b: Span) => Math.max(0, Math.min(a.endMs, b.endMs) - Math.max(a.startMs, b.startMs));
+  const sameWorkout = (a: Span, b: Span) => {
+    const o = overlap(a, b);
+    return o > len(a) / 2 && o > len(b) / 2;
+  };
+  const out: SortedDetected<T> = { shown: [], hidden: [] };
+  const newest = [...sessions].sort((a, b) => b.startMs - a.startMs);
+  for (const s of newest) {
+    if (s.source === opts.ownPackage) continue;
+    const reason: HiddenReason | null = opts.dismissed.has(s.id)
+      ? 'dismissed'
+      : len(s) < MIN_DETECTED_MS
+        ? 'short'
+        : logged.some((l) => sameWorkout(s, l))
+          ? 'logged'
+          : null;
+    if (reason) out.hidden.push({ session: s, reason });
+    else out.shown.push(s);
+  }
+  return out;
 }
 
 /** "Fitbit" from com.fitbit.FitbitMobile; the package itself if unknown. */
