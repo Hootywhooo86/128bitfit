@@ -114,6 +114,32 @@ describe('unlocks', () => {
   });
 });
 
+describe('recomputing only when the log changes', () => {
+  it('sees a new session, an edited set and a new day', async () => {
+    seedWorkouts();
+    const now = new Date(2026, 9, 5);
+    const first = await g.loadGame(now);
+    expect(await g.loadGame(now)).toEqual(first);
+
+    sqlite.exec(`insert into workout_sessions (id, started_at, ended_at, status) values ('s2', ${T0 + 2 * DAY}, ${T0 + 2 * DAY + 3600}, 'completed')`);
+    sqlite.exec(`insert into session_exercises (id, session_id, exercise_id, position, track) values ('s2-bp', 's2', 'bp', 0, 'reps')`);
+    sqlite.exec(`insert into sets (id, session_exercise_id, set_index, reps, weight, weight_unit, completed, is_warmup, set_type) values ('d', 's2-bp', 0, 5, 100, 'lb', 1, 0, 'normal')`);
+    const second = await g.loadGame(now);
+    // One more set (+10) and the week's two-workout quest done (+50).
+    expect(second.progress.xp).toBe(first.progress.xp + 60);
+
+    // Same counts, heavier weight: the total volume has to move.
+    const iron = (v: Awaited<ReturnType<typeof g.loadGame>>) => v.trophies.find((t) => t.id === 'iron-plate')!.progress;
+    sqlite.exec(`update sets set weight = 300 where id = 'd'`);
+    const third = await g.loadGame(now);
+    expect(iron(third)).not.toEqual(iron(second));
+
+    // A new week is new quests, even with nothing logged.
+    const later = await g.loadGame(new Date(2026, 9, 13));
+    expect(later.quests.map((q) => q.done)).toEqual([0, 0, 0]);
+  });
+});
+
 describe('settings', () => {
   it('game on by default, sound off by default', async () => {
     expect(await g.gameOn()).toBe(true);

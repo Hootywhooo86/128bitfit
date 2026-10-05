@@ -126,7 +126,10 @@ export function judgeTrophies(history: GameHistory): TrophyResult[] {
   for (const s of sessions) {
     const key = mondayOf(s.startedAt).getTime();
     const hit = weeks.get(key) ?? new Set<MuscleGroup>();
-    for (const set of s.sets) for (const m of [...set.primary, ...set.secondary]) hit.add(m);
+    for (const set of s.sets) {
+      for (const m of set.primary) hit.add(m);
+      for (const m of set.secondary) hit.add(m);
+    }
     weeks.set(key, hit);
     mostHit = Math.max(mostHit, hit.size);
     if (!mapAt && hit.size >= MUSCLE_GROUPS.length) mapAt = s.startedAt;

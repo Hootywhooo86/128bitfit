@@ -1,4 +1,4 @@
-import { and, eq, like } from 'drizzle-orm';
+import { and, eq, like, sql } from 'drizzle-orm';
 import { dayKey } from '@/lib/fuel-day';
 import { computeGame, type GameState } from '@/lib/game';
 import { resolveLook, unlockedBetween, type Cosmetic, type Look } from '@/lib/game/cosmetics';
@@ -58,7 +58,22 @@ export async function saveLook(look: Look): Promise<void> {
   await setSetting(KEY_LOOK, JSON.stringify(look));
 }
 
+/**
+ * Parsed muscle lists, by their JSON text. Every set of an exercise carries
+ * the same text, so a history of thousands of sets parses a few dozen.
+ */
+const parsedMuscles = new Map<string, MuscleGroup[]>();
+
 function muscles(json: string | null): MuscleGroup[] {
+  const key = json ?? '';
+  const hit = parsedMuscles.get(key);
+  if (hit) return hit;
+  const list = parseMuscles(json);
+  parsedMuscles.set(key, list);
+  return list;
+}
+
+function parseMuscles(json: string | null): MuscleGroup[] {
   try {
     const v: unknown = JSON.parse(json ?? '[]');
     return Array.isArray(v)
@@ -172,14 +187,40 @@ async function storedUnlocks(): Promise<Partial<Record<TrophyId, Date>>> {
   return out;
 }
 
+/**
+ * A cheap summary of everything the game reads: counts and sums, one query.
+ * If it has not changed since the last computation, neither has the game —
+ * so visiting Home again does not re-read and re-judge the whole history.
+ */
+async function fingerprint(now: Date): Promise<string> {
+  const rows = await db.all<Record<string, unknown>>(sql`
+    select
+      (select count(*) || ':' || coalesce(max(started_at), 0) from workout_sessions where status = 'completed') as w,
+      (select count(*) || ':' || coalesce(sum(weight), 0) || ':' || coalesce(sum(reps), 0) || ':' || coalesce(sum(distance_m), 0)
+         from sets where completed = 1 and is_warmup = 0) as s,
+      (select count(*) || ':' || coalesce(sum(distance_m), 0) || ':' || coalesce(sum(moving_s), 0) || ':' || coalesce(sum(elapsed_s), 0)
+         from cardio_sessions where status = 'finished') as c,
+      (select count(*) || ':' || coalesce(sum(protein), 0) || ':' || coalesce(max(logged_at), 0) from food_logs) as f,
+      (select count(*) || ':' || coalesce(max(kg_or_lb), 0) from weight_entries) as b,
+      (select count(*) || ':' || coalesce(sum(length(primary_muscles)), 0) from exercises
+         where category in ('custom', 'imported')) as e
+  `);
+  const protein = await getSetting('protein_target');
+  // Quests are per week and stats look back four weeks: the day matters too.
+  return JSON.stringify([rows[0] ?? null, protein, dayKey(now)]);
+}
+
+let cached: { key: string; state: GameState } | null = null;
+
 /** Computes the game from the log and merges in what storage remembers. */
 export async function loadGame(now = new Date()): Promise<GameView> {
-  const [history, unlockedAt, lookRaw] = await Promise.all([
-    loadGameHistory(),
-    storedUnlocks(),
-    getSetting(KEY_LOOK),
-  ]);
-  const state = computeGame(history, now);
+  const key = await fingerprint(now);
+  let state = cached?.key === key ? cached.state : null;
+  if (!state) {
+    state = computeGame(await loadGameHistory(), now);
+    cached = { key, state };
+  }
+  const [unlockedAt, lookRaw] = await Promise.all([storedUnlocks(), getSetting(KEY_LOOK)]);
   let look: unknown = null;
   try {
     look = lookRaw ? JSON.parse(lookRaw) : null;
