@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { getAiSettings, updateAiSettings, type AiSettings } from '@/db/ai-settings';
 import { useDb } from '@/db/DatabaseProvider';
+import { blipOn, gameOn, setBlipOn, setGameOn } from '@/db/game-queries';
 import {
   getAppSettings,
   getCalorieProfile,
@@ -53,8 +54,12 @@ export default function SettingsScreen() {
   const [units, setUnits] = useState<WeightUnit>('lb');
   const [keepAwake, setKeepAwake] = useState(true);
   const [breakdownAsk, setBreakdownAsk] = useState(true);
+  const [game, setGame] = useState(true);
+  const [blip, setBlip] = useState(false);
   useEffect(() => {
     void breakdownPromptOn().then(setBreakdownAsk);
+    void gameOn().then(setGame);
+    void blipOn().then(setBlip);
   }, []);
   const [activity, setActivity] = useState<ActivityLevel>(DEFAULT_ACTIVITY);
   const [goal, setGoal] = useState<Goal>(DEFAULT_GOAL);
@@ -331,6 +336,28 @@ export default function SettingsScreen() {
           void setBreakdownPrompt(v);
         }}
       />
+
+      <Text style={styles.label}>Game</Text>
+      <ToggleRow
+        name="Game layer: XP, trophies & quests"
+        sub="Levels, RPG stats, weekly quests and pixel trophies, all from what you log. Off hides all of it; nothing you logged changes, and what you earned is kept."
+        value={game}
+        onChange={(v) => {
+          setGame(v);
+          void setGameOn(v);
+        }}
+      />
+      {game ? (
+        <ToggleRow
+          name="Unlock sound"
+          sub="A short 8-bit blip on a level-up or a trophy. Quiet when the phone is on silent."
+          value={blip}
+          onChange={(v) => {
+            setBlip(v);
+            void setBlipOn(v);
+          }}
+        />
+      ) : null}
 
       <AiCoachCard
         draft={ai}

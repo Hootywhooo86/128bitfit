@@ -26,6 +26,7 @@ import { mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import { useCardioEnergy } from '@/lib/health/use-cardio-energy';
 import { MAP_ROUTE_BLUE, type MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { GameNews } from '@/components/game/GameNews';
 
 /** A finished cardio session: the route, the totals and the splits. */
 export default function CardioSummaryScreen() {
@@ -127,91 +128,94 @@ export default function CardioSummaryScreen() {
     ]);
 
   return (
-    <Screen section={sport.label} back>
-      <Text style={s.when}>
-        {started.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })} ·{' '}
-        {started.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-      </Text>
+    <View style={{ flex: 1 }}>
+      <Screen section={sport.label} back>
+        <Text style={s.when}>
+          {started.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' })} ·{' '}
+          {started.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+        </Text>
 
-      {fixes.length >= 2 ? (
-        <View style={s.map}>
-          <RouteMap
-            fixes={fixes}
-            here={null}
-            styleId={styleId}
-            follow={false}
-            showEnds
-            dotColour={colours.dot}
-            lineColour={colours.line}
-          />
-        </View>
-      ) : !session.manual ? (
-        <Note>No route was recorded — the phone never got a usable GPS position.</Note>
-      ) : null}
-
-      <View style={s.grid}>
-        <Big value={distanceM != null ? formatDistance(distanceM, unit) : '–'} label={`Distance (${unitLabel})`} />
-        <Big value={movingS != null ? formatDuration(movingS) : '–'} label="Moving time" />
-        {sport.showSpeed ? (
-          <Big value={hasPace ? formatSpeed(avgSpeed, unit) : '–'} label={`Avg speed (${speedLabel})`} />
-        ) : (
-          <Big
-            value={hasPace ? formatPace(movingS! / (distanceM! / (unit === 'mi' ? 1609.344 : 1000))) : '–:––'}
-            label={`Avg pace (/${unitLabel})`}
-          />
-        )}
-        <Big value={session.elapsedS != null ? formatDuration(session.elapsedS) : '–'} label="Elapsed" />
-        {!session.manual ? (
-          <Big
-            value={stats.elevGainM != null ? String(Math.round(unit === 'mi' ? stats.elevGainM * 3.28084 : stats.elevGainM)) : '–'}
-            label={`Climb (${unit === 'mi' ? 'ft' : 'm'})`}
-          />
+        {fixes.length >= 2 ? (
+          <View style={s.map}>
+            <RouteMap
+              fixes={fixes}
+              here={null}
+              styleId={styleId}
+              follow={false}
+              showEnds
+              dotColour={colours.dot}
+              lineColour={colours.line}
+            />
+          </View>
+        ) : !session.manual ? (
+          <Note>No route was recorded — the phone never got a usable GPS position.</Note>
         ) : null}
-      </View>
 
-      {!session.manual && stats.splits.length > 0 ? (
-        <>
-          <Label>SPLITS</Label>
-          <Card>
-            <CardHead title={`PER ${unitLabel.toUpperCase()}`} note={sport.showSpeed ? speedLabel : 'pace'} />
-            {stats.splits.map((sp) => (
-              <View key={sp.n} style={s.splitRow}>
-                <Text style={s.splitN}>
-                  {sp.distanceM < (unit === 'mi' ? 1609 : 999) ? formatDistance(sp.distanceM, unit) : sp.n}
-                </Text>
-                <Text style={s.splitV}>
-                  {sport.showSpeed
-                    ? formatSpeed(sp.distanceM / sp.movingS, unit)
-                    : formatPace(sp.movingS / (sp.distanceM / (unit === 'mi' ? 1609.344 : 1000)))}
-                </Text>
-                <Text style={s.splitT}>{formatDuration(sp.movingS)}</Text>
-              </View>
-            ))}
-          </Card>
-        </>
-      ) : null}
+        <View style={s.grid}>
+          <Big value={distanceM != null ? formatDistance(distanceM, unit) : '–'} label={`Distance (${unitLabel})`} />
+          <Big value={movingS != null ? formatDuration(movingS) : '–'} label="Moving time" />
+          {sport.showSpeed ? (
+            <Big value={hasPace ? formatSpeed(avgSpeed, unit) : '–'} label={`Avg speed (${speedLabel})`} />
+          ) : (
+            <Big
+              value={hasPace ? formatPace(movingS! / (distanceM! / (unit === 'mi' ? 1609.344 : 1000))) : '–:––'}
+              label={`Avg pace (/${unitLabel})`}
+            />
+          )}
+          <Big value={session.elapsedS != null ? formatDuration(session.elapsedS) : '–'} label="Elapsed" />
+          {!session.manual ? (
+            <Big
+              value={stats.elevGainM != null ? String(Math.round(unit === 'mi' ? stats.elevGainM * 3.28084 : stats.elevGainM)) : '–'}
+              label={`Climb (${unit === 'mi' ? 'ft' : 'm'})`}
+            />
+          ) : null}
+        </View>
 
-      {/* Typed-in sessions too: a watch worn on the treadmill recorded the real thing. */}
-      <HeartRateCard startedAt={session.startedAt} endedAt={session.endedAt} />
+        {!session.manual && stats.splits.length > 0 ? (
+          <>
+            <Label>SPLITS</Label>
+            <Card>
+              <CardHead title={`PER ${unitLabel.toUpperCase()}`} note={sport.showSpeed ? speedLabel : 'pace'} />
+              {stats.splits.map((sp) => (
+                <View key={sp.n} style={s.splitRow}>
+                  <Text style={s.splitN}>
+                    {sp.distanceM < (unit === 'mi' ? 1609 : 999) ? formatDistance(sp.distanceM, unit) : sp.n}
+                  </Text>
+                  <Text style={s.splitV}>
+                    {sport.showSpeed
+                      ? formatSpeed(sp.distanceM / sp.movingS, unit)
+                      : formatPace(sp.movingS / (sp.distanceM / (unit === 'mi' ? 1609.344 : 1000)))}
+                  </Text>
+                  <Text style={s.splitT}>{formatDuration(sp.movingS)}</Text>
+                </View>
+              ))}
+            </Card>
+          </>
+        ) : null}
 
-      <EnergyCard energy={energy} />
+        {/* Typed-in sessions too: a watch worn on the treadmill recorded the real thing. */}
+        <HeartRateCard startedAt={session.startedAt} endedAt={session.endedAt} />
 
-      <Label>COACH</Label>
-      <MenuRow
-        icon="◈"
-        name="Ask the coach about this"
-        sub="A debrief of this session, with your recent cardio and food"
-        onPress={() => router.push({ pathname: '/coach/[mode]', params: { mode: 'debrief', cardio: session.id } })}
-      />
+        <EnergyCard energy={energy} />
 
-      <Label>MORE</Label>
-      {fixes.length >= 2 ? (
-        <MenuRow icon="⇪" name="Export route (GPX)" sub="Open it in Strava, Komoot or any map app" onPress={() => void shareGpx()} />
-      ) : null}
-      <Pressable style={s.delete} onPress={remove}>
-        <Text style={s.deleteT}>Delete session</Text>
-      </Pressable>
-    </Screen>
+        <Label>COACH</Label>
+        <MenuRow
+          icon="◈"
+          name="Ask the coach about this"
+          sub="A debrief of this session, with your recent cardio and food"
+          onPress={() => router.push({ pathname: '/coach/[mode]', params: { mode: 'debrief', cardio: session.id } })}
+        />
+
+        <Label>MORE</Label>
+        {fixes.length >= 2 ? (
+          <MenuRow icon="⇪" name="Export route (GPX)" sub="Open it in Strava, Komoot or any map app" onPress={() => void shareGpx()} />
+        ) : null}
+        <Pressable style={s.delete} onPress={remove}>
+          <Text style={s.deleteT}>Delete session</Text>
+        </Pressable>
+      </Screen>
+      <GameNews />
+    </View>
   );
 }
 

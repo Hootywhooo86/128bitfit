@@ -187,7 +187,15 @@
           ]
         }
       ],
-      "./plugins/with-gym-pass-shortcut"
+      "./plugins/with-gym-pass-shortcut",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

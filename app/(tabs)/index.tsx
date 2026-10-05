@@ -2,6 +2,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { DetectedWorkouts } from '@/components/DetectedWorkouts';
+import { GameNews } from '@/components/game/GameNews';
 import { MuscleLoadCard } from '@/components/MuscleLoadCard';
 import { ReadinessCard } from '@/components/ReadinessCard';
 import { StepsCard } from '@/components/StepsCard';
@@ -9,6 +10,7 @@ import { WeeklyRecapCard } from '@/components/WeeklyRecapCard';
 import { WeightCard } from '@/components/WeightCard';
 import { Bar, Card, CardHead, Label, MenuRow, Screen, SessionCard, Stat3 } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
+import type { GameView } from '@/db/game-queries';
 import { addWater, getDayFuelSummary } from '@/db/food-queries';
 import { countRecentSets, getMuscleTally, periodFor } from '@/db/muscle-queries';
 import { getCardioSettings } from '@/db/map-settings';
@@ -30,6 +32,7 @@ import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
 import type { WeightUnit } from '@/db/settings-queries';
 import type { DistanceUnit } from '@/lib/cardio';
 import type { WeeklyRecap } from '@/lib/weekly-recap';
+import { cosmetic } from '@/lib/game/cosmetics';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 
 /**
@@ -58,6 +61,7 @@ export default function HomeScreen() {
   const [inProgress, setInProgress] = useState(false);
   const [sessionCount, setSessionCount] = useState(0);
   const [latestWeight, setLatestWeight] = useState<WeightEntry | null>(null);
+  const [game, setGame] = useState<GameView | null>(null);
   const [units, setUnits] = useState<WeightUnit>('lb');
   const [tally, setTally] = useState<MuscleTally>(emptyTally());
   const [recentSets, setRecentSets] = useState<number | null>(null);
@@ -156,127 +160,145 @@ export default function HomeScreen() {
 
   const waterPct = waterTarget > 0 ? (waterMl / waterTarget) * 100 : 0;
 
+  const earned = game?.trophies.filter((t) => t.earnedAt).length ?? 0;
+
   return (
-    <Screen section="Home" onRefresh={pullToRefresh} refreshing={refreshing}>
-      <SessionCard
-        title={inProgress ? 'SESSION IN PROGRESS' : 'START TRAINING'}
-        sub={
-          inProgress
-            ? 'Pick up where you left off'
-            : lastWorkout
-              ? `Last: ${lastWorkout.exercises.map((e) => e.name).join(' · ') || 'Workout complete'}`
-              : 'No workouts yet — pick something to run'
-        }
-        action={inProgress ? 'RESUME' : 'START WORKOUT'}
-        onPress={() => router.push('/(tabs)/train')}
-      />
-
-      <View style={s.todayRow}>
-        <Label>TODAY</Label>
-        {/*
-          Pull-to-refresh is the main path, but it is a gesture, and a gesture
-          that does not register leaves no way to ask for fresh numbers. This
-          always works.
-        */}
-        <Pressable onPress={pullToRefresh} hitSlop={10}>
-          <Text style={s.refresh}>{refreshing ? 'REFRESHING' : 'REFRESH'}</Text>
-        </Pressable>
-      </View>
-      <Stat3
-        items={[
-          // A real reading from Health Connect. 0 steps is a reading and shows
-          // as 0; not connected shows a dash, and the card below offers to
-          // connect. These are different facts — see CLAUDE.md.
-          {
-            value: healthState.status === 'ready' && healthState.steps != null
-              ? healthState.steps.toLocaleString()
-              : null,
-            label: 'STEPS',
-          },
-          { value: calories == null ? null : Math.round(calories).toLocaleString(), label: 'KCAL' },
-          { value: activeCalories != null ? Math.round(activeCalories).toLocaleString() : null, label: 'BURNED' },
-        ]}
-      />
-
-      {healthState.status !== 'ready' ? <StepsCard /> : null}
-
-      <ReadinessCard recentSets={recentSets} />
-
-      <Label>WATER</Label>
-      <Card>
-        <CardHead
-          title={`${waterMl} / ${waterTarget} ML`}
-          note={`${Math.round(waterPct)}% · ${Math.round(waterMl / 29.574)} fl oz`}
-        />
-        <Bar pct={waterPct} height={10} />
-        <View style={s.wadd}>
-          {[250, 500, 750].map((ml) => (
-            <Pressable key={ml} style={s.waddBtn} onPress={() => void water(ml)}>
-              <Text style={s.waddT}>+{ml}</Text>
-            </Pressable>
-          ))}
-          <Pressable style={s.waddBtn} onPress={() => void water(-250)}>
-            <Text style={[s.waddT, { color: colors.textDim, fontSize: 16 }]}>−</Text>
-          </Pressable>
-        </View>
-        {drinkMl > 0 ? (
-          <Text style={s.wfoot}>Includes {drinkMl} ml from drinks you logged as food.</Text>
-        ) : null}
-        {unmeasured.length > 0 ? (
-          <Text style={s.wfoot}>
-            Not counted: {unmeasured.slice(0, 3).join(', ')}
-            {unmeasured.length > 3 ? ` and ${unmeasured.length - 3} more` : ''} — logged by weight, not
-            volume. Log drinks in ml or fl oz to count them.
-          </Text>
-        ) : null}
-        <Text style={s.wfoot}>
-          One glass = 250 ml (8 fl oz) · goal {waterTarget} ml (
-          {Math.round(waterTarget / 29.574)} fl oz)
-        </Text>
-      </Card>
-
-      <Label>PROGRESS</Label>
-      <WeightCard
-        local={latestWeight}
-        units={units}
-        onPress={() => router.push('/home/weight')}
-      />
-
-      <Stat3
-        items={[
-          { value: sessionCount > 0 ? String(sessionCount) : null, label: 'WORKOUTS' },
-          { value: null, label: 'WEEK STREAK' },
-          { value: null, label: 'LB THIS WK' },
-        ]}
-      />
-
-      <View style={{ height: 10 }} />
-      <MuscleLoadCard tally={tally} untagged={untagged} />
-
-      {lastWorkout ? (
-        <MenuRow
-          icon="◷"
-          name="Recent sessions"
-          sub={`${lastWorkout.completedSets} sets · ${lastWorkout.exerciseCount} exercises`}
+    <View style={{ flex: 1 }}>
+      <Screen section="Home" onRefresh={pullToRefresh} refreshing={refreshing}>
+        <SessionCard
+          title={inProgress ? 'SESSION IN PROGRESS' : 'START TRAINING'}
+          sub={
+            inProgress
+              ? 'Pick up where you left off'
+              : lastWorkout
+                ? `Last: ${lastWorkout.exercises.map((e) => e.name).join(' · ') || 'Workout complete'}`
+                : 'No workouts yet — pick something to run'
+          }
+          action={inProgress ? 'RESUME' : 'START WORKOUT'}
           onPress={() => router.push('/(tabs)/train')}
         />
-      ) : null}
 
-      <Label>THIS WEEK</Label>
-      <WeeklyRecapCard recap={recap} weightUnit={units} distanceUnit={distanceUnit} />
-      <MenuRow
-        icon="✦"
-        name="Weekly check-in"
-        sub={
-          sessionCount === 0
-            ? 'Log a couple of sessions and the coach will have something to say'
-            : 'Ready when you are'
-        }
-        onPress={() => router.push('/(tabs)/coach')}
-      />
+        {game ? (
+          <MenuRow
+            icon="★"
+            name={`LV ${game.progress.level} · ${cosmetic('title', game.look.title)?.name ?? 'NOVICE'}`}
+            sub={
+              game.progress.xp === 0
+                ? 'Finish a workout to earn your first XP'
+                : `${game.progress.xp.toLocaleString()} XP · ${earned} / ${game.trophies.length} trophies · ${game.quests.filter((q) => q.complete).length} / ${game.quests.length} quests`
+            }
+            onPress={() => router.push('/game')}
+          />
+        ) : null}
 
-      <DetectedWorkouts />
-    </Screen>
+        <View style={s.todayRow}>
+          <Label>TODAY</Label>
+          {/*
+            Pull-to-refresh is the main path, but it is a gesture, and a gesture
+            that does not register leaves no way to ask for fresh numbers. This
+            always works.
+          */}
+          <Pressable onPress={pullToRefresh} hitSlop={10}>
+            <Text style={s.refresh}>{refreshing ? 'REFRESHING' : 'REFRESH'}</Text>
+          </Pressable>
+        </View>
+        <Stat3
+          items={[
+            // A real reading from Health Connect. 0 steps is a reading and shows
+            // as 0; not connected shows a dash, and the card below offers to
+            // connect. These are different facts — see CLAUDE.md.
+            {
+              value: healthState.status === 'ready' && healthState.steps != null
+                ? healthState.steps.toLocaleString()
+                : null,
+              label: 'STEPS',
+            },
+            { value: calories == null ? null : Math.round(calories).toLocaleString(), label: 'KCAL' },
+            { value: activeCalories != null ? Math.round(activeCalories).toLocaleString() : null, label: 'BURNED' },
+          ]}
+        />
+
+        {healthState.status !== 'ready' ? <StepsCard /> : null}
+
+        <ReadinessCard recentSets={recentSets} />
+
+        <Label>WATER</Label>
+        <Card>
+          <CardHead
+            title={`${waterMl} / ${waterTarget} ML`}
+            note={`${Math.round(waterPct)}% · ${Math.round(waterMl / 29.574)} fl oz`}
+          />
+          <Bar pct={waterPct} height={10} />
+          <View style={s.wadd}>
+            {[250, 500, 750].map((ml) => (
+              <Pressable key={ml} style={s.waddBtn} onPress={() => void water(ml)}>
+                <Text style={s.waddT}>+{ml}</Text>
+              </Pressable>
+            ))}
+            <Pressable style={s.waddBtn} onPress={() => void water(-250)}>
+              <Text style={[s.waddT, { color: colors.textDim, fontSize: 16 }]}>−</Text>
+            </Pressable>
+          </View>
+          {drinkMl > 0 ? (
+            <Text style={s.wfoot}>Includes {drinkMl} ml from drinks you logged as food.</Text>
+          ) : null}
+          {unmeasured.length > 0 ? (
+            <Text style={s.wfoot}>
+              Not counted: {unmeasured.slice(0, 3).join(', ')}
+              {unmeasured.length > 3 ? ` and ${unmeasured.length - 3} more` : ''} — logged by weight, not
+              volume. Log drinks in ml or fl oz to count them.
+            </Text>
+          ) : null}
+          <Text style={s.wfoot}>
+            One glass = 250 ml (8 fl oz) · goal {waterTarget} ml (
+            {Math.round(waterTarget / 29.574)} fl oz)
+          </Text>
+        </Card>
+
+        <Label>PROGRESS</Label>
+        <WeightCard
+          local={latestWeight}
+          units={units}
+          onPress={() => router.push('/home/weight')}
+        />
+
+        <Stat3
+          items={[
+            { value: sessionCount > 0 ? String(sessionCount) : null, label: 'WORKOUTS' },
+            { value: null, label: 'WEEK STREAK' },
+            { value: null, label: 'LB THIS WK' },
+          ]}
+        />
+
+        <View style={{ height: 10 }} />
+        <MuscleLoadCard tally={tally} untagged={untagged} />
+
+        {lastWorkout ? (
+          <MenuRow
+            icon="◷"
+            name="Recent sessions"
+            sub={`${lastWorkout.completedSets} sets · ${lastWorkout.exerciseCount} exercises`}
+            onPress={() => router.push('/(tabs)/train')}
+          />
+        ) : null}
+
+        <Label>THIS WEEK</Label>
+        <WeeklyRecapCard recap={recap} weightUnit={units} distanceUnit={distanceUnit} />
+        <MenuRow
+          icon="✦"
+          name="Weekly check-in"
+          sub={
+            sessionCount === 0
+              ? 'Log a couple of sessions and the coach will have something to say'
+              : 'Ready when you are'
+          }
+          onPress={() => router.push('/(tabs)/coach')}
+        />
+
+        <DetectedWorkouts />
+      </Screen>
+      <GameNews onView={setGame} />
+    </View>
   );
 }
 

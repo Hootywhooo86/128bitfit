@@ -34,6 +34,7 @@
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.44.7",
     "expo": "~57.0.24",
+    "expo-audio": "~57.0.5",
     "expo-brightness": "~57.0.2",
     "expo-build-properties": "~57.0.21",
     "expo-camera": "~57.0.5",
