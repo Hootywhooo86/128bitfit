@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { getAiSettings } from '@/db/ai-settings';
 import { Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
@@ -65,7 +65,7 @@ export default function CoachScreen() {
           <Text style={styles.byoTitle}>Bring your own key</Text>
           <Text style={styles.blurb}>
             Anthropic, OpenAI, Gemini, OpenRouter, Groq, Hugging Face, or your own server. Your key
-            stays in this phone's secure storage.
+            stays in this phone&apos;s secure storage.
           </Text>
           <Text style={styles.cta}>Configure in Settings →</Text>
         </Pressable>

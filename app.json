@@ -127,7 +127,6 @@
       ],
       "@maplibre/maplibre-react-native",
       "expo-sharing",
-      "expo-build-properties",
       "./plugins/with-latin-only-mlkit",
       [
         "react-native-android-widget",

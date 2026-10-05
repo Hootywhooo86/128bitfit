@@ -15,6 +15,7 @@ import {
   getProviderMeta,
   visionSupport,
   webSearchUnavailableReason,
+  type ChatMessage,
   type WebSearchOutcome,
 } from './ai-coach';
 import { callWithRotation } from './ai-rotate';
@@ -28,7 +29,6 @@ import {
   systemPrompt,
   type AiFoodResult,
 } from './ai-food';
-import type { ChatMessage } from './ai-coach';
 
 export type AiPhoto = { base64: string; mimeType: string };
 

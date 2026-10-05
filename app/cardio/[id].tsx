@@ -24,7 +24,6 @@ import {
 import { offerBreakdown } from '@/lib/ai-breakdown';
 import { mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import { useCardioEnergy } from '@/lib/health/use-cardio-energy';
-import type { EnergyResult } from '@/lib/workout-energy';
 import { MAP_ROUTE_BLUE, type MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
@@ -55,7 +54,7 @@ export default function CardioSummaryScreen() {
       // Straight after Finish, not when opened from history.
       if (s && fresh === '1') void offerBreakdown(router, { cardioId: s.id });
     })();
-  }, [id]);
+  }, [id, fresh, router]);
 
   const sport = sportById(session?.sport);
   const stats = useMemo(() => cardioStats(fixes, sport, { autoPause, unit }), [fixes, sport, autoPause, unit]);

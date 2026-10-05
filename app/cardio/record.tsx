@@ -50,6 +50,11 @@ const BATTERY_TIP_KEY = 'cardio_battery_tip_shown';
  * SQLite; this screen only reads them back. Leaving it, locking the phone or
  * the app being killed does not stop a recording — coming back picks it up.
  */
+const NO_FIXES: Fix[] = [];
+
+/** A crash here shows a screen with Try again, instead of closing the app. */
+export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
+
 export default function RecordCardioScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -65,9 +70,13 @@ export default function RecordCardioScreen() {
   const [access, setAccess] = useState<LocationAccess | 'checking'>('checking');
   const [here, setHere] = useState<Here | null>(null);
   const [session, setSession] = useState<CardioSession | null>(null);
-  const [fixes, setFixes] = useState<Fix[]>([]);
+  // Fixes belong to one session; held with its id so a different session
+  // starts empty without an effect resetting them after the fact.
+  const [track, setTrack] = useState<{ sessionId: string | null; fixes: Fix[] }>({ sessionId: null, fixes: [] });
+  const fixes = track.sessionId != null && track.sessionId === session?.id ? track.fixes : NO_FIXES;
   const lastId = useRef(0);
-  const [now, setNow] = useState(Date.now());
+  const lastFor = useRef<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const [expanded, setExpanded] = useState(false);
   const [recenter, setRecenter] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -132,17 +141,19 @@ export default function RecordCardioScreen() {
   // Read new fixes from SQLite while the screen is up.
   const pull = useCallback(async () => {
     if (!session) return;
-    const fresh = await getCardioFixes(session.id, lastId.current);
+    const id = session.id;
+    if (lastFor.current !== id) {
+      lastFor.current = id;
+      lastId.current = 0;
+    }
+    const fresh = await getCardioFixes(id, lastId.current);
     if (fresh.length > 0) {
       lastId.current = fresh[fresh.length - 1].id;
-      setFixes((prev) => [...prev, ...fresh]);
+      setTrack((prev) =>
+        prev.sessionId === id ? { sessionId: id, fixes: [...prev.fixes, ...fresh] } : { sessionId: id, fixes: fresh }
+      );
     }
   }, [session]);
-
-  useEffect(() => {
-    lastId.current = 0;
-    setFixes([]);
-  }, [session?.id]);
 
   useEffect(() => {
     if (!session) return;

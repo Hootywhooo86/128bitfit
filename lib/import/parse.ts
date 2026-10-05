@@ -99,7 +99,6 @@ export type ImportReport = {
 
 export type ImportResult = ImportReport | { error: string };
 
-/* eslint-disable-next-line import/first */
 
 /** RFC4180-ish: quoted fields, doubled quotes, embedded newlines and commas. */
 export function parseCsv(text: string): string[][] {

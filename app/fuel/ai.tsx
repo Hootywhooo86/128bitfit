@@ -24,7 +24,7 @@ import { defaultMealTypeForHour } from '@/lib/nutrition';
 import { MealSlot } from '@/components/MealSlot';
 import { mealTimestamp, type MealDay } from '@/lib/meal-time';
 import { parseDayKey } from '@/lib/fuel-day';
-import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
+import { colors, fonts, radius, themedStyles } from '@/lib/theme';
 
 /**
  * Log a meal by describing it, or by photographing it.

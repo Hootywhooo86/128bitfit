@@ -29,7 +29,6 @@ import { explainFloor } from '@/lib/calorie-floor';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 
 const STEPS = ['Basics', 'Goals', 'Done'] as const;
-type Step = (typeof STEPS)[number];
 
 const SEX_OPTIONS: { id: SexOption; label: string }[] = [
   { id: 'female', label: 'Female' },

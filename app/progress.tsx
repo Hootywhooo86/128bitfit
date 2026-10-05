@@ -1,8 +1,7 @@
-import { Stack } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/components/ui';
-import { useFocusEffect } from 'expo-router';
+import { Stack, useFocusEffect } from 'expo-router';
 import { MuscleMap } from '@/components/MuscleMap';
 import { useDb } from '@/db/DatabaseProvider';
 import { getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';

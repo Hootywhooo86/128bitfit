@@ -32,9 +32,14 @@ export function useNow(on: boolean): number {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     if (!on) return;
-    setNow(Date.now());
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const tick = () => setNow(Date.now());
+    // Catch up at once on turning on, then every second.
+    const first = setTimeout(tick, 0);
+    const t = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(first);
+      clearInterval(t);
+    };
   }, [on]);
   return now;
 }

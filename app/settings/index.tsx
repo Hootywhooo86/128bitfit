@@ -1,22 +1,14 @@
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Pressable,
-  ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import {
-  AI_PROVIDERS,
-  getAiSettings,
-  updateAiSettings,
-  type AiSettings,
-} from '@/db/ai-settings';
+import { getAiSettings, updateAiSettings, type AiSettings } from '@/db/ai-settings';
 import { useDb } from '@/db/DatabaseProvider';
 import {
   getAppSettings,
@@ -26,43 +18,30 @@ import {
   type AppSettings,
   type WeightUnit,
 } from '@/db/settings-queries';
-import {
-  getProviderMeta,
-  providerCanSearchWeb,
-  webSearchUnavailableReason,
-  type AiProviderId,
-} from '@/lib/ai-coach';
 import { explainFloor } from '@/lib/calorie-floor';
-import { HF_VISION_FAMILIES } from '@/lib/ai-fallback';
 import { AiKeyStoreError } from '@/lib/ai-secure';
 import {
   ACTIVITY_LEVELS,
   DEFAULT_ACTIVITY,
   DEFAULT_GOAL,
   GOALS,
-  basalMetabolicRate,
-  suggestCalorieTarget,
-  totalDailyEnergy,
   type ActivityLevel,
   type CalorieProfile,
   type Goal,
 } from '@/lib/body';
 import { baseUrlProblem } from '@/lib/api-key';
-import { colors, spacing, themedStyles } from '@/lib/theme';
-import { HfModelPicker } from '@/components/HfModelPicker';
+import { colors } from '@/lib/theme';
 import { Screen } from '@/components/ui';
-import { accentName } from '@/lib/accent';
 import { UpdateCard } from '@/components/UpdateCard';
 import { ToggleRow } from '@/components/ToggleRow';
 import { breakdownPromptOn, setBreakdownPrompt } from '@/lib/ai-breakdown';
-import { REPDB } from 'repdb-generated';
-import { REPDB_CREDIT, REPDB_URL } from '@/lib/exercise-images';
-import { HEALTH_APP } from '@/lib/health/platform';
-
-const KOFI_URL = 'https://ko-fi.com/128bit';
+import { AboutSection } from '@/components/settings/AboutSection';
+import { AiCoachCard, type AiDraft } from '@/components/settings/AiCoachCard';
+import { MaintenanceNote } from '@/components/settings/MaintenanceNote';
+import { SettingsLinks } from '@/components/settings/SettingsLinks';
+import { settingsStyles as styles } from '@/components/settings/settings-styles';
 
 export default function SettingsScreen() {
-  const router = useRouter();
   const { ready } = useDb();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,16 +60,16 @@ export default function SettingsScreen() {
   const [goal, setGoal] = useState<Goal>(DEFAULT_GOAL);
   const [profile, setProfile] = useState<CalorieProfile | null>(null);
 
-  const [aiProvider, setAiProvider] = useState<AiProviderId>('anthropic');
-  const [aiModel, setAiModel] = useState('');
-  /** null = typed by hand, so nothing is known about its image support. */
-  const [aiModelVision, setAiModelVision] = useState<boolean | null>(null);
-  const [aiBaseUrl, setAiBaseUrl] = useState('');
-  const [aiKeyDraft, setAiKeyDraft] = useState('');
+  const [ai, setAi] = useState<AiDraft>({
+    provider: 'anthropic',
+    model: '',
+    modelVision: null,
+    baseUrl: '',
+    keyDraft: '',
+    webSearch: true,
+  });
   const [aiHasKey, setAiHasKey] = useState(false);
-  const [aiWebSearch, setAiWebSearch] = useState(true);
   const [clearKeyConfirm, setClearKeyConfirm] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   const applyApp = (s: AppSettings) => {
     setDisplayName(s.displayName);
@@ -104,13 +83,15 @@ export default function SettingsScreen() {
   };
 
   const applyAi = (s: AiSettings) => {
-    setAiProvider(s.provider);
-    setAiModelVision(s.modelVision);
-    setAiModel(s.model);
-    setAiBaseUrl(s.baseUrl);
+    setAi({
+      provider: s.provider,
+      model: s.model,
+      modelVision: s.modelVision,
+      baseUrl: s.baseUrl,
+      keyDraft: '',
+      webSearch: s.webSearch,
+    });
     setAiHasKey(s.hasKey);
-    setAiWebSearch(s.webSearch);
-    setAiKeyDraft('');
     setClearKeyConfirm(false);
   };
 
@@ -137,22 +118,11 @@ export default function SettingsScreen() {
     }, [refresh])
   );
 
-  const onSelectProvider = (id: AiProviderId) => {
-    setAiProvider(id);
-    const meta = getProviderMeta(id);
-    setAiModel(meta.defaultModel);
-    // A different provider's default model. What the old one could see says
-    // nothing about this one, so forget it rather than carry it over.
-    setAiModelVision(null);
-    if (meta.defaultBaseUrl) setAiBaseUrl(meta.defaultBaseUrl);
-    else if (!meta.needsBaseUrl) setAiBaseUrl('');
-  };
-
   const onSave = async () => {
     if (saving) return;
     // Before anything is written: an address that can never connect should
     // be caught here, not on the first question to the coach.
-    const urlProblem = baseUrlProblem(aiBaseUrl);
+    const urlProblem = baseUrlProblem(ai.baseUrl);
     if (urlProblem) {
       Alert.alert('Base URL not saved', urlProblem);
       return;
@@ -179,14 +149,14 @@ export default function SettingsScreen() {
       }
 
       const aiPatch: Parameters<typeof updateAiSettings>[0] = {
-        provider: aiProvider,
-        model: aiModel,
-        baseUrl: aiBaseUrl,
-        modelVision: aiModelVision,
-        webSearch: aiWebSearch,
+        provider: ai.provider,
+        model: ai.model,
+        baseUrl: ai.baseUrl,
+        modelVision: ai.modelVision,
+        webSearch: ai.webSearch,
       };
-      if (aiKeyDraft.trim()) {
-        aiPatch.apiKey = aiKeyDraft;
+      if (ai.keyDraft.trim()) {
+        aiPatch.apiKey = ai.keyDraft;
       }
       let keyWarning: string | null = null;
       try {
@@ -238,57 +208,14 @@ export default function SettingsScreen() {
     );
   }
 
-  const providerMeta = getProviderMeta(aiProvider);
-
   return (
     <Screen section="Settings" back>
       <Text style={styles.muted}>
-        Everything here stays on this phone. An AI key is kept in the phone's secure
+        Everything here stays on this phone. An AI key is kept in the phone&apos;s secure
         storage and only ever sent to the AI provider you pick.
       </Text>
 
-      <Pressable style={styles.charCard} onPress={() => router.push('/settings/privacy')}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aiTitle}>Privacy & health data</Text>
-          <Text style={styles.muted}>What is stored, what leaves the device →</Text>
-        </View>
-      </Pressable>
-
-      <Pressable style={styles.charCard} onPress={() => router.push('/settings/theme')}>
-        <View style={[styles.themeDot, { backgroundColor: colors.accent }]} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aiTitle}>Theme colour</Text>
-          <Text style={styles.muted}>{accentName(colors.accent)} · free, all of them →</Text>
-        </View>
-      </Pressable>
-
-      <Pressable style={styles.charCard} onPress={() => router.push('/settings/map')}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aiTitle}>Map</Text>
-          <Text style={styles.muted}>Dark or light, km or miles, route colours →</Text>
-        </View>
-      </Pressable>
-
-      <Pressable style={styles.charCard} onPress={() => router.push('/settings/health')}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aiTitle}>{HEALTH_APP}</Text>
-          <Text style={styles.muted}>Check what it is actually reporting →</Text>
-        </View>
-      </Pressable>
-
-      <Pressable style={styles.charCard} onPress={() => router.push('/settings/import')}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aiTitle}>Import exercises</Text>
-          <Text style={styles.muted}>From Hevy, a CSV, or a JSON export →</Text>
-        </View>
-      </Pressable>
-
-      <Pressable style={styles.charCard} onPress={() => router.push('/settings/export')}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aiTitle}>Export data</Text>
-          <Text style={styles.muted}>Download everything as CSV and JSON →</Text>
-        </View>
-      </Pressable>
+      <SettingsLinks />
 
       <Text style={styles.label}>Display name</Text>
       <TextInput
@@ -405,134 +332,13 @@ export default function SettingsScreen() {
         }}
       />
 
-      <View style={styles.aiCard}>
-        <Text style={styles.aiTitle}>AI Coach — Bring your own key</Text>
-        <Text style={styles.muted}>
-          128BIT FIT does not sell AI subscriptions. Paste a key from Anthropic, OpenAI, Gemini,
-          OpenRouter, Groq, or point at a custom OpenAI-compatible endpoint (e.g. Ollama). Your key stays
-          on this device.
-        </Text>
-
-        <Text style={styles.label}>Provider</Text>
-        <View style={styles.providerWrap}>
-          {AI_PROVIDERS.map((p) => (
-            <Pressable
-              key={p.id}
-              style={[styles.providerChip, aiProvider === p.id && styles.providerChipOn]}
-              onPress={() => onSelectProvider(p.id)}
-            >
-              <Text
-                style={[styles.providerText, aiProvider === p.id && styles.providerTextOn]}
-              >
-                {p.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        <Text style={styles.hint}>{providerMeta.hint}</Text>
-
-        <Pressable
-          style={[styles.toggleRow, { marginTop: spacing.md }]}
-          onPress={() => setAiWebSearch((v) => !v)}
-          accessibilityRole="switch"
-          accessibilityState={{ checked: aiWebSearch }}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>Look things up online</Text>
-            <Text style={[styles.muted, { marginBottom: 0 }]}>
-              {providerCanSearchWeb(aiProvider, aiModel || providerMeta.defaultModel)
-                ? `Lets the coach, meal photos and recipe links search the web for real figures instead of guessing. Describing a meal has its own Estimate and Look up online buttons either way. Searches can cost extra on your key.`
-                : webSearchUnavailableReason(aiProvider, aiModel || providerMeta.defaultModel)}
-            </Text>
-          </View>
-          <View style={[styles.switch, aiWebSearch && styles.switchOn]}>
-            <View style={[styles.knob, aiWebSearch && styles.knobOn]} />
-          </View>
-        </Pressable>
-
-        <Text style={styles.label}>Model</Text>
-        <TextInput
-          style={styles.input}
-          value={aiModel}
-          onChangeText={setAiModel}
-          placeholder={providerMeta.defaultModel}
-          placeholderTextColor={colors.textMuted}
-          autoCapitalize="none"
-          autoCorrect={false}
-        />
-        {aiProvider === 'huggingface' ? (
-          <>
-            <Pressable style={styles.browseBtn} onPress={() => setPickerOpen(true)}>
-              <Text style={styles.browseText}>Browse models →</Text>
-            </Pressable>
-            <Text style={styles.muted}>
-              Photos rotate automatically when a model runs out of credit or its provider is
-              busy: {HF_VISION_FAMILIES.map((f) => f.label).join(' → ')}. Your token works for
-              all of them, so nothing else is needed. A key that is rejected stops there rather
-              than retrying five times.
-            </Text>
-          </>
-        ) : null}
-        <HfModelPicker
-          visible={pickerOpen}
-          apiKey={aiKeyDraft.trim() || null}
-          onPick={(m) => {
-            setAiModel(m.id);
-            // Recorded now, while the router's answer is in hand — a photo gets
-            // taken where there may be no signal to ask again.
-            setAiModelVision(m.vision);
-            setPickerOpen(false);
-          }}
-          onClose={() => setPickerOpen(false)}
-        />
-
-        {(providerMeta.needsBaseUrl ||
-          aiProvider === 'openai' ||
-          aiProvider === 'openrouter' ||
-          aiProvider === 'custom') && (
-          <>
-            <Text style={styles.label}>
-              Base URL{providerMeta.needsBaseUrl ? ' (required)' : ' (optional override)'}
-            </Text>
-            <TextInput
-              style={styles.input}
-              value={aiBaseUrl}
-              onChangeText={setAiBaseUrl}
-              placeholder={providerMeta.defaultBaseUrl ?? 'https://…'}
-              placeholderTextColor={colors.textMuted}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-          </>
-        )}
-
-        <Text style={styles.label}>API key</Text>
-        <TextInput
-          style={styles.input}
-          value={aiKeyDraft}
-          onChangeText={setAiKeyDraft}
-          placeholder={aiHasKey ? '••••••••  (leave blank to keep)' : 'Paste key — never shared'}
-          placeholderTextColor={colors.textMuted}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
-          textContentType="password"
-        />
-        <Text style={styles.hint}>
-          Status: {aiHasKey ? 'Key saved on device' : 'No key yet — the coach needs one to answer'}
-        </Text>
-
-        {aiHasKey ? (
-          <Pressable
-            style={[styles.clearKey, clearKeyConfirm && styles.clearKeyConfirm]}
-            onPress={() => void onClearKey()}
-          >
-            <Text style={styles.clearKeyText}>
-              {clearKeyConfirm ? 'Tap again to clear key' : 'Clear saved API key'}
-            </Text>
-          </Pressable>
-        ) : null}
-      </View>
+      <AiCoachCard
+        draft={ai}
+        onChange={(patch) => setAi((prev) => ({ ...prev, ...patch }))}
+        hasKey={aiHasKey}
+        clearKeyConfirm={clearKeyConfirm}
+        onClearKey={() => void onClearKey()}
+      />
 
       <Pressable style={[styles.save, saving && { opacity: 0.6 }]} onPress={() => void onSave()}>
         <Text style={styles.saveText}>{saving ? 'Saving…' : savedFlash ? 'Saved' : 'Save'}</Text>
@@ -540,242 +346,7 @@ export default function SettingsScreen() {
 
       <UpdateCard />
 
-      {/* A tip jar, nothing more: every feature stays free whether or not anyone uses it. */}
-      <Pressable
-        style={[styles.charCard, { marginTop: spacing.lg }]}
-        onPress={() =>
-          void Linking.openURL(KOFI_URL).catch(() =>
-            Alert.alert('Could not open the browser', `The page is ${KOFI_URL}`)
-          )
-        }
-        accessibilityRole="link"
-        accessibilityLabel="Buy me a Ko-fi"
-      >
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aiTitle}>Buy me a Ko-fi ☕</Text>
-          <Text style={styles.muted}>Like the app? A tip helps keep it going. Optional — everything here stays free →</Text>
-        </View>
-      </Pressable>
-
-      <View style={styles.aiCard}>
-        <Text style={styles.aiTitle}>About / data licenses</Text>
-        <Text style={styles.muted}>
-          USDA FoodData Central powers the offline food database. Barcode products may also come
-          from Open Food Facts and are available under the Open Database License (ODbL). Cached
-          barcode results are stored on this phone only.
-        </Text>
-        <Text style={styles.muted}>
-          Exercises: free-exercise-db (public domain).
-          {REPDB.exercises.length > 0 ? ` ${REPDB.exercises.length} more, with pictures:` : ''}
-        </Text>
-        {REPDB.exercises.length > 0 ? (
-          <Pressable onPress={() => void Linking.openURL(REPDB_URL)}>
-            <Text style={[styles.muted, { textDecorationLine: 'underline' }]}>{REPDB_CREDIT}</Text>
-          </Pressable>
-        ) : null}
-      </View>
+      <AboutSection />
     </Screen>
   );
 }
-
-/**
- * What these two choices actually do to the numbers.
- *
- * Shown live, because "×1.55" means nothing on its own and the point of the
- * setting is the calorie figure at the end of it. Renders nothing when the
- * profile is too incomplete to compute one — a maintenance figure invented
- * from a missing height and age would be exactly the made-up measurement the
- * app exists to avoid.
- */
-function MaintenanceNote({
-  profile,
-  activity,
-  goal,
-}: {
-  profile: CalorieProfile | null;
-  activity: ActivityLevel;
-  goal: Goal;
-}) {
-  if (!profile) return null;
-  const withActivity = { ...profile, activity };
-  const bmr = basalMetabolicRate(withActivity);
-  const tdee = totalDailyEnergy(withActivity);
-  if (bmr == null || tdee == null) {
-    return (
-      <Text style={styles.muted}>
-        Add your height, birthday and a weigh-in and this will show what you burn in a day.
-      </Text>
-    );
-  }
-  const target = suggestCalorieTarget(withActivity, goal);
-  return (
-    <View style={styles.calcCard}>
-      <Text style={styles.calcRow}>
-        Resting burn <Text style={styles.calcNum}>{Math.round(bmr).toLocaleString()}</Text> kcal
-      </Text>
-      <Text style={styles.calcRow}>
-        Maintenance <Text style={styles.calcNum}>{Math.round(tdee).toLocaleString()}</Text> kcal
-      </Text>
-      <Text style={styles.calcRow}>
-        Suggested target <Text style={styles.calcNum}>{target.toLocaleString()}</Text> kcal
-      </Text>
-      <Text style={styles.optDetail}>
-        An estimate from height, weight, age and how active you say you are — not a
-        measurement. Set the target field above to this if you want it. Whatever you enter,
-        it is never allowed below your resting burn.
-      </Text>
-    </View>
-  );
-}
-
-const styles = themedStyles(() => StyleSheet.create({
-  themeDot: { width: 22, height: 22, borderRadius: 11 },
-  browseBtn: { paddingVertical: 10 },
-  browseText: { color: colors.accent, fontSize: 13, fontWeight: '700' },
-  container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
-  center: {
-    flex: 1,
-    backgroundColor: colors.bg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  muted: { color: colors.textMuted, lineHeight: 20, marginBottom: spacing.md },
-  label: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-    marginTop: spacing.sm,
-  },
-  input: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    color: colors.text,
-    fontSize: 16,
-  },
-  unitRow: { flexDirection: 'row', gap: spacing.sm },
-  unitChip: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-  },
-  unitChipOn: { borderColor: colors.accent, backgroundColor: colors.track },
-  optRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
-    marginBottom: 6,
-  },
-  optRowOn: { borderColor: colors.accent, backgroundColor: colors.track },
-  optName: { color: colors.text, fontWeight: '700', fontSize: 14 },
-  optDetail: { color: colors.textMuted, fontSize: 11.5, lineHeight: 16, marginTop: 2 },
-  optFactor: { color: colors.textMuted, fontSize: 12.5, fontWeight: '700' },
-  calcCard: {
-    backgroundColor: colors.surfaceAlt,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-    gap: 4,
-  },
-  calcRow: { color: colors.textMuted, fontSize: 13 },
-  calcNum: { color: colors.text, fontWeight: '800', fontSize: 15 },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    padding: spacing.md,
-  },
-  toggleTitle: { color: colors.text, fontWeight: '700', fontSize: 14, marginBottom: 3 },
-  switch: {
-    width: 46,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.track,
-    borderWidth: 1,
-    borderColor: colors.border,
-    justifyContent: 'center',
-    padding: 2,
-  },
-  switchOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  knob: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: colors.textMuted,
-  },
-  knobOn: { backgroundColor: colors.onAccent, alignSelf: 'flex-end' },
-  unitText: { color: colors.textMuted, fontWeight: '800' },
-  unitTextOn: { color: colors.accent },
-  save: {
-    marginTop: spacing.lg,
-    backgroundColor: colors.accent,
-    paddingVertical: 14,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  saveText: { color: colors.chipActiveText, fontWeight: '900', fontSize: 16 },
-  aiCard: {
-    marginTop: spacing.lg,
-    padding: spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  aiTitle: { color: colors.text, fontWeight: '800', marginBottom: 6, fontSize: 16 },
-  charCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    marginBottom: spacing.md,
-  },
-  providerWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  providerChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
-  },
-  providerChipOn: { borderColor: colors.accent, backgroundColor: colors.track },
-  providerText: { color: colors.textMuted, fontWeight: '700', fontSize: 12 },
-  providerTextOn: { color: colors.accent },
-  hint: { color: colors.textMuted, fontSize: 12, marginTop: 8, lineHeight: 16 },
-  clearKey: {
-    marginTop: spacing.md,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-  },
-  clearKeyConfirm: { borderColor: colors.danger },
-  clearKeyText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
-}));

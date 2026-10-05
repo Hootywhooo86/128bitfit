@@ -66,6 +66,7 @@ export function HealthSyncCard() {
   }, []);
 
   React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data when the screen opens; the state it sets is the result of that read
     void refresh().catch(() => setStatus({ kind: 'unavailable' }));
     return subscribeMirror(setFailure);
   }, [refresh]);

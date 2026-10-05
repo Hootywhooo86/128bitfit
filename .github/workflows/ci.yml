@@ -15,9 +15,9 @@ jobs:
     name: typecheck
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # verify-import needs node:sqlite (Node 22+); pinned here too so both
           # jobs type-check and run against the same runtime.
@@ -27,6 +27,23 @@ jobs:
       - run: npm ci
 
       - run: npm run typecheck
+
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Warnings fail the run too: an unused import or a missed hook
+      # dependency is cheapest to fix in the PR that adds it.
+      - run: npm run lint -- --max-warnings 0
 
   test:
     name: test (${{ matrix.tz }})
@@ -39,9 +56,9 @@ jobs:
       matrix:
         tz: [UTC, America/Los_Angeles, Pacific/Kiritimati, Asia/Kathmandu]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -56,9 +73,9 @@ jobs:
     name: verify:import
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           # node:sqlite does not exist before Node 22, so this job cannot run on
           # the >=18 that package.json engines allows.

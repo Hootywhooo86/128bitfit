@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm';
+import { desc } from 'drizzle-orm';
 import {
   ACTIVITY_LEVELS,
   DEFAULT_ACTIVITY,
@@ -13,7 +13,8 @@ import {
 } from '@/lib/body';
 import { clampCalorieTarget, type ClampedTarget } from '@/lib/calorie-floor';
 import { db } from './client';
-import { settings, weightEntries } from './schema';
+import { getSetting, setSetting } from './settings-store';
+import { weightEntries } from './schema';
 import {
   DEFAULT_GOALS,
   ensureDefaultGoals,
@@ -21,6 +22,8 @@ import {
   type DailyGoals,
 } from './food-queries';
 import { widgetsChanged } from '@/lib/widget-refresh';
+
+export { getSetting, setSetting };
 
 export type WeightUnit = 'kg' | 'lb';
 
@@ -58,18 +61,6 @@ const parseActivity = (raw: string | null): ActivityLevel =>
   ACTIVITY_LEVELS.some((l) => l.id === raw) ? (raw as ActivityLevel) : DEFAULT_ACTIVITY;
 const parseGoal = (raw: string | null): Goal =>
   GOALS.some((g) => g.id === raw) ? (raw as Goal) : DEFAULT_GOAL;
-
-export async function getSetting(key: string): Promise<string | null> {
-  const rows = await db.select().from(settings).where(eq(settings.key, key)).limit(1);
-  return rows[0]?.value ?? null;
-}
-
-export async function setSetting(key: string, value: string): Promise<void> {
-  await db
-    .insert(settings)
-    .values({ key, value })
-    .onConflictDoUpdate({ target: settings.key, set: { value } });
-}
 
 function parseIntSetting(raw: string | null, fallback: number): number {
   if (raw == null) return fallback;

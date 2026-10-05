@@ -5,7 +5,6 @@ import {
   Image,
   Linking,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,

@@ -19,7 +19,7 @@
  * - Skip foods with no usable energy; report skip counts.
  */
 
-import { mkdir, writeFile, access, constants } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";

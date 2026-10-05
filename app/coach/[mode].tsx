@@ -173,6 +173,7 @@ export default function CoachSessionScreen() {
   useEffect(() => {
     if (auto !== '1' || autoRan.current || !ctx || asking || turns.length > 0) return;
     autoRan.current = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the one automatic ask, once its context has loaded; it has to run after that load
     if (consumeAutoAsk()) void onAsk();
   }, [auto, ctx, asking, turns.length, onAsk]);
 

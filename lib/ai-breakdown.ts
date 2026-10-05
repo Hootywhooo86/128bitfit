@@ -7,10 +7,10 @@
  */
 import { Alert } from 'react-native';
 import type { useRouter } from 'expo-router';
-
-type Router = ReturnType<typeof useRouter>;
 import { getAiRuntimeConfig } from '@/db/ai-settings';
 import { getSetting, setSetting } from '@/db/settings-queries';
+
+type Router = ReturnType<typeof useRouter>;
 
 const KEY = 'ai_breakdown_prompt';
 

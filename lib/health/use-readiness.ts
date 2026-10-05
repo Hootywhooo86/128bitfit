@@ -65,6 +65,7 @@ export function useReadiness(recentSets: number | null) {
 
   useEffect(() => {
     let alive = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data when the screen opens; the state it sets is the result of that read
     refresh().catch(() => {
       // A failed read is not a score of zero.
       if (alive) setState({ status: 'denied', missing: ['sleep'] });

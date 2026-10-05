@@ -14,7 +14,7 @@ import { countRecentSets, getMuscleTally, periodFor } from '@/db/muscle-queries'
 import { getCardioSettings } from '@/db/map-settings';
 import { getWeeklyRecap } from '@/db/recap-queries';
 import { getAppSettings } from '@/db/settings-queries';
-import { getLatestWeightEntry, weightInKg } from '@/db/weight-queries';
+import { getLatestWeightEntry } from '@/db/weight-queries';
 import type { WeightEntry } from '@/db/schema';
 import {
   countCompletedSessions,
@@ -26,7 +26,6 @@ import {
 import { useTodaySteps, useTodayCalories } from '@/lib/health/use-health';
 import { broadcastHealthRefresh } from '@/lib/health/use-health-refresh';
 import { withMinimumDuration } from '@/lib/min-duration';
-import { formatKg } from '@/lib/weight-source';
 import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
 import type { WeightUnit } from '@/db/settings-queries';
 import type { DistanceUnit } from '@/lib/cardio';

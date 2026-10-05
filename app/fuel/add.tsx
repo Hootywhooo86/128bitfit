@@ -5,7 +5,6 @@ import {
   Alert,
   FlatList,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -28,11 +27,9 @@ import {
   formatGrams,
   formatKcal,
   formatOptionalGrams,
-  formatOptionalKcal,
   isCaloriesMissing,
   nutrientsForServings,
   nutrientsPerServing,
-  parseNutrients,
   scaleLoggedPortion,
 } from '@/lib/nutrition';
 import { OFF_LICENSE_NOTE } from '@/lib/open-food-facts';
@@ -41,6 +38,9 @@ import { Screen } from '@/components/ui';
 import { NumberBox } from '@/components/NumberBox';
 
 type RecentItem = RecentFood;
+
+/** A crash here shows a screen with Try again, instead of closing the app. */
+export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
 
 export default function AddFoodScreen() {
   const router = useRouter();

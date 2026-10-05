@@ -15,6 +15,9 @@ import { RestTimerProvider } from '@/lib/rest-timer';
 import { colors, fonts } from '@/lib/theme';
 
 
+/** A crash here shows a screen with Try again, instead of closing the app. */
+export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
+
 export default function RootLayout() {
   // Silkscreen is the pixel face for labels and headers; Inter is body text.
   // Holding the first frame until they load avoids a flash of the system font

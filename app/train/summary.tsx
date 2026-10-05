@@ -52,7 +52,7 @@ export default function WorkoutSummaryScreen() {
       // the session is already saved either way.
       setPrs(await personalRecordsIn(sid).catch(() => []));
     })();
-  }, [id]);
+  }, [id, fresh, router]);
 
   const repeat = async () => {
     if (!summary) return;

@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import {
@@ -18,7 +17,7 @@ import {
   updateFoodLog,
 } from '@/db/food-queries';
 import { MEAL_TYPES, type Food, type FoodLog, type MealType } from '@/db/schema';
-import { formatGrams, formatKcal, formatOptionalGrams, nutrientsForServings, nutrientsPerServing } from '@/lib/nutrition';
+import { formatKcal, formatOptionalGrams, nutrientsForServings, nutrientsPerServing } from '@/lib/nutrition';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 
 const MEAL_LABELS: Record<MealType, string> = {
@@ -59,6 +58,7 @@ export default function EditFoodLogScreen() {
   }, [logId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- loads data when the screen opens; the state it sets is the result of that read
     void load();
   }, [load]);
 

@@ -59,7 +59,6 @@ export function describeKeyProblem(key: string | null | undefined): string | nul
   if (/[\s\u0000-\u001f\u007f]/.test(key)) {
     return 'The saved key contains a space or a line break. Paste it again — select only the key itself.';
   }
-  // eslint-disable-next-line no-control-regex
   if (!/^[\x21-\x7e]+$/.test(key)) {
     return 'The saved key contains characters that cannot be sent in a request header. Paste it again.';
   }

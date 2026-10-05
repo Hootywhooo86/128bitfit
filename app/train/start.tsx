@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
 import { Label, MenuRow, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { listStartableRoutines, type StartableRoutine } from '@/db/start-queries';

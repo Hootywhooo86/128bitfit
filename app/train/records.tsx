@@ -5,7 +5,7 @@ import { PixelTrophy } from '@/components/PixelTrophy';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { listPersonalRecords, type ExerciseBest } from '@/db/workout-queries';
-import { colors, fonts, spacing } from '@/lib/theme';
+import { colors, fonts } from '@/lib/theme';
 
 /**
  * Best lifts, from the prototype's `train:prs`.
