@@ -29,8 +29,20 @@ type MainLift = 'bench' | 'squat' | 'deadlift' | 'press';
  */
 const STANDARD: Record<MainLift, number> = { bench: 1.0, squat: 1.25, deadlift: 1.5, press: 0.65 };
 
+/** Names already recognised: a history repeats the same few thousands of times. */
+const liftByName = new Map<string, MainLift | null>();
+
 /** The four barbell lifts STR is judged on, recognised by name. */
 export function mainLift(name: string): MainLift | null {
+  let lift = liftByName.get(name);
+  if (lift === undefined) {
+    lift = matchLift(name);
+    liftByName.set(name, lift);
+  }
+  return lift;
+}
+
+function matchLift(name: string): MainLift | null {
   const n = name.toLowerCase();
   const variant = /dumbbell|kettlebell|machine|smith|cable|band|single|one[- ]arm|one[- ]leg/.test(n);
   if (variant) return null;

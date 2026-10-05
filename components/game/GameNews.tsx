@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { InteractionManager, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   blipOn,
   gameOn,
@@ -37,7 +37,7 @@ export function GameNews({ onView }: { onView?: (view: GameView | null) => void 
   useFocusEffect(
     useCallback(() => {
       let live = true;
-      void (async () => {
+      const check = async () => {
         try {
           if (!(await gameOn())) {
             if (live) onView?.(null);
@@ -54,9 +54,17 @@ export function GameNews({ onView }: { onView?: (view: GameView | null) => void 
         } catch {
           // The game layer never gets in the way of the screen it sits on.
         }
-      })();
+      };
+      // After the screen's own loading and health reads, never ahead of
+      // them: the game is a bonus, the readings are the point.
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      const task = InteractionManager.runAfterInteractions(() => {
+        timer = setTimeout(() => void check(), 1200);
+      });
       return () => {
         live = false;
+        task.cancel();
+        if (timer) clearTimeout(timer);
       };
     }, [onView])
   );

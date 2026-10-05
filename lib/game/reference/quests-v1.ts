@@ -1,6 +1,7 @@
+/** The first quests implementation, kept only as the reference the faster one is tested against. */
 import { dayKey } from '@/lib/fuel-day';
 import { mondayOf } from '@/lib/weekly-recap';
-import type { GameHistory } from './types';
+import type { GameHistory } from '../types';
 
 /**
  * Weekly quests: three small goals, new every Monday.
@@ -29,80 +30,37 @@ function addWeeks(monday: Date, weeks: number): Date {
   return new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + weeks * 7);
 }
 
-/** Everything one Monday-to-Sunday week holds, so a week is read once, not rescanned. */
-type Week = {
-  /** Strength sessions with sets, plus cardio sessions. */
-  workouts: number;
-  cardioMinutes: number;
-  /** Local `YYYY-MM-DD` of each workout, for the protein quest. */
-  trainingDays: Set<string>;
-  /** Primary muscles trained, for the variety quest. */
-  muscles: Set<string>;
-};
-
-type WeekIndex = Map<number, Week>;
-
-function indexWeeks(history: GameHistory): WeekIndex {
-  const weeks: WeekIndex = new Map();
-  const week = (at: Date) => {
-    const key = mondayOf(at).getTime();
-    let w = weeks.get(key);
-    if (!w) {
-      w = { workouts: 0, cardioMinutes: 0, trainingDays: new Set(), muscles: new Set() };
-      weeks.set(key, w);
-    }
-    return w;
-  };
-  for (const s of history.sessions) {
-    const w = week(s.startedAt);
-    for (const set of s.sets) for (const m of set.primary) w.muscles.add(m);
-    if (s.sets.length === 0) continue;
-    w.workouts++;
-    w.trainingDays.add(dayKey(s.startedAt));
-  }
-  for (const c of history.cardio) {
-    const w = week(c.startedAt);
-    w.workouts++;
-    w.cardioMinutes += Math.max(0, c.minutes);
-    w.trainingDays.add(dayKey(c.startedAt));
-  }
-  return weeks;
+function inRange(t: Date, from: Date, to: Date): boolean {
+  return t.getTime() >= from.getTime() && t.getTime() < to.getTime();
 }
 
 /** The quests for the week starting `monday`, and how far along they are. */
 export function questsForWeek(history: GameHistory, monday: Date): Quest[] {
-  return questsFromIndex(history, indexWeeks(history), proteinDays(history), monday);
-}
+  const next = addWeeks(monday, 1);
+  const before = addWeeks(monday, -4);
 
-/** Days whose logged protein reached the target. */
-function proteinDays(history: GameHistory): Set<string> {
-  const target = history.proteinTargetG;
-  if (target == null || target <= 0) return new Set();
-  return new Set(history.foodDays.filter((d) => d.proteinG != null && d.proteinG >= target).map((d) => d.day));
-}
-
-function questsFromIndex(history: GameHistory, weeks: WeekIndex, protein: Set<string>, monday: Date): Quest[] {
-  let priorWorkouts = 0;
-  let priorCardio = 0;
-  for (let k = 1; k <= 4; k++) {
-    const w = weeks.get(addWeeks(monday, -k).getTime());
-    if (!w) continue;
-    priorWorkouts += w.workouts;
-    priorCardio += w.cardioMinutes;
-  }
-  const now = weeks.get(monday.getTime());
+  const workouts = [...history.sessions.filter((s) => s.sets.length > 0), ...history.cardio];
+  const priorWorkouts = workouts.filter((w) => inRange(w.startedAt, before, monday)).length;
+  const priorCardio = history.cardio
+    .filter((c) => inRange(c.startedAt, before, monday))
+    .reduce((a, c) => a + Math.max(0, c.minutes), 0);
 
   const trainTarget = Math.max(2, Math.min(5, Math.round(priorWorkouts / 4)));
   const moveTarget =
     priorCardio > 0 ? Math.max(30, Math.min(180, Math.round(priorCardio / 4 / 10) * 10)) : 30;
 
+  const thisWeek = workouts.filter((w) => inRange(w.startedAt, monday, next));
+  const cardioMinutes = history.cardio
+    .filter((c) => inRange(c.startedAt, monday, next))
+    .reduce((a, c) => a + Math.max(0, c.minutes), 0);
+
   const quests: Quest[] = [
-    make('train', `Finish ${trainTarget} workouts`, trainTarget, now?.workouts ?? 0),
+    make('train', `Finish ${trainTarget} workouts`, trainTarget, thisWeek.length),
     make(
       'move',
       priorCardio > 0 ? `Do ${moveTarget} minutes of cardio` : 'Try 30 minutes of cardio',
       moveTarget,
-      Math.floor(now?.cardioMinutes ?? 0)
+      Math.floor(cardioMinutes)
     ),
   ];
 
@@ -110,11 +68,18 @@ function questsFromIndex(history: GameHistory, weeks: WeekIndex, protein: Set<st
   const odd = Math.floor(monday.getTime() / WEEK) % 2 === 1;
   const target = history.proteinTargetG;
   if (odd && target != null && target > 0) {
-    let hit = 0;
-    for (const day of now?.trainingDays ?? []) if (protein.has(day)) hit++;
+    const trainingDays = new Set(thisWeek.map((w) => dayKey(w.startedAt)));
+    const hit = history.foodDays.filter(
+      (d) => trainingDays.has(d.day) && d.proteinG != null && d.proteinG >= target
+    ).length;
     quests.push(make('protein', 'Reach your protein target on 2 training days', 2, hit));
   } else {
-    quests.push(make('variety', 'Train 6 different muscles', 6, now?.muscles.size ?? 0));
+    const muscles = new Set<string>();
+    for (const s of history.sessions) {
+      if (!inRange(s.startedAt, monday, next)) continue;
+      for (const set of s.sets) for (const m of set.primary) muscles.add(m);
+    }
+    quests.push(make('variety', 'Train 6 different muscles', 6, muscles.size));
   }
   return quests;
 }
@@ -129,11 +94,9 @@ export function questXp(history: GameHistory, now: Date): { at: Date; xp: number
   if (times.length === 0) return [];
   const first = mondayOf(new Date(Math.min(...times.map((t) => t.getTime()))));
   const last = mondayOf(now);
-  const weeks = indexWeeks(history);
-  const protein = proteinDays(history);
   const events: { at: Date; xp: number }[] = [];
   for (let w = first, i = 0; w.getTime() <= last.getTime() && i < 2000; w = addWeeks(first, ++i)) {
-    const done = questsFromIndex(history, weeks, protein, w).filter((q) => q.complete).length;
+    const done = questsForWeek(history, w).filter((q) => q.complete).length;
     if (done > 0) events.push({ at: w, xp: done * QUEST_XP });
   }
   return events;
