@@ -59,6 +59,8 @@ import { REPDB } from 'repdb-generated';
 import { REPDB_CREDIT, REPDB_URL } from '@/lib/exercise-images';
 import { HEALTH_APP } from '@/lib/health/platform';
 
+const KOFI_URL = 'https://ko-fi.com/128bit';
+
 export default function SettingsScreen() {
   const router = useRouter();
   const { ready } = useDb();
@@ -537,6 +539,23 @@ export default function SettingsScreen() {
       </Pressable>
 
       <UpdateCard />
+
+      {/* A tip jar, nothing more: every feature stays free whether or not anyone uses it. */}
+      <Pressable
+        style={[styles.charCard, { marginTop: spacing.lg }]}
+        onPress={() =>
+          void Linking.openURL(KOFI_URL).catch(() =>
+            Alert.alert('Could not open the browser', `The page is ${KOFI_URL}`)
+          )
+        }
+        accessibilityRole="link"
+        accessibilityLabel="Buy me a Ko-fi"
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiTitle}>Buy me a Ko-fi ☕</Text>
+          <Text style={styles.muted}>Like the app? A tip helps keep it going. Optional — everything here stays free →</Text>
+        </View>
+      </Pressable>
 
       <View style={styles.aiCard}>
         <Text style={styles.aiTitle}>About / data licenses</Text>
