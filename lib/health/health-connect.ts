@@ -26,6 +26,7 @@ import { dayKey, eachDay, endOfLocalDay, previousDay, startOfLocalDay } from './
 import { describeError, type DiagnosticStep } from './diagnose';
 import { sleepMinutesByWakeDay } from './sleep';
 import { readAllPages } from './paging';
+import { sourceName, stepFreshness, type StepRow } from './step-freshness';
 import {
   HEALTH_SCOPES,
   emptyHealthDay,
@@ -749,14 +750,26 @@ export async function diagnoseHealthConnect(): Promise<DiagnosticStep[]> {
 
   try {
     const records = await readAll<unknown>('Steps', start.toISOString(), end.toISOString());
-    const rows = (records ?? []) as { startTime?: string; count?: number }[];
+    const rows = (records ?? []) as StepRow[];
     const total = rows.reduce((n, r) => n + (typeof r.count === 'number' ? r.count : 0), 0);
     add('Steps records', String(rows.length), rows.length > 0);
     add('Steps total', String(total), null);
-    // Which app wrote them, and when — a count of 0 with records present is a
-    // different problem from no records at all.
-    for (const r of rows.slice(0, 3)) {
-      add('  record', `${r.startTime ?? '?'} count=${r.count ?? '?'}`, null);
+    // Which app wrote them, and how recently. This app re-reads every minute;
+    // steps that show up an hour late are the writing app's sync schedule,
+    // and this is the line that shows it.
+    const fresh = stepFreshness(rows, new Date());
+    if (fresh.newestEnd) {
+      add(
+        'Newest step record',
+        `ends ${fresh.newestEnd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} — ${fresh.minutesOld} min ago`,
+        null
+      );
+    }
+    for (const src of fresh.sources) {
+      add('  written by', `${sourceName(src.origin)}: ${src.records} records, ${src.steps} steps`, null);
+    }
+    for (const r of fresh.newest) {
+      add('  newest', `${r.startTime ?? '?'} -> ${r.endTime ?? '?'} count=${r.count ?? '?'}`, null);
     }
   } catch (e) {
     add('Steps read', `threw — ${describeError(e)}`, false);
