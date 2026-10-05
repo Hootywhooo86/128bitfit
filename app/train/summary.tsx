@@ -13,6 +13,7 @@ import { PixelTrophy } from '@/components/PixelTrophy';
 import { HeartRateCard } from '@/components/HeartRateCard';
 import { offerBreakdown } from '@/lib/ai-breakdown';
 import { colors, spacing, themedStyles } from '@/lib/theme';
+import { GameNews } from '@/components/game/GameNews';
 
 function formatDuration(ms: number): string {
   const sec = Math.floor(ms / 1000);
@@ -125,6 +126,7 @@ export default function WorkoutSummaryScreen() {
           </Pressable>
         ) : null}
       </ScrollView>
+      <GameNews />
     </>
   );
 }

@@ -154,6 +154,21 @@ Visual rules it establishes:
 - Pixel font (Silkscreen) for section labels and headers only. Body text is Inter.
 - The character is a hand-authored 28×44 sprite grid rendered at 2×, not procedural shapes.
 
+## Game layer
+
+XP, levels, RPG stats (STR / END / BAL / CON), weekly quests, pixel trophies and
+level-unlocked cosmetics. Pure logic in `lib/game/`, storage in `db/game-queries.ts`
+(settings keys, so it exports and restores with everything else). Toggle in Settings,
+on by default. These rules are tested in `lib/game/no-harm.test.ts` — keep them:
+
+- Never reward eating less, a deficit, weight loss, fasting or an under-target streak.
+  The game's input type has no calorie, fasting or weight-trend fields; STR is judged
+  against the heaviest logged bodyweight so losing weight can't raise it.
+- No daily streaks. Consistency is weekly; resting or missing a quest costs nothing.
+- No leaderboards, nothing networked. Nothing seeded: an empty log is LV 1, all "???".
+- Greys and the accent only. Never the heat colours. Unlocks show in-app, never as a push.
+- Every cosmetic is free and earned by training. Nothing is for sale.
+
 ## Build order
 
 1. Scaffold Expo + SQLite + Drizzle. Port the schema from the build spec.
