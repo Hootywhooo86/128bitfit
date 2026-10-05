@@ -53,7 +53,8 @@ export function SetRow({
     setShownWeightFor(set.weight);
     setWeight(show(set.weight));
   }
-  const repsKey = `${byDistance}:${repsSource}`;
+  // Same triggers as before: either stored number, or the track mode.
+  const repsKey = `${byDistance}:${set.reps}:${set.distanceM}`;
   const [shownRepsFor, setShownRepsFor] = useState(repsKey);
   if (shownRepsFor !== repsKey) {
     setShownRepsFor(repsKey);
