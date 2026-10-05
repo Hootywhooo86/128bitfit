@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useId, useState } from 'react';
 import { StyleSheet, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { colors } from '@/lib/theme';
@@ -20,7 +20,8 @@ export function ColorSlider({
   label: string;
 }) {
   const [width, setWidth] = useState(0);
-  const id = useRef(`g${Math.random().toString(36).slice(2)}`).current;
+  // Unique per slider so two gradients never share an id; letters only, as SVG url(#…) wants.
+  const id = `g${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 
   const move = (e: GestureResponderEvent) => {
     if (width <= 0) return;

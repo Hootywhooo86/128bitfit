@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SPORT_GROUPS, searchSports, type Sport, type SportId } from '@/lib/cardio';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
@@ -22,9 +22,12 @@ export function SportPicker({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState('');
-  useEffect(() => {
+  // Each opening starts with an empty search.
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
     if (visible) setQuery('');
-  }, [visible]);
+  }
   const found = searchSports(query);
 
   return (

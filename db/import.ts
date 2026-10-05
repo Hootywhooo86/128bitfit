@@ -146,12 +146,10 @@ export async function importBundledData(
     return { skipped: true, exerciseCount: counts.exercises, foodCount: counts.foods };
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const exerciseData = [
     ...(require('../assets/data/exercises.json') as ExerciseJson[]),
     ...REPDB.exercises,
   ];
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const foodData = require('../assets/data/foods.json') as FoodJson[];
 
   report({

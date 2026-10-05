@@ -154,11 +154,15 @@ function PickExercise({
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<Exercise[]>([]);
 
-  React.useEffect(() => {
-    if (!from) return;
-    setQuery('');
-    setItems([]);
-  }, [from]);
+  // A new exercise to match starts with an empty search.
+  const [shownFor, setShownFor] = useState(from);
+  if (shownFor !== from) {
+    setShownFor(from);
+    if (from) {
+      setQuery('');
+      setItems([]);
+    }
+  }
 
   React.useEffect(() => {
     if (!from) return;

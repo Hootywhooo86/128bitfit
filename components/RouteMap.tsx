@@ -53,7 +53,11 @@ export function RouteMap({
   const last = fixes[fixes.length - 1];
 
   // A style change is a new chance to load: signal may have come back.
-  useEffect(() => setFailed(false), [styleId]);
+  const [failedFor, setFailedFor] = useState(styleId);
+  if (failedFor !== styleId) {
+    setFailedFor(styleId);
+    setFailed(false);
+  }
 
   // Zoom in on the first fix and on "centre on me"; in between, only pan, so
   // someone who pinched out to look around is not yanked back every second.

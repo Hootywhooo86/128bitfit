@@ -65,7 +65,6 @@ const OWN_SOURCE = 'com.hootywhooo86.bit128fit';
 
 // Typed loosely on purpose: the library's identifier unions are huge, and the
 // strings here are checked against HealthKit at runtime by every call anyway.
-/* eslint-disable @typescript-eslint/no-explicit-any */
 type Id = any;
 
 const Q = (name: string): Id => `HKQuantityTypeIdentifier${name}`;

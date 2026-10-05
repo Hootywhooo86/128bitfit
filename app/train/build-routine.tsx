@@ -349,9 +349,11 @@ function PickExercise({
   const [picked, setPicked] = useState<Exercise[]>([]);
 
   // A fresh pick every time it opens; last visit's ticks are not this one's.
-  useEffect(() => {
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (wasVisible !== visible) {
+    setWasVisible(visible);
     if (visible) setPicked([]);
-  }, [visible]);
+  }
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>

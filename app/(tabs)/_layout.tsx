@@ -13,6 +13,9 @@ function TabLabel({ label, focused }: { label: string; focused: boolean }) {
   return <Text style={[s.tab, focused && s.tabOn]}>{label}</Text>;
 }
 
+/** A crash here shows a screen with Try again, instead of closing the app. */
+export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
+
 export default function TabLayout() {
   // The labels read the accent; without this they keep the old one until the
   // next tab switch.

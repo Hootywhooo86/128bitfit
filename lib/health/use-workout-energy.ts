@@ -64,6 +64,7 @@ export function useWorkoutEnergy(window: { startedAt: number; endedAt: number } 
       alive = false;
     };
     // Keyed on the instants, not the object, so a re-render does not re-read.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [window?.startedAt, window?.endedAt]);
 
   return energy;

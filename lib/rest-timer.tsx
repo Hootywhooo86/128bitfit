@@ -3,6 +3,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -81,7 +82,9 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
   const [totalSeconds, setTotalSeconds] = useState(DEFAULT_REST);
   const [sessionExerciseId, setSessionExerciseId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [tick, setTick] = useState(0);
+  // The clock the countdown is drawn against: moved on by the tick below and
+  // by every change to endsAt, so render itself never reads the time.
+  const [now, setNow] = useState(() => Date.now());
   const engineRef = useRef<RestTimerEngine>(jsEngine);
   const cancelRef = useRef<(() => void) | null>(null);
   const endsAtRef = useRef<number | null>(null);
@@ -91,10 +94,13 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
   // Read inside setEndsAt's updater, where a closure over state would be stale.
   const totalSecondsRef = useRef(DEFAULT_REST);
 
-  endsAtRef.current = endsAt;
-  totalSecondsRef.current = totalSeconds;
-  sessionIdRef.current = sessionId;
-  sessionExerciseIdRef.current = sessionExerciseId;
+  // Kept in step after each commit; the callbacks that read them run later.
+  useLayoutEffect(() => {
+    endsAtRef.current = endsAt;
+    totalSecondsRef.current = totalSeconds;
+    sessionIdRef.current = sessionId;
+    sessionExerciseIdRef.current = sessionExerciseId;
+  });
 
   const clearSchedule = useCallback(() => {
     cancelRef.current?.();
@@ -197,6 +203,7 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
       const next = Date.now() + secs * 1000;
       setTotalSeconds(secs);
       setEndsAt(next);
+      setNow(Date.now());
       setSessionExerciseId(seId);
       setSessionId(sid);
       arm(next, seId, sid);
@@ -242,6 +249,7 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
         arm(next, seId, sid);
         return next;
       });
+      setNow(Date.now());
     },
     [arm]
   );
@@ -265,6 +273,7 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
       const scheduled = await findScheduledRestEndsAt();
       if (!cancelled && scheduled) {
         setEndsAt(scheduled.endsAt);
+        setNow(Date.now());
         setSessionId(scheduled.sessionId);
         setSessionExerciseId(scheduled.sessionExerciseId);
         setTotalSeconds(Math.max(1, Math.ceil((scheduled.endsAt - Date.now()) / 1000)));
@@ -312,6 +321,7 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
         const next = Date.now() + secs * 1000;
         setTotalSeconds(secs);
         setEndsAt(next);
+        setNow(Date.now());
         setSessionId(data.sessionId ?? sessionIdRef.current);
         setSessionExerciseId(data.sessionExerciseId ?? sessionExerciseIdRef.current);
         arm(next, data.sessionExerciseId ?? sessionExerciseIdRef.current, data.sessionId ?? sessionIdRef.current);
@@ -344,7 +354,7 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
   // Re-sync countdown when returning from background (JS timers throttle).
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active') setTick((n) => n + 1);
+      if (state === 'active') setNow(Date.now());
     });
     return () => sub.remove();
   }, []);
@@ -352,16 +362,13 @@ export function RestTimerProvider({ children }: { children: React.ReactNode }) {
   // 250ms UI tick while running
   useEffect(() => {
     if (endsAt == null) return;
-    const id = setInterval(() => setTick((n) => n + 1), 250);
+    const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, [endsAt]);
 
   useEffect(() => () => clearSchedule(), [clearSchedule]);
 
-  const remainingSeconds =
-    endsAt == null ? 0 : Math.max(0, Math.ceil((endsAt - Date.now()) / 1000));
-
-  void tick;
+  const remainingSeconds = endsAt == null ? 0 : Math.max(0, Math.ceil((endsAt - now) / 1000));
 
   const value = useMemo<RestTimerApi>(
     () => ({

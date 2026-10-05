@@ -46,7 +46,9 @@ export function useHealthRefresh(onRefresh: () => void): void {
   // Held in a ref so a caller passing an inline function does not tear the
   // subscription down and rebuild it on every render.
   const latest = useRef(onRefresh);
-  latest.current = onRefresh;
+  useEffect(() => {
+    latest.current = onRefresh;
+  });
 
   useEffect(() => {
     const fire = () => latest.current();

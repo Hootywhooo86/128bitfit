@@ -5,7 +5,7 @@
  * a desk scanner reads more reliably than a photo of a card. The photo stays
  * as the fallback, and as the only option for a code that cannot be redrawn.
  */
-import bwipjs from 'bwip-js/generic';
+import { toSVG } from 'bwip-js/generic';
 
 export type ScannedCode = { value: string; format: string };
 
@@ -75,7 +75,7 @@ export function barcodeSvg(code: ScannedCode): string | null {
   const bcid = encoderFor(code.format);
   if (!bcid) return null;
   try {
-    return bwipjs.toSVG({
+    return toSVG({
       bcid,
       text: code.value,
       scale: 3,

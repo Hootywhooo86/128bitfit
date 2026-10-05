@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 import React from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { health } from '@/lib/health';
 import { HealthSyncCard } from '@/components/HealthSyncCard';
 import { colors, spacing, themedStyles } from '@/lib/theme';
