@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Card, Note, Screen } from '@/components/ui';
+import { diagnoseDetected } from '@/db/detected-queries';
 import { diagnoseHealth, health } from '@/lib/health';
 import { formatReport, type DiagnosticStep } from '@/lib/health/diagnose';
 import { colors, fonts, spacing } from '@/lib/theme';
@@ -23,7 +24,10 @@ export default function HealthDiagnosticsScreen() {
 
   const run = useCallback(async () => {
     setSteps(null);
-    setSteps(await diagnoseHealth());
+    // Steps first, then workouts: "my walk from today is missing" needs to
+    // know whether Health Connect has it at all.
+    const connection = await diagnoseHealth();
+    setSteps([...connection, ...(await diagnoseDetected())]);
   }, []);
 
   useEffect(() => {
@@ -47,8 +51,8 @@ export default function HealthDiagnosticsScreen() {
   return (
     <Screen section={HEALTH_APP} back onRefresh={() => void run()}>
       <Note>
-        Each line is one step of reading today&apos;s steps. A line marked XX is the one that
-        failed — everything below it did not run.
+        Each line is one step of reading today&apos;s steps, then the workouts Health Connect
+        holds for the last two days. A line marked XX is the one that failed.
       </Note>
 
       {steps == null ? (

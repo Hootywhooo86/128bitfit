@@ -1,6 +1,13 @@
 import { and, eq, gte } from 'drizzle-orm';
 import { health } from '@/lib/health';
-import { applyLabel, sortDetected, type DetectedSession, type HiddenReason } from '@/lib/detected-workouts';
+import {
+  applyLabel,
+  detectedReport,
+  sortDetected,
+  type DetectedSession,
+  type HiddenReason,
+  type ReportLine,
+} from '@/lib/detected-workouts';
 import { db } from './client';
 import { cardioSessions, workoutSessions } from './schema';
 import { getSetting, setSetting } from './settings-queries';
@@ -150,4 +157,16 @@ export async function getDetectedWorkouts(opts: { days?: number; now?: number } 
 export async function readDetectedReadings(workouts: readonly DetectedSession[]): Promise<Map<string, DetectedReadings | null>> {
   const out = await Promise.all(workouts.map(async (w) => [w.id, await readingsFor(w).catch(() => null)] as const));
   return new Map(out);
+}
+
+/** The workouts section of the Health Connect report: the last two days, and where each one went. */
+export async function diagnoseDetected(now = Date.now()): Promise<ReportLine[]> {
+  try {
+    const state = await getDetectedWorkouts({ days: 2, now });
+    return detectedReport(state, now, (ms) =>
+      new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    );
+  } catch (e) {
+    return [{ label: 'Workouts read', value: `threw — ${e instanceof Error ? e.message : String(e)}`, ok: false }];
+  }
 }
