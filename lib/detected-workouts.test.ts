@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyLabel, hasRealTitle, isUnidentified, LABEL_CHOICES, sortDetected, sourceName, sportForType, workoutTypeName, type DetectedSession } from './detected-workouts';
+import { applyLabel, detectedReport, hasRealTitle, isUnidentified, LABEL_CHOICES, sortDetected, sourceName, sportForType, workoutTypeName, type DetectedSession } from './detected-workouts';
 
 const MIN = 60_000;
 const T = Date.UTC(2026, 9, 3, 13);
@@ -105,5 +105,32 @@ describe('detected workouts', () => {
     expect(sourceName('com.apple.health.81A2C3D4')).toBe('Apple Watch');
     expect(sourceName('com.fitbit.FitbitMobile')).toBe('Fitbit');
     expect(sourceName(null)).toBe('another app');
+  });
+});
+
+describe('detectedReport', () => {
+  const t = (ms: number) => new Date(ms).toISOString().slice(11, 16);
+  const now = Date.parse('2026-10-06T00:15:00Z');
+  const walk = { id: 'a', type: 79, title: null, startMs: Date.parse('2026-10-05T23:00:00Z'), endMs: Date.parse('2026-10-05T23:30:00Z'), source: 'com.fitbit.FitbitMobile' };
+  const lift = { id: 'b', type: 70, title: null, startMs: Date.parse('2026-10-05T18:00:00Z'), endMs: Date.parse('2026-10-05T19:00:00Z'), source: 'com.fitbit.FitbitMobile' };
+
+  it('lists every workout, newest first, with where it went', () => {
+    const lines = detectedReport(
+      { status: 'ready', days: 2, workouts: [walk], hidden: [{ session: lift, reason: 'logged' }] },
+      now,
+      t
+    );
+    expect(lines.map((l) => `${l.label} | ${l.value}`)).toEqual([
+      'Workouts in Health Connect, last 2 days | 2 (not counting ones this app wrote)',
+      'Newest workout | ended 23:30 — 45 min ago',
+      '  Walk | 23:00–23:30 · Fitbit · on Home',
+      '  Strength training | 18:00–19:00 · Fitbit · held back: Same time as a workout you logged here',
+    ]);
+  });
+
+  it('says plainly when there are none, or why it could not read', () => {
+    expect(detectedReport({ status: 'ready', days: 2, workouts: [], hidden: [] }, now, t)).toHaveLength(1);
+    expect(detectedReport({ status: 'no_exercise_access' }, now, t)[0]).toMatchObject({ ok: false });
+    expect(detectedReport({ status: 'error', message: 'boom' }, now, t)[0].value).toBe('threw — boom');
   });
 });

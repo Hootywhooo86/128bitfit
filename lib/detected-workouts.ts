@@ -242,3 +242,60 @@ export function sourceName(pkg: string | null): string {
   };
   return known[pkg] ?? pkg;
 }
+
+/** One line of the Health Connect report. Same shape as lib/health/diagnose's step. */
+export type ReportLine = { label: string; value: string; ok: boolean | null };
+
+/**
+ * The workouts part of the Health Connect report: every workout Health
+ * Connect holds for the window, when, who wrote it, and whether Home shows it
+ * or held it back and why. Built for "my workout from today is missing" —
+ * it answers whether Health Connect has it at all before anything else.
+ */
+export function detectedReport(
+  state:
+    | { status: 'unavailable' }
+    | { status: 'not_connected' }
+    | { status: 'no_exercise_access' }
+    | { status: 'error'; message: string }
+    | {
+        status: 'ready';
+        days: number;
+        workouts: readonly DetectedSession[];
+        hidden: readonly { session: DetectedSession; reason: HiddenReason }[];
+      },
+  now: number,
+  time: (ms: number) => string
+): ReportLine[] {
+  if (state.status === 'unavailable') return [{ label: 'Workouts', value: 'Health Connect not available', ok: false }];
+  if (state.status === 'not_connected') return [{ label: 'Workouts', value: 'Not connected', ok: false }];
+  if (state.status === 'no_exercise_access') {
+    return [{ label: 'Exercise permission', value: 'NOT granted — workouts cannot be read', ok: false }];
+  }
+  if (state.status === 'error') return [{ label: 'Workouts read', value: `threw — ${state.message}`, ok: false }];
+
+  const all = [
+    ...state.workouts.map((s) => ({ s, where: 'on Home' })),
+    ...state.hidden.map((h) => ({ s: h.session, where: `held back: ${HIDDEN_REASON_TEXT[h.reason]}` })),
+  ].sort((a, b) => b.s.startMs - a.s.startMs);
+
+  const lines: ReportLine[] = [
+    {
+      label: `Workouts in Health Connect, last ${state.days} days`,
+      value: `${all.length} (not counting ones this app wrote)`,
+      ok: null,
+    },
+  ];
+  if (all[0]) {
+    const mins = Math.max(0, Math.round((now - all[0].s.endMs) / 60_000));
+    lines.push({ label: 'Newest workout', value: `ended ${time(all[0].s.endMs)} — ${mins} min ago`, ok: null });
+  }
+  for (const { s, where } of all) {
+    lines.push({
+      label: `  ${workoutTypeName(s.type, s.title)}`,
+      value: `${time(s.startMs)}–${time(s.endMs)} · ${sourceName(s.source)} · ${where}`,
+      ok: null,
+    });
+  }
+  return lines;
+}
