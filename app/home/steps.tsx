@@ -108,7 +108,7 @@ export default function StepsScreen() {
         {canOpenStepApp(source) ? (
           <>
             <Pressable style={s.btn} onPress={sync} accessibilityRole="button">
-              <Text style={s.btnText}>SYNC {app!.toUpperCase()}</Text>
+              <Text style={s.btnText}>SYNC HEALTH APP</Text>
             </Pressable>
             <Text style={s.note}>
               Opens {app} so your watch syncs. Come back here and the count updates within a minute.

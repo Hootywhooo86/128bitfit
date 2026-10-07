@@ -54,16 +54,16 @@ async function offerStepSync(): Promise<void> {
   const source = newest?.source ?? null;
   if (!canOpenStepApp(source)) {
     Alert.alert(
-      'Sync steps',
+      'Sync health app',
       'Open the app that counts your steps and let it sync, then come back — the count here updates within a minute.'
     );
     return;
   }
   const app = stepAppName(source)!;
-  Alert.alert('Sync steps', `Open ${app} so your watch syncs? Come back here and the count updates within a minute.`, [
+  Alert.alert('Sync health app', `Open ${app} so your watch syncs? Come back here and the count updates within a minute.`, [
     { text: 'Cancel', style: 'cancel' },
     {
-      text: `Open ${app}`,
+      text: 'Sync health app',
       onPress: () => {
         const res = openStepApp(source);
         if (!res.ok) Alert.alert(`Couldn't open ${app}`, res.message);
