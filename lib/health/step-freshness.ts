@@ -2,11 +2,13 @@
  * How fresh the step records in Health Connect are, and who wrote them.
  *
  * This app re-reads every minute, but it can only show what the step-counting
- * app (Samsung Health, Fitbit, Google Fit…) has already written into Health
+ * app (Samsung Health, Google Health, Google Fit…) has already written into Health
  * Connect, and those sync on their own schedule. When steps arrive an hour
  * late, this is what tells "our read is slow" apart from "the source app has
  * not synced yet".
  */
+import STEP_APPS from './step-apps.json';
+
 export type StepRow = {
   startTime?: string;
   endTime?: string;
@@ -49,16 +51,8 @@ export function stepFreshness(rows: readonly StepRow[], now: Date, keep = 3): St
 
 /** Package names people will recognise, for the report. Unknown ones stay as they are. */
 const KNOWN: Record<string, string> = {
-  'com.sec.android.app.shealth': 'Samsung Health',
-  'com.google.android.apps.fitness': 'Google Fit',
-  'com.fitbit.FitbitMobile': 'Fitbit',
+  ...Object.fromEntries(STEP_APPS.map((a) => [a.package, a.name])),
   'com.google.android.apps.healthdata': 'Health Connect (phone sensor)',
-  'com.garmin.android.apps.connectmobile': 'Garmin Connect',
-  'com.huawei.health': 'Huawei Health',
-  'com.xiaomi.wearable': 'Mi Fitness',
-  'com.ouraring.oura': 'Oura',
-  'com.whoop.android': 'WHOOP',
-  'com.strava': 'Strava',
 };
 
 export function sourceName(origin: string): string {

@@ -44,6 +44,7 @@ import {
   type HeartRateSample,
   type HealthWorkoutEntry,
   type HealthWriteResult,
+  type NewestSteps,
 } from './types';
 
 const PERMISSIONS = healthConnectPermissions() as Permission[];
@@ -666,6 +667,14 @@ export const healthConnectProvider: HealthProvider = {
     } catch (e) {
       return { written: 0, error: writeError(e, `the deleted ${scope} entry`) };
     }
+  },
+
+  async readNewestSteps(): Promise<NewestSteps | null> {
+    const day = dayKey(new Date());
+    const rows = await readAll<StepRow>('Steps', startOfLocalDay(day).toISOString(), endOfLocalDay(day).toISOString());
+    const fresh = stepFreshness(rows, new Date(), 1);
+    if (!fresh.newestEnd) return null;
+    return { endMs: fresh.newestEnd.getTime(), source: fresh.newest[0]?.metadata?.dataOrigin ?? null };
   },
 
   openSettings(): void {

@@ -29,6 +29,7 @@ import type {
   HealthWorkoutSession,
   HealthWorkoutEntry,
   HealthWriteResult,
+  NewestSteps,
 } from './types';
 
 let resolved: HealthProvider | null = null;
@@ -85,6 +86,9 @@ export const health: HealthProvider = {
   },
   readWorkouts(startMs: number, endMs: number): Promise<HealthWorkoutSession[]> {
     return provider().readWorkouts(startMs, endMs);
+  },
+  readNewestSteps(): Promise<NewestSteps | null> {
+    return provider().readNewestSteps();
   },
   writeEntries(entries: HealthWorkoutEntry[]): Promise<number> {
     return provider().writeEntries(entries);

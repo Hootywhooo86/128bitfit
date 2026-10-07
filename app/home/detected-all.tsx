@@ -83,8 +83,8 @@ export default function DetectedAllScreen() {
 
           <Note>
             {Platform.OS === 'ios'
-              ? "Still missing one? It shows here once it has reached Apple Health. A workout from another app's watch (Garmin, Fitbit…) only arrives after that app syncs, so open it to push it through. Apple Health also never says whether 128BIT FIT is allowed to read workouts — if none ever appear, check Health → Sharing → Apps → 128BIT FIT iOS."
-              : "Still missing one? It shows here once your watch's app has synced it to Health Connect, so open that app (Fitbit, Samsung Health…) to push it through. Health Connect also only shares workouts from up to 30 days before you first connected 128BIT FIT."}
+              ? "Still missing one? It shows here once it has reached Apple Health. A workout from another app's watch (Garmin, Google Health…) only arrives after that app syncs, so open it to push it through. Apple Health also never says whether 128BIT FIT is allowed to read workouts — if none ever appear, check Health → Sharing → Apps → 128BIT FIT iOS."
+              : "Still missing one? It shows here once your watch's app has synced it to Health Connect, so open that app (Google Health, Samsung Health…) to push it through. Health Connect also only shares workouts from up to 30 days before you first connected 128BIT FIT."}
           </Note>
         </>
       )}

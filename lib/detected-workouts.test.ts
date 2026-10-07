@@ -103,7 +103,7 @@ describe('detected workouts', () => {
 
   it('names known sources', () => {
     expect(sourceName('com.apple.health.81A2C3D4')).toBe('Apple Watch');
-    expect(sourceName('com.fitbit.FitbitMobile')).toBe('Fitbit');
+    expect(sourceName('com.fitbit.FitbitMobile')).toBe('Google Health');
     expect(sourceName(null)).toBe('another app');
   });
 });
@@ -123,8 +123,8 @@ describe('detectedReport', () => {
     expect(lines.map((l) => `${l.label} | ${l.value}`)).toEqual([
       'Workouts in Health Connect, last 2 days | 2 (not counting ones this app wrote)',
       'Newest workout | ended 23:30 — 45 min ago',
-      '  Walk | 23:00–23:30 · Fitbit · on Home',
-      '  Strength training | 18:00–19:00 · Fitbit · held back: Same time as a workout you logged here',
+      '  Walk | 23:00–23:30 · Google Health · on Home',
+      '  Strength training | 18:00–19:00 · Google Health · held back: Same time as a workout you logged here',
     ]);
   });
 
