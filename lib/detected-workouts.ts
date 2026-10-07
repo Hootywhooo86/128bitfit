@@ -217,13 +217,13 @@ export function sortDetected<T extends DetectedSession>(
   return out;
 }
 
-/** "Fitbit" from com.fitbit.FitbitMobile; the package itself if unknown. */
+/** "Google Health" (the Fitbit app's name since May 2026) from com.fitbit.FitbitMobile; the package itself if unknown. */
 export function sourceName(pkg: string | null): string {
   if (!pkg) return 'another app';
   // Apple Watch workouts come from com.apple.health.<device id>.
   if (pkg.startsWith('com.apple.health')) return 'Apple Watch';
   const known: Record<string, string> = {
-    'com.fitbit.FitbitMobile': 'Fitbit',
+    'com.fitbit.FitbitMobile': 'Google Health',
     'com.google.android.apps.fitness': 'Google Fit',
     'com.google.android.apps.healthdata': 'Health Connect',
     'com.sec.android.app.shealth': 'Samsung Health',
@@ -238,7 +238,7 @@ export function sourceName(pkg: string | null): string {
     'com.apple.Fitness': 'Fitness',
     'com.strava.stravaride': 'Strava',
     'com.garmin.connect.mobile': 'Garmin Connect',
-    'com.fitbit.FitbitMobile.ios': 'Fitbit',
+    'com.fitbit.FitbitMobile.ios': 'Google Health',
   };
   return known[pkg] ?? pkg;
 }

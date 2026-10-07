@@ -1,0 +1,13 @@
+[
+  { "package": "com.fitbit.FitbitMobile", "name": "Google Health" },
+  { "package": "com.sec.android.app.shealth", "name": "Samsung Health" },
+  { "package": "com.google.android.apps.fitness", "name": "Google Fit" },
+  { "package": "com.garmin.android.apps.connectmobile", "name": "Garmin Connect" },
+  { "package": "com.huawei.health", "name": "Huawei Health" },
+  { "package": "com.xiaomi.wearable", "name": "Mi Fitness" },
+  { "package": "com.ouraring.oura", "name": "Oura" },
+  { "package": "com.whoop.android", "name": "WHOOP" },
+  { "package": "com.strava", "name": "Strava" },
+  { "package": "com.polar.polarflow", "name": "Polar Flow" },
+  { "package": "com.suunto.android", "name": "Suunto" }
+]

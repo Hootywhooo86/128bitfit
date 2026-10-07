@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { DetectedWorkouts } from '@/components/DetectedWorkouts';
 import { GameNews } from '@/components/game/GameNews';
 import { MuscleLoadCard } from '@/components/MuscleLoadCard';
@@ -25,6 +25,8 @@ import {
   getLastCompletedWorkoutSummary,
   type WorkoutSummary,
 } from '@/db/workout-queries';
+import { health } from '@/lib/health';
+import { canOpenStepApp, openStepApp, stepAppName } from '@/lib/health/step-app';
 import { useTodaySteps, useTodayCalories } from '@/lib/health/use-health';
 import { broadcastHealthRefresh } from '@/lib/health/use-health-refresh';
 import { withMinimumDuration } from '@/lib/min-duration';
@@ -43,6 +45,33 @@ import { colors, fonts, radius, spacing } from '@/lib/theme';
  * Every number here is real or absent. A tile with no reading shows a dash, not
  * a zero — see the empty-state table in CLAUDE.md.
  */
+/**
+ * Hold STEPS: offer to open the app that writes your steps, so it syncs.
+ * Nothing can make it sync from outside; opening it does.
+ */
+async function offerStepSync(): Promise<void> {
+  const newest = await health.readNewestSteps().catch(() => null);
+  const source = newest?.source ?? null;
+  if (!canOpenStepApp(source)) {
+    Alert.alert(
+      'Sync steps',
+      'Open the app that counts your steps and let it sync, then come back — the count here updates within a minute.'
+    );
+    return;
+  }
+  const app = stepAppName(source)!;
+  Alert.alert('Sync steps', `Open ${app} so your watch syncs? Come back here and the count updates within a minute.`, [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: `Open ${app}`,
+      onPress: () => {
+        const res = openStepApp(source);
+        if (!res.ok) Alert.alert(`Couldn't open ${app}`, res.message);
+      },
+    },
+  ]);
+}
+
 export default function HomeScreen() {
   const { ready } = useDb();
   const router = useRouter();
@@ -212,6 +241,8 @@ export default function HomeScreen() {
                 ? healthState.steps.toLocaleString()
                 : null,
               label: 'STEPS',
+              onPress: () => router.push('/home/steps'),
+              onLongPress: () => void offerStepSync(),
             },
             { value: calories == null ? null : Math.round(calories).toLocaleString(), label: 'KCAL' },
             { value: activeCalories != null ? Math.round(activeCalories).toLocaleString() : null, label: 'BURNED' },

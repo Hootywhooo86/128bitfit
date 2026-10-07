@@ -210,6 +210,9 @@ export type HealthWriteResult = {
   error: string | null;
 };
 
+/** The newest step record today: when it ends, and the app that wrote it. */
+export type NewestSteps = { endMs: number; source: string | null };
+
 export interface HealthProvider {
   /** For logs and the Settings screen, e.g. "Health Connect". */
   readonly name: string;
@@ -245,6 +248,13 @@ export interface HealthProvider {
    * read fails, so a refused read is never shown as "no workouts".
    */
   readWorkouts(startMs: number, endMs: number): Promise<HealthWorkoutSession[]>;
+
+  /**
+   * When today's newest step record ends, and which app wrote it — how far
+   * behind the watch's sync is. Null when there are no records today or the
+   * platform cannot say.
+   */
+  readNewestSteps(): Promise<NewestSteps | null>;
 
   writeEntries(entries: HealthWorkoutEntry[]): Promise<number>;
   writeNutrition(entries: HealthNutritionEntry[]): Promise<HealthWriteResult>;

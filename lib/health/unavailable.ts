@@ -17,6 +17,7 @@ import {
   type HealthWindow,
   type HeartRateSample,
   type HealthWriteResult,
+  type NewestSteps,
 } from './types';
 import { eachDay } from './dates';
 
@@ -56,6 +57,10 @@ export const unavailableProvider: HealthProvider = {
 
   async readWorkouts(): Promise<HealthWorkoutSession[]> {
     return [];
+  },
+
+  async readNewestSteps(): Promise<NewestSteps | null> {
+    return null;
   },
 
   async writeEntries(): Promise<number> {

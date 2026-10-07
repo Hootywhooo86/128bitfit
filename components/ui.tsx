@@ -172,16 +172,36 @@ export function MenuRow({
 export function Stat3({
   items,
 }: {
-  items: { value: string | null; label: string }[];
+  items: {
+    value: string | null;
+    label: string;
+    /** A tile with these is a button: tap opens more, hold offers an action. */
+    onPress?: () => void;
+    onLongPress?: () => void;
+  }[];
 }) {
   return (
     <View style={s.st3}>
-      {items.map((it) => (
-        <View key={it.label} style={s.st3Cell}>
-          <Text style={s.st3B}>{it.value ?? '–'}</Text>
-          <Text style={s.st3S}>{it.label}</Text>
-        </View>
-      ))}
+      {items.map((it) =>
+        it.onPress || it.onLongPress ? (
+          <Pressable
+            key={it.label}
+            style={({ pressed }) => [s.st3Cell, pressed && s.pressed]}
+            onPress={it.onPress}
+            onLongPress={it.onLongPress}
+            accessibilityRole="button"
+            accessibilityLabel={`${it.label}: ${it.value ?? 'no reading'}`}
+          >
+            <Text style={s.st3B}>{it.value ?? '–'}</Text>
+            <Text style={s.st3S}>{it.label} ›</Text>
+          </Pressable>
+        ) : (
+          <View key={it.label} style={s.st3Cell}>
+            <Text style={s.st3B}>{it.value ?? '–'}</Text>
+            <Text style={s.st3S}>{it.label}</Text>
+          </View>
+        )
+      )}
     </View>
   );
 }

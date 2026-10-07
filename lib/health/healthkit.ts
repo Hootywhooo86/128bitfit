@@ -58,6 +58,7 @@ import {
   type HealthWorkoutSession,
   type HealthWriteResult,
   type HeartRateSample,
+  type NewestSteps,
 } from './types';
 
 /** What the rest of the app calls this app's own records — see db/detected-queries. */
@@ -410,6 +411,14 @@ export const healthKitProvider: HealthProvider = {
       if (bpm != null && Number.isFinite(t)) out.push({ t, bpm: Math.round(bpm) });
     }
     return out.sort((a, b) => a.t - b.t);
+  },
+
+  /**
+   * Not read on iPhone yet: Apple Health takes a watch's steps as they come,
+   * so there is no hour-long sync gap to explain. Null rather than a guess.
+   */
+  async readNewestSteps(): Promise<NewestSteps | null> {
+    return null;
   },
 
   async readWorkouts(startMs: number, endMs: number): Promise<HealthWorkoutSession[]> {
