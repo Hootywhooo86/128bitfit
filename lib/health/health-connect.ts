@@ -10,6 +10,7 @@
  */
 import {
   SdkAvailabilityStatus,
+  aggregateGroupByPeriod,
   aggregateRecord,
   deleteRecordsByUuids,
   getGrantedPermissions,
@@ -26,6 +27,7 @@ import { dayKey, eachDay, endOfLocalDay, previousDay, startOfLocalDay } from './
 import { describeError, type DiagnosticStep } from './diagnose';
 import { sleepMinutesByWakeDay } from './sleep';
 import { readAllPages } from './paging';
+import { dailyTotals, type PeriodGroup } from './day-groups';
 import { sourceName, stepFreshness, type StepRow } from './step-freshness';
 import {
   HEALTH_SCOPES,
@@ -319,6 +321,30 @@ export const healthConnectProvider: HealthProvider = {
     for (const [recordType, field, read, pick] of counters) {
       // Not granted, or the read failed: stays null, exactly as before.
       if (!read) continue;
+      // First choice: one grouped call for the whole range, bucketed by the
+      // local time each record was made in (see ./day-groups). Matches how the
+      // watch app counts a day, including days walked in another time zone.
+      try {
+        const groups = (await aggregateGroupByPeriod({
+          recordType,
+          timeRangeFilter: {
+            operator: 'between',
+            startTime: startOfLocalDay(startDate).toISOString(),
+            endTime: endOfLocalDay(endDate).toISOString(),
+          },
+          timeRangeSlicer: { period: 'DAYS', length: 1 },
+        } as never)) as unknown as PeriodGroup[];
+        for (const [key, total] of dailyTotals(groups, days, pick)) {
+          const day = byDate.get(key);
+          if (day) (day[field] as number | null) = total;
+        }
+        lastReadErrors.delete(`${recordType} (aggregate)`);
+        lastReadErrors.delete(`${recordType} (grouped)`);
+        continue;
+      } catch (e) {
+        // Fall through to one call per day, as before.
+        lastReadErrors.set(`${recordType} (grouped)`, describeError(e));
+      }
       for (const [key, day] of byDate) {
         try {
           const result = (await aggregateRecord({
