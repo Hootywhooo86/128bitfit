@@ -28,6 +28,7 @@ import { describeError, type DiagnosticStep } from './diagnose';
 import { sleepMinutesByWakeDay } from './sleep';
 import { readAllPages } from './paging';
 import { dailyTotals, type PeriodGroup } from './day-groups';
+import { compareStepDays, type StepRecordRow } from './step-compare';
 import { sourceName, stepFreshness, type StepRow } from './step-freshness';
 import {
   HEALTH_SCOPES,
@@ -321,30 +322,6 @@ export const healthConnectProvider: HealthProvider = {
     for (const [recordType, field, read, pick] of counters) {
       // Not granted, or the read failed: stays null, exactly as before.
       if (!read) continue;
-      // First choice: one grouped call for the whole range, bucketed by the
-      // local time each record was made in (see ./day-groups). Matches how the
-      // watch app counts a day, including days walked in another time zone.
-      try {
-        const groups = (await aggregateGroupByPeriod({
-          recordType,
-          timeRangeFilter: {
-            operator: 'between',
-            startTime: startOfLocalDay(startDate).toISOString(),
-            endTime: endOfLocalDay(endDate).toISOString(),
-          },
-          timeRangeSlicer: { period: 'DAYS', length: 1 },
-        } as never)) as unknown as PeriodGroup[];
-        for (const [key, total] of dailyTotals(groups, days, pick)) {
-          const day = byDate.get(key);
-          if (day) (day[field] as number | null) = total;
-        }
-        lastReadErrors.delete(`${recordType} (aggregate)`);
-        lastReadErrors.delete(`${recordType} (grouped)`);
-        continue;
-      } catch (e) {
-        // Fall through to one call per day, as before.
-        lastReadErrors.set(`${recordType} (grouped)`, describeError(e));
-      }
       for (const [key, day] of byDate) {
         try {
           const result = (await aggregateRecord({
@@ -824,6 +801,70 @@ export async function diagnoseHealthConnect(): Promise<DiagnosticStep[]> {
     );
   } catch (e) {
     add('readDays', `threw — ${describeError(e)}`, false);
+  }
+
+  // Every way of totalling the last ten days, side by side (see ./step-compare).
+  // Google Health's week view is the reference; whichever column matches it is
+  // how Home should count.
+  try {
+    let start = day;
+    for (let i = 1; i < 10; i++) start = previousDay(start);
+    const days = eachDay(start, day);
+    const rows = await readAll<StepRecordRow>('Steps', startOfLocalDay(start).toISOString(), endOfLocalDay(day).toISOString());
+    const compared = compareStepDays(rows, days, dayKey);
+    const steps = (r: Record<string, unknown>) => num(r.COUNT_TOTAL);
+    let grouped: Map<string, number> | null = null;
+    try {
+      grouped = dailyTotals(
+        (await aggregateGroupByPeriod({
+          recordType: 'Steps',
+          timeRangeFilter: {
+            operator: 'between',
+            startTime: startOfLocalDay(start).toISOString(),
+            endTime: endOfLocalDay(day).toISOString(),
+          },
+          timeRangeSlicer: { period: 'DAYS', length: 1 },
+        } as never)) as unknown as PeriodGroup[],
+        days,
+        steps
+      );
+    } catch (e) {
+      add('  grouped totals', `threw — ${describeError(e)}`, false);
+    }
+    const fmt = (n: number | null | undefined) => (n == null ? '—' : Math.round(n).toLocaleString('en-US'));
+    add('Step totals, last 10 days', 'per-day · grouped · records · own-zone — compare with Google Health', null);
+    for (const c of [...compared].reverse()) {
+      let perDay: number | null = null;
+      try {
+        perDay = steps(
+          (await aggregateRecord({
+            recordType: 'Steps',
+            timeRangeFilter: {
+              operator: 'between',
+              startTime: startOfLocalDay(c.day).toISOString(),
+              endTime: endOfLocalDay(c.day).toISOString(),
+            },
+          } as never)) as unknown as Record<string, unknown>
+        );
+      } catch {
+        perDay = null;
+      }
+      const zones = Object.entries(c.zones)
+        .sort((x, y) => y[1] - x[1])
+        .map(([z, n]) => `${z}×${n}`)
+        .join(', ');
+      add(
+        `  ${c.day}`,
+        `${fmt(perDay)} · ${fmt(grouped?.get(c.day))} · ${fmt(c.byPhoneZone)} · ${fmt(c.byRecordZone)} (${c.records} records; zones ${zones || 'none'})`,
+        null
+      );
+      const origins = Object.entries(c.origins);
+      if (origins.length > 1) {
+        add('    by app', origins.map(([o, n]) => `${sourceName(o)} ${fmt(n)}`).join(' · '), null);
+      }
+    }
+  } catch (e) {
+    add('Step totals, last 10 days', `threw — ${describeError(e)}`, false);
   }
 
   // Anything tryRead swallowed on that call. Empty is the good case.
