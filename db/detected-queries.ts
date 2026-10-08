@@ -109,8 +109,10 @@ async function readingsFor(s: DetectedSession): Promise<DetectedReadings> {
  * read per workout per measure — so the list can show at once; fetch them
  * with readDetectedReadings.
  */
-export async function getDetectedWorkouts(opts: { days?: number; now?: number } = {}): Promise<DetectedState> {
-  const { days = 7, now = Date.now() } = opts;
+export async function getDetectedWorkouts(
+  opts: { days?: number; now?: number; includeLogged?: boolean } = {}
+): Promise<DetectedState> {
+  const { days = 7, now = Date.now(), includeLogged = false } = opts;
   if ((await health.getAvailability()) !== 'available') return { status: 'unavailable' };
   // One permission lookup answers both "connected at all?" and "exercise?".
   const grants = await health.getGrants();
@@ -149,7 +151,10 @@ export async function getDetectedWorkouts(opts: { days?: number; now?: number } 
     status: 'ready',
     days,
     workouts: sorted.shown.map((x) => ({ ...x, readings: null })),
-    hidden: sorted.hidden,
+    // One that matches a workout logged here is already in the log: listing
+    // it again under "held back" is the same workout twice. Only the report
+    // asks for them, to check the matching.
+    hidden: includeLogged ? sorted.hidden : sorted.hidden.filter((h) => h.reason !== 'logged'),
   };
 }
 
@@ -162,7 +167,7 @@ export async function readDetectedReadings(workouts: readonly DetectedSession[])
 /** The workouts section of the Health Connect report: the last two days, and where each one went. */
 export async function diagnoseDetected(now = Date.now()): Promise<ReportLine[]> {
   try {
-    const state = await getDetectedWorkouts({ days: 2, now });
+    const state = await getDetectedWorkouts({ days: 2, now, includeLogged: true });
     return detectedReport(state, now, (ms) =>
       new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     );
