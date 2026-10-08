@@ -9,6 +9,8 @@ import { View } from 'react-native';
 import { OnboardingGate } from '@/components/OnboardingGate';
 // Registers the background GPS task; it has to exist before any fix arrives.
 import '@/lib/cardio-tracker';
+// Listens for health reads and sends what the user chose to share; idle until signed in.
+import '@/lib/family';
 import { DatabaseProvider } from '@/db/DatabaseProvider';
 import { useAccent } from '@/lib/accent';
 import { RestTimerProvider } from '@/lib/rest-timer';

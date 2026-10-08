@@ -22,6 +22,7 @@ import {
   type Fix,
 } from '@/lib/cardio';
 import { offerBreakdown } from '@/lib/ai-breakdown';
+import { familyWorkoutRemoved } from '@/lib/family';
 import { mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import { useCardioEnergy } from '@/lib/health/use-cardio-energy';
 import { MAP_ROUTE_BLUE, type MapStyleId } from '@/lib/map-style';
@@ -122,6 +123,7 @@ export default function CardioSummaryScreen() {
         onPress: async () => {
           await deleteCardioSession(session.id);
           mirrorWorkoutRemoved(session.id);
+          familyWorkoutRemoved(session.id);
           router.back();
         },
       },

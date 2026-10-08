@@ -31,6 +31,7 @@ import {
   type Fix,
   type Sport,
 } from '@/lib/cardio';
+import { familyCardio } from '@/lib/family';
 import { mirrorWorkout } from '@/lib/health/mirror';
 import { clearLiveCardioStats } from '@/lib/cardio-live-notification';
 import { ensureLocationAccess, startTracking, stopTracking, type LocationAccess } from '@/lib/cardio-tracker';
@@ -310,6 +311,13 @@ export default function RecordCardioScreen() {
                 endedAt: done.endedAt,
                 title: sport.label,
                 exerciseType: sport.healthType,
+              });
+              familyCardio({
+                id: done.id,
+                startedAt: done.startedAt,
+                endedAt: done.endedAt,
+                sport: sport.label,
+                distanceM: done.distanceM,
               });
             }
             router.replace({ pathname: '/cardio/[id]', params: { id: session.id, fresh: '1' } });

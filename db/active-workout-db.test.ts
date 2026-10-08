@@ -32,6 +32,10 @@ vi.mock('@/lib/health/mirror', () => ({
   mirrorWorkout: () => undefined,
   mirrorWorkoutRemoved: () => undefined,
 }));
+vi.mock('@/lib/family', () => ({
+  familyStrength: () => undefined,
+  familyWorkoutRemoved: () => undefined,
+}));
 
 const q = await import('./workout-queries');
 const { exercises, sessionExercises, sets, workoutSessions } = schema;

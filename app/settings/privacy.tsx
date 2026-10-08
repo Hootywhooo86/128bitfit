@@ -27,7 +27,8 @@ export default function PrivacyScreen() {
         <Text style={styles.body}>
           There is no 128BIT FIT account, server or database. Everything you log lives in a
           database on this device. No analytics, no telemetry, no crash reporting —
-          the app has no backend to send anything to.
+          the app has no backend to send anything to. The only copy elsewhere is one you set
+          up yourself (128bit family, below).
         </Text>
       </View>
 
@@ -95,9 +96,10 @@ export default function PrivacyScreen() {
         </View>
 
         <Text style={styles.body}>
-          No health data is ever transmitted off this device by this app. It is never used
-          for advertising, sold, or shared. You can revoke access at any time in Health
-          Connect.
+          Health data never leaves this device unless you turn on daily totals under
+          Settings → 128bit family, which sends them to your own Supabase project. It is
+          never used for advertising, sold, or shared. You can revoke access at any time in
+          Health Connect.
         </Text>
 
         <Pressable style={styles.button} onPress={() => health.openSettings()}>
@@ -122,6 +124,12 @@ export default function PrivacyScreen() {
         <Text style={styles.body}>
           <Text style={styles.bold}>Exercise images.</Text> Loaded from GitHub as you browse
           the library.
+        </Text>
+        <Text style={styles.body}>
+          <Text style={styles.bold}>128bit family.</Text> Off until you sign in under Settings →
+          128bit family and switch it on. Then finished workouts and, if you choose, daily
+          health totals (never weight) go to your own Supabase project for 128bit Tracker. Not
+          through any server of ours.
         </Text>
         <Text style={styles.body}>
           Nothing else. The exercise and food databases ship inside the app and work with no

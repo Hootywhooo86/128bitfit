@@ -5,6 +5,7 @@ import { SportPicker } from '@/components/SportPicker';
 import { Label, MenuRow, Note, Screen } from '@/components/ui';
 import { saveManualCardio } from '@/db/cardio-queries';
 import { getCardioSettings, setLastSport } from '@/db/map-settings';
+import { familyCardio } from '@/lib/family';
 import { mirrorWorkout } from '@/lib/health/mirror';
 import { METRES_PER, sportById, type DistanceUnit } from '@/lib/cardio';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
@@ -59,6 +60,13 @@ export default function ManualCardioScreen() {
         endedAt,
         title: sport.label,
         exerciseType: sport.healthType,
+      });
+      familyCardio({
+        id,
+        startedAt,
+        endedAt,
+        sport: sport.label,
+        distanceM: dist == null ? null : dist * METRES_PER[unit],
       });
       router.replace({ pathname: '/cardio/[id]', params: { id, fresh: '1' } });
     } catch (e) {

@@ -17,6 +17,7 @@ import { resolveSetSeed, type LastPerformance } from '@/lib/set-prefill';
 import { repeatPlan } from '@/lib/repeat-workout';
 import { trackFor } from '@/lib/track-mode';
 import { getTrackPrefs } from '../track-prefs';
+import { familyStrength, familyWorkoutRemoved } from '@/lib/family';
 import { mirrorWorkout, mirrorWorkoutRemoved } from '@/lib/health/mirror';
 import {
   exercises,
@@ -415,11 +416,17 @@ export async function completeSession(sessionId: string): Promise<void> {
       const summary = await getWorkoutSummary(sessionId);
       if (!summary?.session.startedAt || !summary.session.endedAt) return;
       const names = summary.exercises.map((e) => e.name).filter(Boolean);
-      mirrorWorkout({
+      const startedAt = new Date(summary.session.startedAt).getTime();
+      const endedAt = new Date(summary.session.endedAt).getTime();
+      const title = names.length > 0 ? names.slice(0, 3).join(', ') : 'Strength training';
+      mirrorWorkout({ id: sessionId, startedAt, endedAt, title });
+      familyStrength({
         id: sessionId,
-        startedAt: new Date(summary.session.startedAt).getTime(),
-        endedAt: new Date(summary.session.endedAt).getTime(),
-        title: names.length > 0 ? names.slice(0, 3).join(', ') : 'Strength training',
+        startedAt,
+        endedAt,
+        title,
+        exercises: summary.exerciseCount,
+        sets: summary.completedSets,
       });
     } catch {
       // Already recorded locally; a failed mirror is not a failed workout.
@@ -615,4 +622,5 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await db.delete(sessionExercises).where(eq(sessionExercises.sessionId, sessionId));
   await db.delete(workoutSessions).where(eq(workoutSessions.id, sessionId));
   mirrorWorkoutRemoved(sessionId);
+  familyWorkoutRemoved(sessionId);
 }

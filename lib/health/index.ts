@@ -58,6 +58,19 @@ function provider(): HealthProvider {
   return resolved;
 }
 
+const dayListeners = new Set<(days: HealthDay[]) => void>();
+
+/**
+ * Hears every set of days read. The 128bit family feed uses it so a day's
+ * totals go up when the app reads them anyway, never by reading more often.
+ */
+export function onHealthDaysRead(fn: (days: HealthDay[]) => void): () => void {
+  dayListeners.add(fn);
+  return () => {
+    dayListeners.delete(fn);
+  };
+}
+
 /** Stable facade so callers keep one import regardless of platform. */
 export const health: HealthProvider = {
   get name(): string {
@@ -76,7 +89,18 @@ export const health: HealthProvider = {
     return provider().requestPermissions();
   },
   readDays(startDate: string, endDate: string): Promise<HealthDay[]> {
-    return provider().readDays(startDate, endDate);
+    return provider()
+      .readDays(startDate, endDate)
+      .then((days) => {
+        for (const fn of dayListeners) {
+          try {
+            fn(days);
+          } catch {
+            // A listener's problem is not this read's problem.
+          }
+        }
+        return days;
+      });
   },
   readWindow(startMs: number, endMs: number): Promise<HealthWindow> {
     return provider().readWindow(startMs, endMs);

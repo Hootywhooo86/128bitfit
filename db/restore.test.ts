@@ -33,6 +33,10 @@ vi.mock('@/lib/health/mirror', () => ({
   mirrorWeights: () => undefined,
   mirrorMeal: () => undefined,
 }));
+vi.mock('@/lib/family', () => ({
+  familyStrength: () => undefined,
+  familyWorkoutRemoved: () => undefined,
+}));
 
 const { collectExport } = await import('@/lib/export/collect');
 const { buildEnvelope } = await import('@/lib/export/json');

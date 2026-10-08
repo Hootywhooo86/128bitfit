@@ -31,6 +31,7 @@ export function SettingsLinks() {
       />
       <LinkCard href="/settings/map" title="Map" sub="Dark or light, km or miles, route colours →" />
       <LinkCard href="/settings/health" title={HEALTH_APP} sub="Check what it is actually reporting →" />
+      <LinkCard href="/settings/family" title="128bit family" sub="Send workouts and health totals to 128bit Tracker →" />
       <LinkCard href="/settings/import" title="Import exercises" sub="From Hevy, a CSV, or a JSON export →" />
       <LinkCard href="/settings/export" title="Export data" sub="Download everything as CSV and JSON →" />
     </>

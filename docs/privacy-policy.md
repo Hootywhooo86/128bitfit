@@ -1,6 +1,6 @@
 # 128BIT FIT — Privacy Policy
 
-**Last updated:** 21 September 2026
+**Last updated:** 8 October 2026
 
 128BIT FIT is a training and nutrition tracker. This policy describes exactly
 what the app does with your data. It is written against what the code actually
@@ -43,14 +43,15 @@ Specifics:
   "Not connected" rather than inventing numbers.
 - Steps are read **when you open the Home screen** and displayed there. They are
   not stored in the app's database and not sent anywhere.
-- No health data is ever transmitted off your device by this app, and it is
+- Health data never leaves your device unless **you** turn on
+  "Daily Health Connect totals" under Settings → 128bit family (below). It is
   never used for advertising, sold, or shared with third parties.
 - You can revoke access at any time in Health Connect, in Android Settings. The
   app will go back to showing "Not connected".
 
 ## When the app talks to the internet
 
-Three cases, all of them either optional or triggered by something you do:
+Four cases, all of them either optional or triggered by something you do:
 
 **1. Barcode scanning (Open Food Facts).** When you scan a barcode that is not
 in the bundled USDA database, the barcode number is sent to Open Food Facts to
@@ -73,6 +74,22 @@ policy.
 **3. Exercise images.** Illustrations for the exercise library are loaded from
 GitHub as you browse. That request reveals your IP address to GitHub, as any web
 request would.
+
+**4. 128bit family (only if you set it up).** Off until you sign in under
+Settings → 128bit family with your own Supabase project (the one 128bitPlay
+uses) and switch on what to send. Each is separate:
+
+- *Workouts*: for each finished session, its name, length, number of exercises
+  and sets, and for cardio the sport and distance. Deleting a session deletes
+  the copy.
+- *Daily Health Connect totals*: steps, sleep minutes, resting heart rate,
+  active calories and distance for the last 7 days, as the app reads them.
+  Weight is never sent.
+
+It goes straight to the Supabase project you name, which you own and control;
+it does not pass through any server of ours. 128bit Tracker reads it from there
+to show your timeline. Signing out stops it and drops anything not yet sent.
+Your sign-in is kept in the Android Keystore, not in the app database.
 
 There is no other network activity. The exercise and food databases ship inside
 the app and work with no connection at all.

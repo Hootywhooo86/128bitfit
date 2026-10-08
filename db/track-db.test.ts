@@ -30,6 +30,10 @@ vi.mock('@/lib/health/mirror', () => ({
   mirrorWeights: () => undefined,
   mirrorMeal: () => undefined,
 }));
+vi.mock('@/lib/family', () => ({
+  familyStrength: () => undefined,
+  familyWorkoutRemoved: () => undefined,
+}));
 
 const q = await import('./workout-queries');
 
