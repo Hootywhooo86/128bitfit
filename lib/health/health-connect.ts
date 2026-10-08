@@ -226,7 +226,9 @@ export const healthConnectProvider: HealthProvider = {
     const readAll = async () => {
       const out: (unknown[] | null)[] = [];
       for (const [type, from] of [
-        ['Steps', startDate],
+        // A day early: a step walked late in the evening in the watch's time
+        // zone can start before this range's first local midnight.
+        ['Steps', previousDay(startDate)],
         ['HeartRate', startDate],
         ['RestingHeartRate', startDate],
         ['ActiveCaloriesBurned', startDate],
@@ -338,6 +340,22 @@ export const healthConnectProvider: HealthProvider = {
           lastReadErrors.delete(`${recordType} (aggregate)`);
         } catch (e) {
           lastReadErrors.set(`${recordType} (aggregate)`, describeError(e));
+        }
+      }
+    }
+
+    // Steps: each record on the day it was walked, in the zone offset the
+    // watch stored on it — how Google Health counts a day (checked against its
+    // week view, see ./step-compare). Only when one app wrote all of them:
+    // raw records from two apps would double-count, so then the deduplicated
+    // per-day aggregate above stands.
+    if (steps) {
+      const compared = compareStepDays(steps as StepRecordRow[], days, dayKey);
+      const origins = new Set(compared.flatMap((c) => Object.keys(c.origins)));
+      if (origins.size <= 1) {
+        for (const c of compared) {
+          const bucket = byDate.get(c.day);
+          if (bucket) bucket.steps = c.byRecordZone;
         }
       }
     }
@@ -832,7 +850,7 @@ export async function diagnoseHealthConnect(): Promise<DiagnosticStep[]> {
       add('  grouped totals', `threw — ${describeError(e)}`, false);
     }
     const fmt = (n: number | null | undefined) => (n == null ? '—' : Math.round(n).toLocaleString('en-US'));
-    add('Step totals, last 10 days', 'per-day · grouped · records · own-zone — compare with Google Health', null);
+    add('Step totals, last 10 days', 'per-day · grouped · records · own-zone (Home uses own-zone when one app writes steps)', null);
     for (const c of [...compared].reverse()) {
       let perDay: number | null = null;
       try {
