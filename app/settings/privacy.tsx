@@ -25,10 +25,9 @@ export default function PrivacyScreen() {
       <View style={styles.card}>
         <Text style={styles.h1}>Your data stays on your phone</Text>
         <Text style={styles.body}>
-          There is no 128BIT FIT account, server or database. Everything you log lives in a
-          database on this device. No analytics, no telemetry, no crash reporting —
-          the app has no backend to send anything to. The only copy elsewhere is one you set
-          up yourself (128bit family, below).
+          Everything you log lives in a database on this device. No analytics, no telemetry,
+          no crash reporting. The only copy elsewhere is the optional 128bit family account
+          (below), and only what you switch on.
         </Text>
       </View>
 
@@ -97,7 +96,7 @@ export default function PrivacyScreen() {
 
         <Text style={styles.body}>
           Health data never leaves this device unless you turn on daily totals under
-          Settings → 128bit family, which sends them to your own Supabase project. It is
+          Settings → 128bit family, which stores them in your 128bit family account. It is
           never used for advertising, sold, or shared. You can revoke access at any time in
           Health Connect.
         </Text>
@@ -128,8 +127,9 @@ export default function PrivacyScreen() {
         <Text style={styles.body}>
           <Text style={styles.bold}>128bit family.</Text> Off until you sign in under Settings →
           128bit family and switch it on. Then finished workouts and, if you choose, daily
-          health totals (never weight) go to your own Supabase project for 128bit Tracker. Not
-          through any server of ours.
+          health totals (never weight) are stored in your 128bit family account (run by 128bit
+          on Supabase) so Tracker and the other 128bit apps can show them. Only your account
+          can read them.
         </Text>
         <Text style={styles.body}>
           Nothing else. The exercise and food databases ship inside the app and work with no

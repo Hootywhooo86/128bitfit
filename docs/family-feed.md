@@ -1,7 +1,7 @@
 # 128bit family feed
 
-Optional. Settings → **128bit family** signs in to your own Supabase project (the one
-128bitPlay uses) and sends what you switch on to the family feed, where **128bit Tracker**
+Optional. Settings → **128bit family** signs in to the 128bit family account (Google, Apple
+or email; the same account as 128bitPlay and Tracker; or a Supabase project of your own) and sends what you switch on to the family feed, where **128bit Tracker**
 shows it on one timeline with your books, shows, Trakt history and the rest.
 
 Code: `lib/family/events.ts` (what is sent, tested) and `lib/family/index.ts` (sign-in and

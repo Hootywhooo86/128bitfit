@@ -8,10 +8,12 @@ does; if the two ever disagree, the code is the bug.
 
 ## The short version
 
-- **Your data stays on your phone.** There is no 128BIT FIT account, server or
-  database. Everything you log lives in a SQLite database on your device.
-- **We collect nothing.** No analytics, no telemetry, no crash reporting, no
-  advertising identifiers. The app has no backend to send anything to.
+- **Your data stays on your phone.** Everything you log lives in a SQLite
+  database on your device. The only exception is the optional 128bit family
+  account (below): nothing leaves the phone unless you sign in to it and switch
+  on what to share.
+- **We collect nothing else.** No analytics, no telemetry, no crash reporting,
+  no advertising identifiers.
 - **You can take everything with you.** Settings → Export data writes your
   complete history as JSON and CSV files you control.
 
@@ -75,9 +77,9 @@ policy.
 GitHub as you browse. That request reveals your IP address to GitHub, as any web
 request would.
 
-**4. 128bit family (only if you set it up).** Off until you sign in under
-Settings → 128bit family with your own Supabase project (the one 128bitPlay
-uses) and switch on what to send. Each is separate:
+**4. 128bit family account (only if you set it up).** Off until you sign in
+under Settings → 128bit family (with Google, Apple, or email and password) and
+switch on what to send. Each is separate:
 
 - *Workouts*: for each finished session, its name, length, number of exercises
   and sets, and for cardio the sport and distance. Deleting a session deletes
@@ -86,10 +88,13 @@ uses) and switch on what to send. Each is separate:
   active calories and distance for the last 7 days, as the app reads them.
   Weight is never sent.
 
-It goes straight to the Supabase project you name, which you own and control;
-it does not pass through any server of ours. 128bit Tracker reads it from there
-to show your timeline. Signing out stops it and drops anything not yet sent.
-Your sign-in is kept in the Android Keystore, not in the app database.
+It is stored in the 128bit family account database, which 128bit runs on
+Supabase (hosted in the United States), so that 128bit Tracker and the other
+128bit apps you sign in to can show it. Each account can only read its own
+data. It is never used for advertising, sold, or shared. Signing out stops it
+and drops anything not yet sent; deleting your account deletes what was sent.
+If you prefer, "Use my own Supabase project" sends it to a project you run
+instead. Your sign-in is kept in the Android Keystore, not in the app database.
 
 There is no other network activity. The exercise and food databases ship inside
 the app and work with no connection at all.

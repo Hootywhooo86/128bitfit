@@ -5,11 +5,15 @@ import { settingsStyles as styles } from '@/components/settings/settings-styles'
 import { ToggleRow } from '@/components/ToggleRow';
 import { Label, Screen } from '@/components/ui';
 import {
+  FAMILY_PROJECT,
+  deleteFamilyAccount,
   FAMILY_SQL_URL,
   familyStatus,
   sendFamilyNow,
   setShare,
   signInFamily,
+  signInWithProvider,
+  signUpFamily,
   signOutFamily,
   type FamilyStatus,
 } from '@/lib/family';
@@ -17,9 +21,9 @@ import { HEALTH_APP } from '@/lib/health/platform';
 import { colors } from '@/lib/theme';
 
 /**
- * Settings → 128bit family: send workouts and daily health totals to the family
- * feed in your own Supabase project, for 128bit Tracker's timeline. Off until
- * you sign in and switch each one on.
+ * Settings → 128bit family: one account across the 128bit apps. Send workouts
+ * and daily health totals to the family feed for 128bit Tracker's timeline.
+ * Off until you sign in and switch each one on.
  */
 export default function FamilyScreen() {
   const [status, setStatus] = useState<FamilyStatus | null>(null);
@@ -28,13 +32,15 @@ export default function FamilyScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [own, setOwn] = useState(false);
 
   const refresh = useCallback(async () => {
     const s = await familyStatus();
     setStatus(s);
-    if (s.project) {
-      setUrl((u) => u || s.project!.url);
-      setAnonKey((k) => k || s.project!.anonKey);
+    if (s.ownProject) {
+      setOwn(true);
+      setUrl((u) => u || s.project.url);
+      setAnonKey((k) => k || s.project.anonKey);
     }
   }, []);
 
@@ -64,14 +70,15 @@ export default function FamilyScreen() {
   }
 
   const signedIn = !!status.email;
+  const project = () => (own ? { url, anonKey } : FAMILY_PROJECT);
 
   return (
     <Screen section="128bit family" back>
       <Stack.Screen options={{ title: '128bit family' }} />
       <Text style={styles.muted}>
-        Send what you do here to 128bit Tracker&apos;s timeline, next to your books, shows and
-        everything else. It goes to your own Supabase project (the one 128bitPlay uses), never
-        to a server of ours. Off until you sign in and switch something on.
+        Your 128bit family account: the same sign-in as 128bitPlay and 128bit Tracker. Send what
+        you do here to Tracker&apos;s timeline, next to your books, shows and everything else.
+        Nothing is sent until you sign in and switch something on.
       </Text>
 
       {signedIn ? (
@@ -117,45 +124,59 @@ export default function FamilyScreen() {
           >
             <Text style={styles.browseText}>Sign out</Text>
           </Pressable>
+          <Pressable
+            style={styles.browseBtn}
+            onPress={() =>
+              Alert.alert(
+                'Delete your 128bit family account?',
+                'Everything sent from every 128bit app is deleted for good. Your workouts on this phone stay.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: () => run(deleteFamilyAccount, 'Could not delete the account'),
+                  },
+                ]
+              )
+            }
+          >
+            <Text style={[styles.browseText, { color: colors.textMuted }]}>Delete account</Text>
+          </Pressable>
         </>
       ) : (
         <View>
-          <Label>SUPABASE PROJECT URL</Label>
-          <TextInput
-            style={styles.input}
-            value={url}
-            onChangeText={setUrl}
-            placeholder="https://abcd1234.supabase.co"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-          />
-          <Label>ANON PUBLIC KEY</Label>
-          <TextInput
-            style={styles.input}
-            value={anonKey}
-            onChangeText={setAnonKey}
-            placeholder="From Supabase → Settings → API"
-            placeholderTextColor={colors.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          <Label>EMAIL</Label>
+          <Pressable
+            style={styles.save}
+            disabled={busy}
+            onPress={() => run(() => signInWithProvider('google', project()), 'Could not sign in with Google')}
+          >
+            <Text style={styles.saveText}>Continue with Google</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.save, { marginTop: 8 }]}
+            disabled={busy}
+            onPress={() => run(() => signInWithProvider('apple', project()), 'Could not sign in with Apple')}
+          >
+            <Text style={styles.saveText}>Continue with Apple</Text>
+          </Pressable>
+
+          <Label>OR WITH EMAIL</Label>
           <TextInput
             style={styles.input}
             value={email}
             onChangeText={setEmail}
+            placeholder="Email"
             placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
           />
-          <Label>PASSWORD</Label>
           <TextInput
-            style={styles.input}
+            style={[styles.input, { marginTop: 8 }]}
             value={password}
             onChangeText={setPassword}
+            placeholder="Password"
             placeholderTextColor={colors.textMuted}
             secureTextEntry
           />
@@ -164,20 +185,66 @@ export default function FamilyScreen() {
             disabled={busy}
             onPress={() =>
               run(async () => {
-                await signInFamily({ url, anonKey }, email, password);
+                await signInFamily(project(), email, password);
                 setPassword('');
               }, 'Could not sign in')
             }
           >
-            <Text style={styles.saveText}>{busy ? 'Signing in…' : 'Sign in'}</Text>
+            <Text style={styles.saveText}>{busy ? 'Working…' : 'Sign in'}</Text>
+          </Pressable>
+          <Pressable
+            style={styles.browseBtn}
+            disabled={busy}
+            onPress={() =>
+              run(async () => {
+                if (password.length < 6) throw new Error('Pick a password of at least 6 characters.');
+                if (!(await signUpFamily(project(), email, password))) {
+                  Alert.alert('Check your email', 'Tap the link in the email we sent, then come back and sign in.');
+                }
+                setPassword('');
+              }, 'Could not create the account')
+            }
+          >
+            <Text style={styles.browseText}>Create a 128bit family account</Text>
           </Pressable>
           <Text style={styles.hint}>
-            Use the same account as 128bitPlay. No 128bitPlay? Create a free Supabase project, run
-            the family setup SQL in its SQL Editor, and add a user under Authentication.
+            One account for 128bitPlay, 128bitfit, 128bit Tracker and the rest of the family.
           </Text>
-          <Pressable style={styles.browseBtn} onPress={() => Linking.openURL(FAMILY_SQL_URL)}>
-            <Text style={styles.browseText}>Open the setup SQL →</Text>
-          </Pressable>
+
+          <ToggleRow
+            name="Use my own Supabase project"
+            sub="Advanced: keep your feed in a project you run instead of the 128bit family one."
+            value={own}
+            onChange={setOwn}
+          />
+          {own ? (
+            <>
+              <Label>SUPABASE PROJECT URL</Label>
+              <TextInput
+                style={styles.input}
+                value={url}
+                onChangeText={setUrl}
+                placeholder="https://abcd1234.supabase.co"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+              />
+              <Label>ANON PUBLIC KEY</Label>
+              <TextInput
+                style={styles.input}
+                value={anonKey}
+                onChangeText={setAnonKey}
+                placeholder="From Supabase → Settings → API"
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <Pressable style={styles.browseBtn} onPress={() => Linking.openURL(FAMILY_SQL_URL)}>
+                <Text style={styles.browseText}>Run the family setup SQL in it first →</Text>
+              </Pressable>
+            </>
+          ) : null}
         </View>
       )}
     </Screen>

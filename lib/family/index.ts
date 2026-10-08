@@ -3,14 +3,16 @@
  * Settings → 128bit family, and each kind of data has its own switch.
  *
  * When on, finished workouts and/or daily health totals go to the feed in your
- * own Supabase project (the one 128bitPlay uses), and 128bit Tracker shows them
- * on its timeline. There is no 128BIT FIT server in between.
+ * 128bit family account (or a Supabase project of the user's own), and 128bit
+ * Tracker shows them on its timeline.
  *
  * Offline-first like everything else: events wait in an outbox in the local
  * database and go up a few seconds later, or whenever the phone is back online.
  * Nothing is collected while signed out.
  */
+import * as Crypto from 'expo-crypto';
 import * as SecureStore from 'expo-secure-store';
+import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 import { getSetting, setSetting } from '@/db/settings-store';
 import { onHealthDaysRead } from '@/lib/health';
@@ -40,14 +42,26 @@ type Session = { access: string; refresh: string; expires: number; email: string
 
 // --- Stored state -------------------------------------------------------------
 
-export async function getProject(): Promise<Project | null> {
+/**
+ * The 128bit family project: one account across play, fit, tracker, gold and life. Its
+ * publishable key is meant to ship inside apps; the tables are only reachable through the
+ * family SQL's functions. A project saved under "Use my own Supabase project" wins.
+ */
+export const FAMILY_PROJECT: Project = {
+  url: 'https://wvflpwtaszpstmjpkrhu.supabase.co',
+  anonKey: 'sb_publishable_dO8uP74cTV1tbuqESgxysw_323C7lWh',
+};
+
+export async function getProject(): Promise<Project> {
   try {
     const raw = await getSetting(PROJECT_KEY);
-    return raw ? (JSON.parse(raw) as Project) : null;
+    if (raw) return JSON.parse(raw) as Project;
   } catch {
-    return null;
+    // fall through
   }
+  return FAMILY_PROJECT;
 }
+
 
 export async function getShare(): Promise<Share> {
   try {
@@ -104,7 +118,9 @@ async function getOutbox(): Promise<OutboxItem[]> {
 const saveOutbox = (q: OutboxItem[]) => setSetting(OUTBOX_KEY, JSON.stringify(q));
 
 export type FamilyStatus = {
-  project: Project | null;
+  project: Project;
+  /** Signed in to a project of the user's own rather than the 128bit family one. */
+  ownProject: boolean;
   email: string | null;
   share: Share;
   waiting: number;
@@ -124,6 +140,7 @@ export async function familyStatus(): Promise<FamilyStatus> {
   ]);
   return {
     project,
+    ownProject: project.url !== FAMILY_PROJECT.url,
     email: session?.email ?? null,
     share,
     waiting: outbox.length,
@@ -151,7 +168,7 @@ async function call(project: Project, path: string, body: unknown, token?: strin
       { timeoutMs: LOOKUP_TIMEOUT_MS }
     );
   } catch {
-    throw new Error('Could not reach your Supabase project. It will try again later.');
+    throw new Error('Could not reach the 128bit family account. It will try again later.');
   }
   const text = await res.text();
   let json: Record<string, unknown> | null = null;
@@ -165,7 +182,7 @@ async function call(project: Project, path: string, body: unknown, token?: strin
       json?.error_description ?? json?.msg ?? json?.message ?? json?.error ?? `Supabase answered ${res.status}`
     );
     if (/function .* does not exist|Could not find the function/i.test(msg)) {
-      throw new Error('Your Supabase project has no family feed yet. Run the setup SQL first.');
+      throw new Error('The 128bit family account isn\'t set up yet. Try again later.');
     }
     throw new Error(msg);
   }
@@ -190,16 +207,76 @@ function toSession(a: AuthAnswer, email: string): Session {
   };
 }
 
-/** Signs in with the same email and password as 128bitPlay. */
-export async function signInFamily(project: Project, email: string, password: string): Promise<void> {
+function checkProject(project: Project): Project {
   const url = project.url.trim().replace(/\/+$/, '');
   if (!/^https:\/\/[^/]+$/.test(url)) throw new Error('The Project URL looks like https://abcd1234.supabase.co');
   if (project.anonKey.trim().length < 20) throw new Error('Paste the anon / publishable key from Settings → API.');
-  const p = { url, anonKey: project.anonKey.trim() };
-  const a = (await call(p, '/auth/v1/token?grant_type=password', { email: email.trim(), password })) as AuthAnswer;
-  await saveSession(toSession(a, email.trim()));
-  await setSetting(PROJECT_KEY, JSON.stringify(p));
+  return { url, anonKey: project.anonKey.trim() };
+}
+
+async function signedInTo(p: Project, s: Session): Promise<void> {
+  await saveSession(s);
+  // The family project isn't saved, so a later change to it reaches this phone.
+  await setSetting(PROJECT_KEY, p.url === FAMILY_PROJECT.url ? '' : JSON.stringify(p));
   lastError = null;
+}
+
+/** Email and password: the same 128bit family account as 128bitPlay and Tracker. */
+export async function signInFamily(project: Project, email: string, password: string): Promise<void> {
+  const p = checkProject(project);
+  const a = (await call(p, '/auth/v1/token?grant_type=password', { email: email.trim(), password })) as AuthAnswer;
+  await signedInTo(p, toSession(a, email.trim()));
+}
+
+/** Creates the account. False when Supabase wants the email confirmed first. */
+export async function signUpFamily(project: Project, email: string, password: string): Promise<boolean> {
+  const p = checkProject(project);
+  const a = (await call(p, '/auth/v1/signup', { email: email.trim(), password })) as AuthAnswer;
+  if (!a.access_token) return false;
+  await signedInTo(p, toSession(a, email.trim()));
+  return true;
+}
+
+// Google / Apple: Supabase's sign-in page in an in-app browser, back through
+// bitfit://auth-callback. PKCE, so a code caught by another app is useless without the
+// verifier that never leaves this one. Needs the provider on in Supabase and
+// bitfit://auth-callback in Authentication → URL Configuration → Redirect URLs.
+export type Provider = 'google' | 'apple';
+const AUTH_CALLBACK = 'bitfit://auth-callback';
+
+/** Resolves signed in, or throws one honest sentence (cancelled, refused, offline). */
+export async function signInWithProvider(provider: Provider, project: Project): Promise<void> {
+  const p = checkProject(project);
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  const verifier = Array.from(Crypto.getRandomBytes(64), (b) => chars[b % chars.length]).join('');
+  const challenge = (
+    await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, verifier, {
+      encoding: Crypto.CryptoEncoding.BASE64,
+    })
+  )
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  const authUrl =
+    `${p.url}/auth/v1/authorize?provider=${provider}` +
+    `&redirect_to=${encodeURIComponent(AUTH_CALLBACK)}` +
+    `&code_challenge=${challenge}&code_challenge_method=s256`;
+  const result = await WebBrowser.openAuthSessionAsync(authUrl, AUTH_CALLBACK);
+  if (result.type !== 'success') throw new Error('Sign-in was cancelled.');
+  const back = new URL(result.url);
+  const code = back.searchParams.get('code');
+  if (!code) throw new Error(back.searchParams.get('error_description') ?? 'Sign-in was refused.');
+  const a = (await call(p, '/auth/v1/token?grant_type=pkce', { auth_code: code, code_verifier: verifier })) as AuthAnswer;
+  await signedInTo(p, toSession(a, ''));
+}
+
+/** Deletes the 128bit family account and what every 128bit app sent to it. This phone keeps its own data. */
+export async function deleteFamilyAccount(): Promise<void> {
+  const project = await getProject();
+  const t = await token(project);
+  if (!t) throw new Error('Sign in first.');
+  await call(project, '/rest/v1/rpc/delete_my_account', {}, t);
+  await signOutFamily();
 }
 
 /** Signs out and drops anything still waiting: nothing goes up after this. */
