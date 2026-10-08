@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { computeGame } from './index';
 import { COSMETICS, DEFAULT_LOOK, resolveLook, unlockedBetween } from './cosmetics';
 import { questsForWeek, QUEST_XP } from './quests';
+import { drawWeekly, mondayKey, QUEST_POOL, summarise } from './quest-pool';
 import { HERO_HEIGHT, HERO_WIDTH, heroPixels, PETS, petPixels, TROPHY_SPRITES } from './sprites';
 import { balance, consistency, endurance, mainLift, strength } from './stats';
 import { judgeTrophies, TROPHIES, type TrophyId } from './trophies';
@@ -72,10 +73,15 @@ describe('a brand-new user', () => {
     for (const s of g.stats) expect(s.note.length).toBeGreaterThan(10);
   });
 
-  it('gets small starter quests, all at zero', () => {
+  it('gets three quests, all at zero, each its family\'s easiest tier', () => {
+    expect(g.quests).toHaveLength(3);
     expect(g.quests.map((q) => q.done)).toEqual([0, 0, 0]);
-    expect(g.quests[0].target).toBe(2);
-    expect(g.quests[1].title).toBe('Try 30 minutes of cardio');
+    for (const q of g.quests) {
+      const family = QUEST_POOL.find((t) => t.id === q.id)!.family;
+      const first = QUEST_POOL.find((t) => t.family === family)!;
+      expect(q.target).toBe(first.target);
+    }
+    expect(g.monthly).toMatchObject({ hard: true, done: 0, id: 'hard-workouts', target: 12 });
   });
 });
 
@@ -246,9 +252,12 @@ describe('quests', () => {
   const monday = new Date(2026, 9, 5);
 
   it('are sized from your last four weeks', () => {
-    const sessions = Array.from({ length: 16 }, (_, i) => session(new Date(2026, 8, 7 + i * 1.75, 12), [set()]));
-    const q = questsForWeek(history({ sessions }), monday);
-    expect(q[0].target).toBe(4);
+    const p = summarise(history({ sessions: Array.from({ length: 16 }, (_, i) => session(new Date(2026, 8, 7 + i * 1.75, 12), [set()])) }), mondayKey);
+    const prior = [...p.values()];
+    for (let w = 0; w < 200; w++) {
+      const pick = drawWeekly(prior, `w${w}`, false).find((t) => t.family === 'workouts');
+      if (pick) expect([4, 5]).toContain(pick.target);
+    }
   });
 
   it('count this week only and never exceed the target', () => {
