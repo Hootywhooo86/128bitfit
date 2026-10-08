@@ -156,7 +156,8 @@ Visual rules it establishes:
 
 ## Game layer
 
-XP, levels, RPG stats (STR / END / BAL / CON), weekly quests, pixel trophies and
+XP, levels, RPG stats (STR / END / BAL / CON), weekly quests (3 drawn from a pool of 100,
+seeded by week) plus one HARD monthly quest, pixel trophies and
 level-unlocked cosmetics. Pure logic in `lib/game/`, storage in `db/game-queries.ts`
 (settings keys, so it exports and restores with everything else). Toggle in Settings,
 on by default. These rules are tested in `lib/game/no-harm.test.ts` — keep them:

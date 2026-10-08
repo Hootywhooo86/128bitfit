@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { mondayOf } from '@/lib/weekly-recap';
-import { questsForWeek, questXp } from './quests';
+import { legacyQuestsForWeek, POOL_START, questXp } from './quests';
 import * as v1 from './reference/quests-v1';
 import type { GameHistory, GameSet } from './types';
 
@@ -56,9 +56,11 @@ describe('quests match the first implementation', () => {
     it(`seed ${seed}`, () => {
       const h = history(seed);
       const now = new Date(2026, 9, 7, 12);
-      expect(questXp(h, now)).toEqual(v1.questXp(h, now));
+      // Weeks before the pool keep the original quests exactly.
+      const before = new Date(POOL_START.getTime() - 86_400_000);
+      expect(questXp(h, before)).toEqual(v1.questXp(h, before));
       for (let w = mondayOf(new Date(2025, 10, 3)); w <= now; w = new Date(w.getFullYear(), w.getMonth(), w.getDate() + 7)) {
-        expect(questsForWeek(h, w)).toEqual(v1.questsForWeek(h, w));
+        expect(legacyQuestsForWeek(h, w)).toEqual(v1.questsForWeek(h, w));
       }
     });
   }

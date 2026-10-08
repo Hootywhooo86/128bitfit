@@ -1,5 +1,14 @@
 import { dayKey } from '@/lib/fuel-day';
 import { mondayOf } from '@/lib/weekly-recap';
+import {
+  drawMonthly,
+  drawWeekly,
+  emptyPeriod,
+  mondayKey,
+  monthKey,
+  summarise,
+  type Period,
+} from './quest-pool';
 import type { GameHistory } from './types';
 
 /**
@@ -13,14 +22,23 @@ import type { GameHistory } from './types';
 export type QuestId = 'train' | 'move' | 'variety' | 'protein';
 
 export type Quest = {
-  id: QuestId;
+  id: string;
   title: string;
   target: number;
   done: number;
   complete: boolean;
+  /** The monthly HARD quest. */
+  hard?: boolean;
 };
 
 export const QUEST_XP = 50;
+export const HARD_QUEST_XP = 400;
+
+/**
+ * The week the 100-quest pool starts. Weeks before it keep the quests they
+ * had (the four originals), so XP already earned never moves.
+ */
+export const POOL_START = new Date(2026, 9, 5);
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
 
@@ -69,9 +87,39 @@ function indexWeeks(history: GameHistory): WeekIndex {
   return weeks;
 }
 
+/** The original four-quest rules, for weeks before POOL_START. */
+export function legacyQuestsForWeek(history: GameHistory, monday: Date): Quest[] {
+  return questsFromIndex(history, indexWeeks(history), proteinDays(history), monday);
+}
+
+function poolQuests(weeks: Map<number, Period>, monday: Date, hasProtein: boolean): Quest[] {
+  const prior = [1, 2, 3, 4].map((k) => weeks.get(addWeeks(monday, -k).getTime())).filter((p): p is Period => !!p);
+  const now = weeks.get(monday.getTime());
+  return drawWeekly(prior, dayKey(monday), hasProtein).map((t) => {
+    const done = now ? t.measure(now) : 0;
+    return { id: t.id, title: t.title, target: t.target, done: Math.min(done, t.target), complete: done >= t.target };
+  });
+}
+
 /** The quests for the week starting `monday`, and how far along they are. */
 export function questsForWeek(history: GameHistory, monday: Date): Quest[] {
-  return questsFromIndex(history, indexWeeks(history), proteinDays(history), monday);
+  if (monday.getTime() < POOL_START.getTime()) return legacyQuestsForWeek(history, monday);
+  const hasProtein = history.proteinTargetG != null && history.proteinTargetG > 0;
+  return poolQuests(summarise(history, mondayKey), monday, hasProtein);
+}
+
+/** The month's HARD quest, and how far along it is. */
+export function monthlyQuest(history: GameHistory, now: Date): Quest {
+  return monthlyFrom(summarise(history, monthKey), new Date(now.getFullYear(), now.getMonth(), 1));
+}
+
+function monthlyFrom(months: Map<number, Period>, first: Date): Quest {
+  const prior = [1, 2, 3]
+    .map((k) => months.get(new Date(first.getFullYear(), first.getMonth() - k, 1).getTime()))
+    .filter((p): p is Period => !!p);
+  const { template, target } = drawMonthly(prior, dayKey(first));
+  const done = template.measure(months.get(first.getTime()) ?? emptyPeriod());
+  return { id: template.id, title: template.title(target), target, done: Math.min(done, target), complete: done >= target, hard: true };
 }
 
 /** Days whose logged protein reached the target. */
@@ -131,10 +179,25 @@ export function questXp(history: GameHistory, now: Date): { at: Date; xp: number
   const last = mondayOf(now);
   const weeks = indexWeeks(history);
   const protein = proteinDays(history);
+  const pooled = summarise(history, mondayKey);
+  const hasProtein = history.proteinTargetG != null && history.proteinTargetG > 0;
   const events: { at: Date; xp: number }[] = [];
   for (let w = first, i = 0; w.getTime() <= last.getTime() && i < 2000; w = addWeeks(first, ++i)) {
-    const done = questsFromIndex(history, weeks, protein, w).filter((q) => q.complete).length;
+    const quests =
+      w.getTime() < POOL_START.getTime()
+        ? questsFromIndex(history, weeks, protein, w)
+        : poolQuests(pooled, w, hasProtein);
+    const done = quests.filter((q) => q.complete).length;
     if (done > 0) events.push({ at: w, xp: done * QUEST_XP });
+  }
+  // One HARD quest a month, from the month the pool started.
+  const months = summarise(history, monthKey);
+  for (
+    let m = new Date(POOL_START.getFullYear(), POOL_START.getMonth(), 1);
+    m.getTime() <= now.getTime();
+    m = new Date(m.getFullYear(), m.getMonth() + 1, 1)
+  ) {
+    if (monthlyFrom(months, m).complete) events.push({ at: m, xp: HARD_QUEST_XP });
   }
   return events;
 }

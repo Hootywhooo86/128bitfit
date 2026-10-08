@@ -1,5 +1,5 @@
 import { mondayOf } from '@/lib/weekly-recap';
-import { questsForWeek, questXp, type Quest } from './quests';
+import { monthlyQuest, questsForWeek, questXp, type Quest } from './quests';
 import { allStats, type Stat } from './stats';
 import { judgeTrophies, type TrophyResult } from './trophies';
 import type { GameHistory } from './types';
@@ -10,6 +10,8 @@ export type GameState = {
   stats: Stat[];
   trophies: TrophyResult[];
   quests: Quest[];
+  /** This month's HARD quest. */
+  monthly: Quest;
 };
 
 /**
@@ -27,6 +29,7 @@ export function computeGame(history: GameHistory, now: Date): GameState {
     stats: allStats(history, now),
     trophies: judgeTrophies(history),
     quests: questsForWeek(history, mondayOf(now)),
+    monthly: monthlyQuest(history, now),
   };
 }
 

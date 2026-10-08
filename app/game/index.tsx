@@ -16,7 +16,7 @@ import {
   XP_PER_LOGGED_DAY,
   XP_PER_SET,
 } from '@/lib/game/xp';
-import { QUEST_XP } from '@/lib/game/quests';
+import { HARD_QUEST_XP, QUEST_XP } from '@/lib/game/quests';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 
 export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
@@ -95,7 +95,9 @@ export default function GameScreen() {
     );
   }
 
-  const { progress, stats, trophies, quests, look } = view;
+  const { progress, stats, trophies, quests, monthly, look } = view;
+  const now = new Date();
+  const daysLeft = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate() - now.getDate() + 1;
   const earnedCount = trophies.filter((t) => t.earnedAt).length;
   const title = cosmetic('title', look.title)?.name ?? 'NOVICE';
 
@@ -157,7 +159,25 @@ export default function GameScreen() {
             </View>
           ))}
           <Text style={s.statNote}>
-            New quests every Monday, sized from your last four weeks. +{QUEST_XP} XP each. Miss one
+            Three new quests every Monday, drawn from 100 and sized from your last four weeks. +
+            {QUEST_XP} XP each. Miss one and nothing happens.
+          </Text>
+        </Card>
+
+        <Label>{`MONTHLY · HARD · ${daysLeft} DAY${daysLeft === 1 ? '' : 'S'} LEFT`}</Label>
+        <Card>
+          <View style={s.questHead}>
+            <Text style={[s.questTitle, monthly.complete && s.questDone]}>
+              {monthly.complete ? '✓ ' : ''}
+              {monthly.title}
+            </Text>
+            <Text style={s.questCount}>
+              {monthly.done.toLocaleString()} / {monthly.target.toLocaleString()}
+            </Text>
+          </View>
+          <Bar pct={(monthly.done / monthly.target) * 100} height={8} />
+          <Text style={s.statNote}>
+            About a third past your usual month. +{HARD_QUEST_XP} XP. A new one on the 1st; miss it
             and nothing happens.
           </Text>
         </Card>
@@ -212,7 +232,7 @@ export default function GameScreen() {
           {XP_PER_SET} XP per working set (up to {MAX_XP_SETS_PER_SESSION} a session) ·{' '}
           {XP_PER_CARDIO_MINUTE} XP per cardio minute (up to {MAX_XP_MINUTES_PER_CARDIO / 60} hours a
           session) · {XP_PER_LOGGED_DAY} XP for each day you log food, whatever you ate · {QUEST_XP} XP
-          per quest.
+          per weekly quest · {HARD_QUEST_XP} XP for the monthly HARD one.
         </Text>
         <Text style={s.muted}>
           No leaderboards. No daily streaks — consistency is counted in weeks, and rest days cost
