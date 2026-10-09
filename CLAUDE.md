@@ -151,7 +151,11 @@ Visual rules it establishes:
   listed here as paid; it shipped free, and per the non-negotiable above, nothing free
   becomes paid later. It applies to buttons, highlights, active tabs, progress fills and
   links — never to the heat scale or to over-target red.
-- Pixel font (Silkscreen) for section labels and headers only. Body text is Inter.
+- Pixel font (PressStart2P, the 128bit family face) for section labels and headers only.
+  Body text is Inter. The prototype still shows Silkscreen; the app does not.
+- Shared family pieces (font, neutrals, accent rules, sibling apps, event schema) live in
+  `lib/family/`. That folder is identical in every 128bit repo — see its README before
+  changing it.
 - The character is a hand-authored 28×44 sprite grid rendered at 2×, not procedural shapes.
 
 ## Game layer

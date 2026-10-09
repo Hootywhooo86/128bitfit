@@ -118,14 +118,14 @@ const s = StyleSheet.create({
   col: { alignItems: 'center', gap: 6 },
   caption: {
     fontFamily: fonts.pixel,
-    fontSize: 7,
+    fontSize: 6,
     color: colors.textDim,
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
   legend: { flexDirection: 'row', justifyContent: 'center', gap: spacing.lg },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   swatch: { width: 9, height: 9, borderRadius: 2 },
-  legendText: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textDim, letterSpacing: 1 },
+  legendText: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textDim, letterSpacing: 0.7 },
   worked: {
     color: colors.textMuted,
     fontSize: 12,

@@ -453,7 +453,7 @@ const s = themedStyles(() => StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.md,
   },
-  saveT: { fontFamily: fonts.pixel, fontSize: 10, color: colors.onAccent, letterSpacing: 1 },
+  saveT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.onAccent, letterSpacing: 0.7 },
   modal: { flex: 1, backgroundColor: colors.bg, padding: spacing.md, paddingTop: 48 },
   modalHead: {
     flexDirection: 'row',
@@ -461,7 +461,7 @@ const s = themedStyles(() => StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: spacing.md,
   },
-  modalTitle: { fontFamily: fonts.pixel, fontSize: 10, color: colors.text, letterSpacing: 1 },
+  modalTitle: { fontFamily: fonts.pixel, fontSize: 7, color: colors.text, letterSpacing: 0.7 },
   close: { color: colors.textMuted, fontSize: 22 },
   makeOwn: {
     backgroundColor: colors.surfaceAlt,

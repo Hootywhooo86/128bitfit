@@ -1,5 +1,5 @@
 import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { Silkscreen_400Regular, Silkscreen_700Bold } from '@expo-google-fonts/silkscreen';
+import { PressStart2P_400Regular } from '@expo-google-fonts/press-start-2p';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { DarkTheme, ThemeProvider } from 'expo-router/react-navigation';
@@ -19,7 +19,7 @@ import { colors, fonts } from '@/lib/theme';
 export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
 
 export default function RootLayout() {
-  // Silkscreen is the pixel face for labels and headers; Inter is body text.
+  // PressStart2P is the pixel face (shared by every 128bit app) for labels and headers; Inter is body text.
   // Holding the first frame until they load avoids a flash of the system font
   // reflowing every label in the app.
   const accent = useAccent();
@@ -38,8 +38,7 @@ export default function RootLayout() {
     [accent]
   );
   const [fontsReady] = useFonts({
-    Silkscreen_400Regular,
-    Silkscreen_700Bold,
+    PressStart2P_400Regular,
     Inter_400Regular,
     Inter_500Medium,
     Inter_600SemiBold,
@@ -63,7 +62,7 @@ export default function RootLayout() {
               contentStyle: { backgroundColor: colors.bg },
               headerStyle: { backgroundColor: colors.bg },
               headerTintColor: colors.text,
-              headerTitleStyle: { fontFamily: fonts.pixel, fontSize: 11 },
+              headerTitleStyle: { fontFamily: fonts.pixel, fontSize: 8 },
               headerShadowVisible: false,
             }}
           >

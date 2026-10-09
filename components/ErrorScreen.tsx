@@ -57,7 +57,7 @@ const s = themedStyles(() =>
   StyleSheet.create({
     wrap: { flex: 1, backgroundColor: colors.bg },
     inner: { padding: spacing.lg, paddingTop: 72, gap: spacing.md },
-    label: { fontFamily: fonts.pixel, fontSize: 10, letterSpacing: 1, color: colors.textMuted },
+    label: { fontFamily: fonts.pixel, fontSize: 7, letterSpacing: 0.7, color: colors.textMuted },
     title: { color: colors.text, fontFamily: fonts.bodySemi, fontSize: 18, lineHeight: 25 },
     detail: { color: colors.textMuted, fontFamily: fonts.body, fontSize: 13, lineHeight: 19 },
     primary: { backgroundColor: colors.accent, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center' },

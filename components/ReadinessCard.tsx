@@ -121,12 +121,12 @@ const s = StyleSheet.create({
     borderTopColor: colors.border,
   },
   legendTitle: {
-    fontSize: 8,
+    fontSize: 6,
     fontFamily: fonts.pixel,
     color: colors.textDim,
     marginBottom: spacing.sm,
     textAlign: 'center',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
   legend: {
     flexDirection: 'row',

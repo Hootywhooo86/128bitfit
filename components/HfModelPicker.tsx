@@ -135,7 +135,7 @@ export function HfModelPicker({
 const s = themedStyles(() => StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.bg, padding: spacing.md, paddingTop: 48 },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  title: { fontFamily: fonts.pixel, fontSize: 10, color: colors.text, letterSpacing: 1 },
+  title: { fontFamily: fonts.pixel, fontSize: 7, color: colors.text, letterSpacing: 0.7 },
   close: { color: colors.textMuted, fontSize: 22 },
   search: {
     backgroundColor: colors.surfaceAlt,

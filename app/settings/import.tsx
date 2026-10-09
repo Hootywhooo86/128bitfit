@@ -282,5 +282,5 @@ const s = themedStyles(() => StyleSheet.create({
     alignItems: 'center',
     marginTop: 4,
   },
-  primaryT: { fontFamily: fonts.pixel, fontSize: 10, color: colors.onAccent, letterSpacing: 1 },
+  primaryT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.onAccent, letterSpacing: 0.7 },
 }));

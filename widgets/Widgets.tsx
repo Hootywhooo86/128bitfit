@@ -12,7 +12,7 @@ import { muscleGridSvg, ringSvg, trainedCount, type TodayModel, type WorkoutMode
 import { colors } from '@/lib/theme';
 import type { MuscleTally } from '@/lib/muscle-load';
 
-const PIXEL = 'Silkscreen_400Regular';
+const PIXEL = 'PressStart2P_400Regular';
 const BODY = 'Inter_400Regular';
 const BODY_SEMI = 'Inter_600SemiBold';
 
@@ -28,7 +28,7 @@ const shell = {
 };
 
 const label = (text: string) => (
-  <TextWidget text={text} style={{ fontFamily: PIXEL, fontSize: 10, letterSpacing: 0.1, color: hex(colors.textMuted) }} />
+  <TextWidget text={text} style={{ fontFamily: PIXEL, fontSize: 7, letterSpacing: 0.1, color: hex(colors.textMuted) }} />
 );
 
 const deepLink = (path: string) => ({ clickAction: 'OPEN_URI', clickActionData: { uri: `bitfit://${path}` } });
@@ -86,7 +86,7 @@ export function QuickLogWidget() {
             justifyContent: 'center',
           }}
         >
-          <TextWidget text={q.text} style={{ fontFamily: PIXEL, fontSize: 11, color: hex(colors.accent) }} />
+          <TextWidget text={q.text} style={{ fontFamily: PIXEL, fontSize: 8, color: hex(colors.accent) }} />
         </FlexWidget>
       ))}
     </FlexWidget>
@@ -109,7 +109,7 @@ export function WorkoutWidget({ model, note }: { model: WorkoutModel; note?: str
           {label('WORKOUT')}
           <TextWidget text="No workout running" style={{ fontFamily: BODY_SEMI, fontSize: 14, color: hex(colors.text) }} />
         </FlexWidget>
-        <TextWidget text="START" style={{ fontFamily: PIXEL, fontSize: 12, color: hex(colors.accent) }} />
+        <TextWidget text="START" style={{ fontFamily: PIXEL, fontSize: 8, color: hex(colors.accent) }} />
       </FlexWidget>
     );
   }
@@ -156,7 +156,7 @@ export function WorkoutWidget({ model, note }: { model: WorkoutModel; note?: str
             justifyContent: 'center',
           }}
         >
-          <TextWidget text="DONE" style={{ fontFamily: PIXEL, fontSize: 12, color: hex(colors.onAccent) }} />
+          <TextWidget text="DONE" style={{ fontFamily: PIXEL, fontSize: 8, color: hex(colors.onAccent) }} />
         </FlexWidget>
       ) : null}
     </FlexWidget>

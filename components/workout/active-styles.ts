@@ -359,7 +359,7 @@ export const activeWorkoutStyles = themedStyles(() => StyleSheet.create({
     borderColor: colors.accent,
     backgroundColor: colors.surface,
   },
-  prBannerHead: { color: colors.text, fontFamily: fonts.pixel, fontSize: 9, letterSpacing: 1 },
+  prBannerHead: { color: colors.text, fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7 },
   prBannerNote: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
   tickOn: {
     backgroundColor: colors.accent,

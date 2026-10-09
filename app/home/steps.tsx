@@ -154,11 +154,11 @@ export default function StepsScreen() {
 const s = themedStyles(() =>
   StyleSheet.create({
     center: { paddingVertical: 60, alignItems: 'center' },
-    label: { fontFamily: fonts.pixel, fontSize: 10, color: colors.textMuted, letterSpacing: 1 },
-    hero: { fontFamily: fonts.pixelBold, fontSize: 40, color: colors.text, marginVertical: 6 },
+    label: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textMuted, letterSpacing: 0.7 },
+    hero: { fontFamily: fonts.pixelBold, fontSize: 28, color: colors.text, marginVertical: 6 },
     sub: { fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, lineHeight: 19 },
     btn: { backgroundColor: colors.accent, paddingVertical: 12, alignItems: 'center', marginTop: spacing.md },
-    btnText: { fontFamily: fonts.pixel, fontSize: 12, color: colors.bg, letterSpacing: 1 },
+    btnText: { fontFamily: fonts.pixel, fontSize: 8, color: colors.bg, letterSpacing: 0.7 },
     note: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted, lineHeight: 17, marginTop: spacing.sm },
     row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
     day: { width: 92, fontFamily: fonts.body, fontSize: 13, color: colors.text },

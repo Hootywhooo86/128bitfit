@@ -253,7 +253,7 @@ const s = StyleSheet.create({
     paddingVertical: 13,
     paddingHorizontal: spacing.md,
   },
-  mhN: { fontFamily: fonts.pixel, fontSize: 9, letterSpacing: 1, color: colors.text },
+  mhN: { fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7, color: colors.text },
   mhK: { fontSize: 13, color: colors.textMuted, fontFamily: fonts.bodySemi },
   item: {
     flexDirection: 'row',

@@ -118,7 +118,7 @@ const s = themedStyles(() =>
   StyleSheet.create({
     help: { color: colors.textMuted, fontSize: 12.5, lineHeight: 18, textAlign: 'center', fontFamily: fonts.body },
     err: { color: colors.danger, fontSize: 13, marginTop: 6, fontFamily: fonts.body },
-    sub: { fontFamily: fonts.pixel, fontSize: 8, color: colors.textDim, letterSpacing: 1.5, marginTop: 6, marginBottom: 8 },
+    sub: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textDim, letterSpacing: 1, marginTop: 6, marginBottom: 8 },
     sounds: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
     chip: {
       paddingHorizontal: 12,

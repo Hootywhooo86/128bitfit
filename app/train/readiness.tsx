@@ -91,7 +91,7 @@ const s = themedStyles(() =>
     center: { paddingVertical: 40, alignItems: 'center' },
     scoreCard: { alignItems: 'center', paddingVertical: 22 },
     score: { fontSize: 52, fontFamily: fonts.bodyBold, color: colors.text, letterSpacing: -2 },
-    outOf: { fontFamily: fonts.pixel, fontSize: 8, color: colors.textDim, letterSpacing: 1.5, marginTop: 8 },
+    outOf: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textDim, letterSpacing: 1, marginTop: 8 },
     grade: { fontSize: 14, color: colors.textMuted, marginTop: 12, fontFamily: fonts.bodySemi },
     reason: { color: colors.text, fontSize: 13.5, lineHeight: 19, fontFamily: fonts.body },
   })

@@ -132,7 +132,7 @@ const s = themedStyles(() => StyleSheet.create({
   optGo: { color: colors.accent, fontFamily: fonts.bodyBold, fontSize: 13 },
   chev: { color: colors.textDim, fontSize: 16 },
   clockCard: { alignItems: 'center', paddingVertical: 24 },
-  clockL: { fontFamily: fonts.pixel, fontSize: 8, color: colors.textDim, letterSpacing: 1.5 },
+  clockL: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textDim, letterSpacing: 1 },
   clock: {
     fontSize: 44,
     fontFamily: fonts.bodyBold,

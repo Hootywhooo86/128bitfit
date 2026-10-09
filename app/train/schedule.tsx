@@ -79,7 +79,7 @@ const s = themedStyles(() =>
     day: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 11, borderRadius: radius.md },
     today: { backgroundColor: colors.surfaceAlt },
     pressed: { backgroundColor: colors.track },
-    dow: { fontFamily: fonts.pixel, fontSize: 9, width: 34, color: colors.textDim },
+    dow: { fontFamily: fonts.pixel, fontSize: 6, width: 34, color: colors.textDim },
     dowToday: { color: colors.accent },
     name: { flex: 1, fontSize: 14.5, fontFamily: fonts.bodySemi, color: colors.text },
     nameDim: { color: colors.textDim },

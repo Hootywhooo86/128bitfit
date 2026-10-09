@@ -46,7 +46,7 @@ export function useNow(on: boolean): number {
 
 const s = StyleSheet.create({
   top: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  lbl: { fontFamily: fonts.pixel, fontSize: 9, letterSpacing: 1, color: colors.text },
+  lbl: { fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7, color: colors.text },
   sub: { fontSize: 12, color: colors.textMuted, fontFamily: fonts.body },
   clock: {
     fontSize: 34,

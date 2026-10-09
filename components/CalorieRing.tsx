@@ -58,9 +58,9 @@ const s = StyleSheet.create({
   b: { fontSize: 25, fontFamily: fonts.bodyBold, color: colors.text, letterSpacing: -1 },
   small: {
     fontFamily: fonts.pixel,
-    fontSize: 7,
+    fontSize: 6,
     color: colors.textDim,
-    letterSpacing: 1,
+    letterSpacing: 0.7,
     marginTop: 5,
   },
 });

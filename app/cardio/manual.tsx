@@ -134,6 +134,6 @@ const s = themedStyles(() =>
     input: { flex: 1, color: colors.text, fontSize: 18, paddingVertical: 12, fontFamily: fonts.body },
     unit: { color: colors.textMuted, fontSize: 14, fontFamily: fonts.body },
     save: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 15, alignItems: 'center', marginTop: spacing.md },
-    saveT: { fontFamily: fonts.pixel, fontSize: 11, color: colors.onAccent, letterSpacing: 1 },
+    saveT: { fontFamily: fonts.pixel, fontSize: 8, color: colors.onAccent, letterSpacing: 0.7 },
   })
 );

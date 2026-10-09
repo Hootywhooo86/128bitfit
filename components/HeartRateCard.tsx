@@ -137,7 +137,7 @@ const s = themedStyles(() =>
       padding: spacing.md,
       marginBottom: spacing.md,
     },
-    label: { fontFamily: fonts.pixel, fontSize: 9, color: colors.textMuted, letterSpacing: 1, marginBottom: 8 },
+    label: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textMuted, letterSpacing: 0.7, marginBottom: 8 },
     stats: { flexDirection: 'row', gap: 32, marginBottom: 10 },
     big: { color: colors.text, fontSize: 26, fontFamily: fonts.bodyBold },
     small: { color: colors.textMuted, fontSize: 12, fontFamily: fonts.body },

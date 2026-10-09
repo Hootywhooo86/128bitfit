@@ -283,8 +283,10 @@ The fix was to stop styling screens individually:
   section beneath it in pixel type — never the route's name. The stock header
   is off by default in `app/_layout.tsx`; a screen not yet ported re-enables a
   styled one rather than being left with no way back.
-- **Fonts.** Silkscreen for section labels, headers and tab labels; Inter for
-  body text. The first frame is held until both load, so labels do not reflow
+- **Fonts.** PressStart2P (the 128bit family face, `lib/family/tokens.ts`) for
+  section labels, headers and tab labels; Inter for body text. PressStart2P's
+  capitals are a full em tall against Silkscreen's 0.7, so pixel sizes are 0.7×
+  what they were under Silkscreen, with 6 as the floor. The first frame is held until both load, so labels do not reflow
   from the system font.
 
 Two typefaces, two jobs: pixel type never runs as body text, and body type
@@ -641,6 +643,7 @@ list costs a convenience, not the feature.
 ### The app icon
 
 The logo is the wordmark: `128BIT` over `FIT` in Silkscreen, white on black.
+(The app's pixel face is now PressStart2P; the icon has not been redrawn yet.)
 `scripts/` does not generate it — it was produced once from the bundled font at
 the largest whole-pixel size that fits each icon's safe area, so the letters
 stay crisp rather than anti-aliasing to mush. The adaptive foreground uses a

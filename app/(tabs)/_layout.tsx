@@ -59,8 +59,8 @@ export default function TabLayout() {
 const s = themedStyles(() => StyleSheet.create({
   tab: {
     fontFamily: fonts.pixel,
-    fontSize: 11.5,
-    letterSpacing: 1,
+    fontSize: 8,
+    letterSpacing: 0.7,
     color: colors.textDim,
     textAlign: 'center',
     width: 90,

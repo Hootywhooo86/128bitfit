@@ -327,9 +327,9 @@ const s = themedStyles(() => StyleSheet.create({
   lblWrap: { marginTop: spacing.lg, marginBottom: 10 },
   lbl: {
     fontFamily: fonts.pixel,
-    fontSize: 8,
+    fontSize: 6,
     color: colors.textDim,
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
   card: {
     backgroundColor: colors.surface,
@@ -346,7 +346,7 @@ const s = themedStyles(() => StyleSheet.create({
     alignItems: 'baseline',
     marginBottom: 13,
   },
-  chT: { fontFamily: fonts.pixel, fontSize: 9, letterSpacing: 1, color: colors.text },
+  chT: { fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7, color: colors.text },
   chS: { fontSize: 12, color: colors.textMuted, fontFamily: fonts.body },
 
   mrow: {
@@ -382,9 +382,9 @@ const s = themedStyles(() => StyleSheet.create({
   st3B: { fontSize: 21, fontFamily: fonts.bodyBold, color: colors.text, letterSpacing: -0.6 },
   st3S: {
     fontFamily: fonts.pixel,
-    fontSize: 7,
+    fontSize: 6,
     color: colors.textDim,
-    letterSpacing: 1,
+    letterSpacing: 0.7,
     marginTop: 5,
   },
 
@@ -396,7 +396,7 @@ const s = themedStyles(() => StyleSheet.create({
     padding: 15,
     marginBottom: 10,
   },
-  sessN: { fontFamily: fonts.pixel, fontSize: 11, letterSpacing: 1, color: colors.text },
+  sessN: { fontFamily: fonts.pixel, fontSize: 8, letterSpacing: 0.7, color: colors.text },
   sessS: { fontSize: 12.5, color: colors.textMuted, marginTop: 7, fontFamily: fonts.body },
   sessBtn: {
     marginTop: 13,
@@ -405,7 +405,7 @@ const s = themedStyles(() => StyleSheet.create({
     paddingVertical: 14,
     alignItems: 'center',
   },
-  sessBtnT: { fontFamily: fonts.pixel, fontSize: 10, color: colors.onAccent, letterSpacing: 1 },
+  sessBtnT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.onAccent, letterSpacing: 0.7 },
 
   mac: { marginBottom: 11 },
   macL: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 },
@@ -431,7 +431,7 @@ const s = themedStyles(() => StyleSheet.create({
   },
   qaBtnOn: { borderColor: colors.accent },
   qaIc: { fontSize: 16, color: colors.textMuted, lineHeight: 18 },
-  qaTx: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textMuted, letterSpacing: 0.5 },
+  qaTx: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textMuted, letterSpacing: 0.4 },
 
   note: { borderLeftWidth: 2, borderLeftColor: colors.borderBright, paddingLeft: 11 },
   noteT: { fontSize: 12.5, color: colors.textMuted, lineHeight: 21, fontFamily: fonts.body },

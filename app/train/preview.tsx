@@ -139,5 +139,5 @@ const s = themedStyles(() => StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.md,
   },
-  startT: { fontFamily: fonts.pixel, fontSize: 11, color: colors.onAccent, letterSpacing: 1 },
+  startT: { fontFamily: fonts.pixel, fontSize: 8, color: colors.onAccent, letterSpacing: 0.7 },
 }));

@@ -59,6 +59,6 @@ const s = themedStyles(() =>
     btnTOn: { color: colors.onAccent },
     val: { flex: 1, alignItems: 'center' },
     num: { color: colors.text, fontSize: 40, fontFamily: fonts.bodyBold, letterSpacing: -1.5 },
-    lbl: { fontFamily: fonts.pixel, fontSize: 8, color: colors.textDim, letterSpacing: 1.5, marginTop: 2 },
+    lbl: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textDim, letterSpacing: 1, marginTop: 2 },
   })
 );

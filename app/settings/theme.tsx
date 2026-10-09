@@ -213,7 +213,7 @@ const s = themedStyles(() =>
     },
     swatchOn: { borderColor: colors.accent },
     dot: { width: 26, height: 26, borderRadius: 13 },
-    name: { fontFamily: fonts.pixel, fontSize: 8, letterSpacing: 1, color: colors.textMuted },
+    name: { fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7, color: colors.textMuted },
     nameOn: { color: colors.text },
     dotEmpty: { borderWidth: 1, borderColor: colors.borderBright, alignItems: 'center', justifyContent: 'center' },
     plus: { color: colors.textMuted, fontSize: 16, lineHeight: 18, fontFamily: fonts.bodySemi },
@@ -232,9 +232,9 @@ const s = themedStyles(() =>
       paddingVertical: 8,
       backgroundColor: colors.surfaceAlt,
     },
-    sliderLabel: { fontFamily: fonts.pixel, fontSize: 8, letterSpacing: 1, color: colors.textMuted, marginTop: 6 },
+    sliderLabel: { fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7, color: colors.textMuted, marginTop: 6 },
     previewBtn: { marginTop: spacing.md, borderRadius: radius.md, paddingVertical: 12, alignItems: 'center' },
-    previewBtnT: { fontFamily: fonts.pixel, fontSize: 10, letterSpacing: 2 },
+    previewBtnT: { fontFamily: fonts.pixel, fontSize: 7, letterSpacing: 1.4 },
     save: {
       marginTop: spacing.md,
       borderRadius: radius.md,
@@ -256,7 +256,7 @@ const s = themedStyles(() =>
       backgroundColor: colors.surfaceAlt,
     },
     segOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    segT: { fontFamily: fonts.pixel, fontSize: 8, letterSpacing: 1, color: colors.textMuted },
+    segT: { fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7, color: colors.textMuted },
     segTOn: { color: colors.onAccent },
   })
 );

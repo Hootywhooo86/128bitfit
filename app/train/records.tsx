@@ -104,8 +104,8 @@ const s = StyleSheet.create({
   name: {
     color: colors.textMuted,
     fontFamily: fonts.pixel,
-    fontSize: 8,
-    letterSpacing: 1.2,
+    fontSize: 6,
+    letterSpacing: 0.8,
     marginBottom: 6,
   },
   bestRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },

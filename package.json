@@ -24,7 +24,7 @@
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
-    "@expo-google-fonts/silkscreen": "^0.4.2",
+    "@expo-google-fonts/press-start-2p": "^0.4.1",
     "@kingstinct/react-native-healthkit": "^16.0.0",
     "@maplibre/maplibre-react-native": "^11.4.0",
     "@react-native-community/datetimepicker": "^9.2.1",

@@ -473,7 +473,7 @@ const s = themedStyles(() => StyleSheet.create({
   cam: { height: 320, borderRadius: radius.lg, overflow: 'hidden', marginBottom: 10 },
   help: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 8, fontFamily: fonts.body },
   err: { color: colors.danger, fontSize: 13, lineHeight: 19, fontFamily: fonts.body },
-  fieldL: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textDim, letterSpacing: 1, marginBottom: 5 },
+  fieldL: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textDim, letterSpacing: 0.7, marginBottom: 5 },
   input: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -519,7 +519,7 @@ const s = themedStyles(() => StyleSheet.create({
     marginTop: 4,
     marginBottom: 10,
   },
-  primaryT: { fontFamily: fonts.pixel, fontSize: 10, color: colors.onAccent, letterSpacing: 1 },
+  primaryT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.onAccent, letterSpacing: 0.7 },
   secondary: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,

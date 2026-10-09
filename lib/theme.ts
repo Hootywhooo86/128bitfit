@@ -10,6 +10,7 @@
  * which is read live through the getters below.
  */
 import { accentVersion, currentAccent, currentOnAccent } from './accent';
+import { PIXEL_FONT } from './family/tokens';
 
 export const colors = {
   bg: '#000000',
@@ -49,9 +50,10 @@ export const colors = {
 };
 
 export const fonts = {
-  /** Section labels and headers only. Never body text. */
-  pixel: 'Silkscreen_400Regular',
-  pixelBold: 'Silkscreen_700Bold',
+  /** Section labels and headers only. Never body text. The 128bit family face. */
+  pixel: PIXEL_FONT,
+  /** PressStart2P has one weight; kept so call sites can still say "bold". */
+  pixelBold: PIXEL_FONT,
   body: 'Inter_400Regular',
   bodyMedium: 'Inter_500Medium',
   bodySemi: 'Inter_600SemiBold',

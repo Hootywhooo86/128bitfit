@@ -61,6 +61,6 @@ const s = themedStyles(() =>
     ic: { width: 26, textAlign: 'center', fontSize: 15, color: colors.textMuted, fontFamily: fonts.bodySemi },
     n: { fontSize: 15, fontFamily: fonts.bodySemi, color: colors.text },
     sub: { fontSize: 12.5, color: colors.textDim, marginTop: 4, fontFamily: fonts.body },
-    go: { color: colors.accent, fontFamily: fonts.pixel, fontSize: 9, letterSpacing: 1 },
+    go: { color: colors.accent, fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7 },
   })
 );

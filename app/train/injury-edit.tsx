@@ -158,11 +158,11 @@ const s = themedStyles(() =>
       backgroundColor: colors.surface,
     },
     segOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    segT: { fontFamily: fonts.pixel, fontSize: 8, letterSpacing: 1, color: colors.textMuted },
+    segT: { fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7, color: colors.textMuted },
     segTOn: { color: colors.onAccent },
     err: { color: colors.danger, marginTop: 12, fontFamily: fonts.body },
     primary: { backgroundColor: colors.accent, borderRadius: radius.md, paddingVertical: 14, alignItems: 'center', marginTop: spacing.lg },
-    primaryT: { fontFamily: fonts.pixel, fontSize: 10, color: colors.onAccent, letterSpacing: 1 },
+    primaryT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.onAccent, letterSpacing: 0.7 },
     secondary: {
       marginTop: 10,
       paddingVertical: 12,

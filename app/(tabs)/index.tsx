@@ -338,8 +338,8 @@ const s = StyleSheet.create({
   todayRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   refresh: {
     fontFamily: fonts.pixel,
-    fontSize: 9,
-    letterSpacing: 1,
+    fontSize: 6,
+    letterSpacing: 0.7,
     color: colors.textDim,
     // Same vertical box as Label's wrapper, so the two sit on one line rather
     // than the pixel type drifting below the section heading.

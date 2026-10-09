@@ -168,7 +168,7 @@ const s = themedStyles(() => StyleSheet.create({
     alignItems: 'center',
     marginTop: spacing.md,
   },
-  startT: { fontFamily: fonts.pixel, fontSize: 10, color: colors.onAccent, letterSpacing: 1 },
+  startT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.onAccent, letterSpacing: 0.7 },
   secondary: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,

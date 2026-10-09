@@ -117,7 +117,7 @@ const s = themedStyles(() =>
       backgroundColor: colors.surface,
     },
     segOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-    segT: { fontFamily: fonts.pixel, fontSize: 8, letterSpacing: 1, color: colors.textMuted },
+    segT: { fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7, color: colors.textMuted },
     segTOn: { color: colors.onAccent },
     viz: { height: 110, justifyContent: 'center', overflow: 'hidden' },
     barLine: { position: 'absolute', left: 0, right: 0, height: 8, backgroundColor: colors.borderBright, top: 50 },

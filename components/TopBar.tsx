@@ -71,12 +71,12 @@ const s = StyleSheet.create({
   mid: { flex: 1, alignItems: 'center' },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   logo: { width: 16, height: 16 },
-  ttl: { fontFamily: fonts.pixel, fontSize: 12.5, letterSpacing: 1, color: colors.text },
+  ttl: { fontFamily: fonts.pixel, fontSize: 9, letterSpacing: 0.7, color: colors.text },
   sub: {
     fontFamily: fonts.pixel,
-    fontSize: 9,
+    fontSize: 6,
     color: colors.textDim,
     marginTop: 5,
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
 });

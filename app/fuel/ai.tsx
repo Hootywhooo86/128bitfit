@@ -613,7 +613,7 @@ const s = themedStyles(() => StyleSheet.create({
     alignItems: 'center',
   },
   segOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  segT: { fontFamily: fonts.pixel, fontSize: 8, color: colors.textMuted, letterSpacing: 1 },
+  segT: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textMuted, letterSpacing: 0.7 },
   segTOn: { color: colors.onAccent },
   help: { color: colors.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 10, fontFamily: fonts.body },
   input: {
@@ -637,7 +637,7 @@ const s = themedStyles(() => StyleSheet.create({
     marginTop: 12,
     marginBottom: 10,
   },
-  primaryT: { fontFamily: fonts.pixel, fontSize: 10, color: colors.onAccent, letterSpacing: 1 },
+  primaryT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.onAccent, letterSpacing: 0.7 },
   secondary: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -652,7 +652,7 @@ const s = themedStyles(() => StyleSheet.create({
   modelNote: { color: colors.textDim, fontSize: 12, lineHeight: 18, marginBottom: 10, fontFamily: fonts.body },
   itemName: { color: colors.text, fontSize: 15, fontFamily: fonts.bodySemi },
   itemPortion: { color: colors.textDim, fontSize: 12, marginTop: 3, marginBottom: 6, fontFamily: fonts.body },
-  tag: { fontFamily: fonts.pixel, fontSize: 7, letterSpacing: 1, color: colors.textDim, marginBottom: 10 },
+  tag: { fontFamily: fonts.pixel, fontSize: 6, letterSpacing: 0.7, color: colors.textDim, marginBottom: 10 },
   tagSourced: { color: colors.accent },
   srcRow: { paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.border },
   srcT: { color: colors.text, fontSize: 13, fontFamily: fonts.bodyMedium },
@@ -673,7 +673,7 @@ const s = themedStyles(() => StyleSheet.create({
     fontFamily: fonts.body,
   },
   field: { flex: 1 },
-  fieldL: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textDim, letterSpacing: 1, marginBottom: 4 },
+  fieldL: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textDim, letterSpacing: 0.7, marginBottom: 4 },
   fieldI: {
     backgroundColor: colors.surfaceAlt,
     borderWidth: 1,
@@ -699,6 +699,6 @@ const s = themedStyles(() => StyleSheet.create({
     alignItems: 'center',
   },
   mealOn: { backgroundColor: colors.accent, borderColor: colors.accent },
-  mealT: { fontFamily: fonts.pixel, fontSize: 7, color: colors.textMuted, letterSpacing: 0.5 },
+  mealT: { fontFamily: fonts.pixel, fontSize: 6, color: colors.textMuted, letterSpacing: 0.4 },
   mealTOn: { color: colors.onAccent },
 }));

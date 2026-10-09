@@ -541,7 +541,7 @@ const s = themedStyles(() =>
       justifyContent: 'center',
     },
     roundT: { color: colors.text, fontSize: 24, lineHeight: 28 },
-    roundSmall: { color: colors.text, fontFamily: fonts.pixel, fontSize: 8 },
+    roundSmall: { color: colors.text, fontFamily: fonts.pixel, fontSize: 6 },
     bottom: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: spacing.md, gap: 12 },
     card: {
       backgroundColor: colors.surface,
@@ -560,7 +560,7 @@ const s = themedStyles(() =>
     },
     bannerGood: { backgroundColor: colors.accent },
     bannerQuiet: { backgroundColor: colors.surface },
-    bannerT: { flex: 1, textAlign: 'center', fontFamily: fonts.pixel, fontSize: 10, color: colors.textMuted, letterSpacing: 1 },
+    bannerT: { flex: 1, textAlign: 'center', fontFamily: fonts.pixel, fontSize: 7, color: colors.textMuted, letterSpacing: 0.7 },
     bannerTGood: { color: colors.onAccent },
     expand: { width: 22, textAlign: 'right', color: colors.text, fontSize: 18 },
     stats: { flexDirection: 'row', paddingVertical: 14, paddingHorizontal: 8 },
@@ -580,7 +580,7 @@ const s = themedStyles(() =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    sportBadgeT: { fontFamily: fonts.pixel, fontSize: 11, color: colors.text },
+    sportBadgeT: { fontFamily: fonts.pixel, fontSize: 8, color: colors.text },
     sportName: { color: colors.text, fontSize: 13, fontFamily: fonts.body },
     startBtn: {
       width: 84,

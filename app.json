@@ -132,7 +132,7 @@
         "react-native-android-widget",
         {
           "fonts": [
-            "./node_modules/@expo-google-fonts/silkscreen/400Regular/Silkscreen_400Regular.ttf",
+            "./node_modules/@expo-google-fonts/press-start-2p/400Regular/PressStart2P_400Regular.ttf",
             "./node_modules/@expo-google-fonts/inter/400Regular/Inter_400Regular.ttf",
             "./node_modules/@expo-google-fonts/inter/600SemiBold/Inter_600SemiBold.ttf"
           ],

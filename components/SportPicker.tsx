@@ -101,7 +101,7 @@ const s = themedStyles(() =>
     },
     grab: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.borderBright, marginTop: 8 },
     head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
-    title: { fontFamily: fonts.pixel, fontSize: 11, color: colors.text, letterSpacing: 1 },
+    title: { fontFamily: fonts.pixel, fontSize: 8, color: colors.text, letterSpacing: 0.7 },
     close: { color: colors.textMuted, fontSize: 20 },
     search: {
       backgroundColor: colors.surfaceAlt,
@@ -127,7 +127,7 @@ const s = themedStyles(() =>
       justifyContent: 'center',
     },
     badgeOn: { borderColor: colors.accent, backgroundColor: colors.accent },
-    badgeT: { fontFamily: fonts.pixel, fontSize: 9, color: colors.text },
+    badgeT: { fontFamily: fonts.pixel, fontSize: 6, color: colors.text },
     badgeTOn: { color: colors.onAccent },
     name: { color: colors.text, fontSize: 16, fontFamily: fonts.body },
     nameOn: { color: colors.accent, fontFamily: fonts.bodySemi },
