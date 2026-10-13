@@ -8,8 +8,9 @@ does; if the two ever disagree, the code is the bug.
 
 ## The short version
 
-- **Your data stays on your phone.** There is no 128BIT FIT account, server or
-  database. Everything you log lives in a SQLite database on your device.
+- **Your data stays on your phone.** Everything you log lives in a SQLite
+  database on your device. The only exception is one you opt into: signing in to
+  the 128bit family account and switching sharing on (see below).
 - **We collect nothing.** No analytics, no telemetry, no crash reporting, no
   advertising identifiers. The app has no backend to send anything to.
 - **You can take everything with you.** Settings → Export data writes your
@@ -25,8 +26,25 @@ All of it on your device only:
 - Coach conversations: the questions you ask and the replies you receive
 - Settings, including your character and display preferences
 
-Deleting the app deletes this data. Because there is no server, we cannot
-recover it for you — export first if you want a copy.
+Deleting the app deletes this data. Your log is not backed up to any server, so
+we cannot recover it for you — export first if you want a copy.
+
+## The 128bit family account (optional)
+
+Settings → 128bit family lets you sign in to the account shared by the 128bit
+apps (Play, Tracker and FIT). Signing in shares nothing by itself. Two switches,
+both off until you turn them on, decide what is sent to **your own family feed**:
+
+- **Workouts:** each finished workout's name, length, number of exercises and
+  sets, or a cardio session's sport, minutes and distance.
+- **Daily health summary:** per day, steps, sleep minutes, resting heart rate,
+  active calories and distance, read from Health Connect.
+
+Only your account can read your feed; it is shown in 128bit Tracker's timeline.
+Food logs, weight, photos, coach conversations and AI keys are never sent. The
+feed is stored with Supabase. Turning a switch off stops sending; signing out
+removes the sign-in from the phone. Your sign-in is kept in the phone's secure
+storage and is never in an export.
 
 ## Health Connect (Android)
 

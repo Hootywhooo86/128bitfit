@@ -36,6 +36,7 @@ import type { DistanceUnit } from '@/lib/cardio';
 import type { WeeklyRecap } from '@/lib/weekly-recap';
 import { cosmetic } from '@/lib/game/cosmetics';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { useFamilySync } from '@/lib/family/use-family-sync';
 
 /**
  * Home, laid out as prototype/app-shell.html: the session card, TODAY tiles
@@ -91,6 +92,7 @@ export default function HomeScreen() {
   const [sessionCount, setSessionCount] = useState(0);
   const [latestWeight, setLatestWeight] = useState<WeightEntry | null>(null);
   const [game, setGame] = useState<GameView | null>(null);
+  useFamilySync();
   const [units, setUnits] = useState<WeightUnit>('lb');
   const [tally, setTally] = useState<MuscleTally>(emptyTally());
   const [recentSets, setRecentSets] = useState<number | null>(null);
