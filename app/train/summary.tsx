@@ -14,6 +14,7 @@ import { HeartRateCard } from '@/components/HeartRateCard';
 import { offerBreakdown } from '@/lib/ai-breakdown';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { GameNews } from '@/components/game/GameNews';
+import { useFamilySync } from '@/lib/family/use-family-sync';
 
 function formatDuration(ms: number): string {
   const sec = Math.floor(ms / 1000);
@@ -26,6 +27,7 @@ function formatDuration(ms: number): string {
 }
 
 export default function WorkoutSummaryScreen() {
+  useFamilySync();
   const { id, fresh } = useLocalSearchParams<{ id: string; fresh?: string }>();
   const router = useRouter();
   const [summary, setSummary] = useState<WorkoutSummary | null>(null);

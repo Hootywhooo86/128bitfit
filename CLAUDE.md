@@ -80,7 +80,7 @@ An empty app that tells the truth beats a full one that lies.
 | Framework | Expo (React Native), SDK 54+, dev builds not Expo Go |
 | Language | TypeScript |
 | Local DB | expo-sqlite + Drizzle ORM |
-| Sync | Supabase (Postgres + Auth + row-level security) |
+| Sync | Supabase (Postgres + Auth + row-level security) — the 128bit family account, see docs/family-feed.md |
 | State | Zustand |
 | Sprites | react-native-skia |
 | Health | react-native-health-connect (Android), HealthKit later |

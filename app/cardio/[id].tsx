@@ -27,9 +27,11 @@ import { useCardioEnergy } from '@/lib/health/use-cardio-energy';
 import { MAP_ROUTE_BLUE, type MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 import { GameNews } from '@/components/game/GameNews';
+import { useFamilySync } from '@/lib/family/use-family-sync';
 
 /** A finished cardio session: the route, the totals and the splits. */
 export default function CardioSummaryScreen() {
+  useFamilySync();
   const router = useRouter();
   const { id, fresh } = useLocalSearchParams<{ id: string; fresh?: string }>();
   const [session, setSession] = useState<CardioSession | null | undefined>(undefined);

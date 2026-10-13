@@ -25,9 +25,10 @@ export default function PrivacyScreen() {
       <View style={styles.card}>
         <Text style={styles.h1}>Your data stays on your phone</Text>
         <Text style={styles.body}>
-          There is no 128BIT FIT account, server or database. Everything you log lives in a
-          database on this device. No analytics, no telemetry, no crash reporting —
-          the app has no backend to send anything to.
+          Everything you log lives in a database on this device. No analytics, no telemetry,
+          no crash reporting. The one exception is your choice: if you sign in to the 128bit
+          family account and switch sharing on, the workouts and daily health summary you
+          picked go to your own family feed. Food, weight and photos never do.
         </Text>
       </View>
 
@@ -95,9 +96,10 @@ export default function PrivacyScreen() {
         </View>
 
         <Text style={styles.body}>
-          No health data is ever transmitted off this device by this app. It is never used
-          for advertising, sold, or shared. You can revoke access at any time in Health
-          Connect.
+          No health data leaves this device unless you turn on &quot;Daily health summary&quot; in
+          Settings → 128bit family, and then only to your own family account. It is never
+          used for advertising, sold, or shared with anyone else. You can revoke access at any
+          time in Health Connect.
         </Text>
 
         <Pressable style={styles.button} onPress={() => health.openSettings()}>
