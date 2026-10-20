@@ -196,7 +196,8 @@
           "recordAudioAndroid": false,
           "enableBackgroundPlayback": false
         }
-      ]
+      ],
+      "@clerk/expo"
     ],
     "experiments": {
       "typedRoutes": true
