@@ -37,3 +37,13 @@ After the screen settles on Home, a workout summary or a cardio summary, at most
 every 15 minutes, and on **Sync now**. Offline or failing, it records one honest
 sentence for the Settings screen and tries again next time. Logging never waits
 on it.
+
+## Clerk sign-in (side by side)
+
+Settings → **Clerk account** is a second sign-in, next to the family account and
+separate from it: email (Clerk's hosted page) or Google, the person's choice.
+It doesn't send anything to the family feed. Set `EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY`
+in `.env` (see `.env.example`). Without it the app is unchanged and the screen says
+sign-in isn't set up. Code: `lib/clerk.ts`, `components/ClerkGate.tsx`,
+`app/settings/clerk.tsx`. Hosted sign-in needs a dev build rebuilt after adding
+the `@clerk/expo` plugin, so Android picks up the callback.

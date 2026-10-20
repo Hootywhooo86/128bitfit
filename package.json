@@ -23,6 +23,7 @@
     "lint": "expo lint"
   },
   "dependencies": {
+    "@clerk/expo": "^4.13.1",
     "@expo-google-fonts/inter": "^0.4.2",
     "@expo-google-fonts/silkscreen": "^0.4.2",
     "@kingstinct/react-native-healthkit": "^16.0.0",
@@ -35,6 +36,7 @@
     "drizzle-orm": "^0.44.7",
     "expo": "~57.0.24",
     "expo-audio": "~57.0.5",
+    "expo-auth-session": "~57.0.16",
     "expo-brightness": "~57.0.2",
     "expo-build-properties": "~57.0.21",
     "expo-camera": "~57.0.5",

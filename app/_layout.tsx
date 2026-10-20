@@ -6,6 +6,7 @@ import { DarkTheme, ThemeProvider } from 'expo-router/react-navigation';
 import { StatusBar } from 'expo-status-bar';
 import React, { useMemo } from 'react';
 import { View } from 'react-native';
+import { ClerkGate } from '@/components/ClerkGate';
 import { OnboardingGate } from '@/components/OnboardingGate';
 // Registers the background GPS task; it has to exist before any fix arrives.
 import '@/lib/cardio-tracker';
@@ -49,6 +50,7 @@ export default function RootLayout() {
   if (!fontsReady) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
 
   return (
+    <ClerkGate>
     <ThemeProvider value={navTheme}>
       <DatabaseProvider>
         <RestTimerProvider>
@@ -125,5 +127,6 @@ export default function RootLayout() {
         </RestTimerProvider>
       </DatabaseProvider>
     </ThemeProvider>
+    </ClerkGate>
   );
 }

@@ -23,6 +23,7 @@ export function SettingsLinks() {
   return (
     <>
       <LinkCard href="/settings/family" title="128bit family" sub="One account for Play, Tracker and FIT →" />
+      <LinkCard href="/settings/clerk" title="Clerk account" sub="Sign in with email or Google →" />
       <LinkCard href="/settings/privacy" title="Privacy & health data" sub="What is stored, what leaves the device →" />
       <LinkCard
         href="/settings/theme"
