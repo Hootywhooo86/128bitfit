@@ -49,6 +49,7 @@ import type { SetValues } from '@/components/workout/types';
 import { activeWorkoutStyles as styles } from '@/components/workout/active-styles';
 import { Elapsed } from '@/components/workout/Elapsed';
 import { ExerciseCard } from '@/components/workout/ExerciseCard';
+import { WorkoutMuscleCard } from '@/components/workout/WorkoutMuscleCard';
 
 /** A crash here shows a screen with Try again, instead of closing the app. */
 export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
@@ -331,6 +332,13 @@ export default function ActiveWorkoutScreen() {
               />
             ))
           )}
+          {/* Changes whenever a set is ticked or unticked, or an exercise swapped. */}
+          <WorkoutMuscleCard
+            sessionId={sessionId}
+            version={workout.exercises
+              .map((ex) => `${ex.exerciseId}:${ex.sets.filter((st) => st.completed).length}`)
+              .join(',')}
+          />
         </ScrollView>
 
         <View style={styles.footer}>

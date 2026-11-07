@@ -11,6 +11,7 @@ import {
 } from '@/db/workout-queries';
 import { PixelTrophy } from '@/components/PixelTrophy';
 import { HeartRateCard } from '@/components/HeartRateCard';
+import { WorkoutMuscleCard } from '@/components/workout/WorkoutMuscleCard';
 import { offerBreakdown } from '@/lib/ai-breakdown';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { GameNews } from '@/components/game/GameNews';
@@ -118,6 +119,8 @@ export default function WorkoutSummaryScreen() {
             <Text style={styles.rowMeta}>{ex.setCount} sets</Text>
           </View>
         ))}
+
+        <WorkoutMuscleCard sessionId={summary.session.id} version="" />
 
         <Pressable style={styles.btn} onPress={() => router.replace('/(tabs)/train')}>
           <Text style={styles.btnText}>Back to Train</Text>
