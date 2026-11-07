@@ -245,6 +245,17 @@ export default function ActiveWorkoutScreen() {
           </Pressable>
         ) : null}
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+          {/*
+            At the top, compact, and scrolls away with the list. Its version
+            changes whenever a set is ticked or unticked, or an exercise swapped.
+          */}
+          <WorkoutMuscleCard
+            compact
+            sessionId={sessionId}
+            version={workout.exercises
+              .map((ex) => `${ex.exerciseId}:${ex.sets.filter((st) => st.completed).length}`)
+              .join(',')}
+          />
           {workout.exercises.length === 0 ? (
             <Text style={styles.empty}>
               No exercises yet. Add one from the library to start logging sets.
@@ -332,13 +343,6 @@ export default function ActiveWorkoutScreen() {
               />
             ))
           )}
-          {/* Changes whenever a set is ticked or unticked, or an exercise swapped. */}
-          <WorkoutMuscleCard
-            sessionId={sessionId}
-            version={workout.exercises
-              .map((ex) => `${ex.exerciseId}:${ex.sets.filter((st) => st.completed).length}`)
-              .join(',')}
-          />
         </ScrollView>
 
         <View style={styles.footer}>

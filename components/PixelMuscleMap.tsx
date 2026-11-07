@@ -18,11 +18,14 @@ import { colors, fonts, muscleHeat, spacing, themedStyles } from '@/lib/theme';
 export function PixelMuscleMap({
   tally,
   width = 150,
+  compact = false,
   empty,
 }: {
   tally: MuscleTally;
   /** Roughly how wide each figure should be, in points. */
   width?: number;
+  /** Leaves out the footnote once something is trained. */
+  compact?: boolean;
   /** Said under the map when nothing has been trained. */
   empty?: string;
 }) {
@@ -62,7 +65,7 @@ export function PixelMuscleMap({
 
       {worked.length === 0 ? (
         <Text style={styles.note}>{empty ?? 'Nothing trained yet. Log a set and the muscles it works fill in.'}</Text>
-      ) : (
+      ) : compact ? null : (
         <Text style={styles.note}>
           A muscle fills from the bottom up and is full at {FULL_SETS} sets. Tap one to see its count.
         </Text>

@@ -12,7 +12,16 @@ import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
  * Nothing is drawn until the screen has settled: the first figure takes a
  * moment to build, and opening a workout to log a set must never wait on it.
  */
-export function WorkoutMuscleCard({ sessionId, version }: { sessionId: string; version: string }) {
+export function WorkoutMuscleCard({
+  sessionId,
+  version,
+  compact = false,
+}: {
+  sessionId: string;
+  version: string;
+  /** Smaller figures and no footnote, for the top of the live workout. */
+  compact?: boolean;
+}) {
   const [tally, setTally] = useState<MuscleTally | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -34,12 +43,17 @@ export function WorkoutMuscleCard({ sessionId, version }: { sessionId: string; v
   }, [sessionId, version]);
 
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, compact ? styles.compact : null]}>
       <Text style={styles.title}>MUSCLES THIS WORKOUT</Text>
       {failed ? (
         <Text style={styles.error}>Could not read this workout&apos;s sets for the muscle map.</Text>
       ) : tally ? (
-        <PixelMuscleMap tally={tally} empty="Tick a set and the muscles it works fill in here." />
+        <PixelMuscleMap
+          tally={tally}
+          width={compact ? 96 : 150}
+          compact={compact}
+          empty="Tick a set and the muscles it works fill in here."
+        />
       ) : null}
     </View>
   );
@@ -56,6 +70,7 @@ const styles = themedStyles(() =>
       gap: spacing.sm,
       marginTop: spacing.md,
     },
+    compact: { marginTop: 0, marginBottom: spacing.md, padding: spacing.sm },
     title: { fontFamily: fonts.pixel, fontSize: 10, color: colors.textMuted, letterSpacing: 1.5 },
     error: { color: colors.textMuted, fontSize: 13, fontFamily: fonts.body },
   })
