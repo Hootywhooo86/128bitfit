@@ -499,76 +499,51 @@ Two things about web, both load-bearing:
 ### Muscle load (the muscle map)
 
 - `lib/muscle-load.ts` (pure) — the 17 muscle groups the bundled exercise data
-  actually uses, the tally, the load buckets, and `muscleRoles()`.
-- `db/muscle-queries.ts` runs one grouped query for completed sets of completed
-  sessions and feeds both. Only completed sets of **completed** sessions count:
-  an abandoned workout is full of values nobody lifted, and colouring a muscle
-  from those would invent training that did not happen.
-- **Red is targeted, yellow is assisted.** `muscleRoles()` classifies each
-  muscle for the window: `primary` if any exercise named it as a target,
-  `secondary` if it only ever assisted, `none` otherwise. A muscle that was both
-  is primary — the harder classification wins, because that is what the training
-  actually was, and the order the exercises were logged in must not change the
-  answer. Both directions are tested.
-- `muscleRole` in `lib/theme.ts` holds the two colours. They are the same two
-  ends as the `muscleHeat` load scale, so the two never read as different
-  meanings of the same colour. Untrained stays untinted — absence of load, not a
-  low amount of it.
+  actually uses, the tally and the load buckets. A set counts fully for a
+  muscle an exercise targets and half for one it assists.
+- `db/muscle-queries.ts`: `getMuscleTally(since)` counts completed sets of
+  **completed** sessions — an abandoned workout is full of values nobody
+  lifted, and colouring a muscle from those would invent training.
+  `getSessionMuscleTally(id)` counts the ticked sets of one workout whatever
+  its status, so the map under a live workout fills in set by set.
 - Unknown muscle names are ignored rather than guessed at, so a typo in the data
   shows up as a missing muscle instead of load on the wrong one.
 
-#### The artwork
+#### The figure
 
-`assets/figure/` holds, per view, a body silhouette, the line art, and one alpha
-mask per muscle — 13 each. `components/MuscleMap.tsx` stacks three layers: the
-body in near-black, fills for whatever the session worked, then the line art on
-top. The lines have to be last or a filled muscle would erase its own
-definition.
+The figure is pixel art drawn in code, not an image: `lib/muscle-figure/`.
 
-The figure is a **silhouette**: no skin tone, no shading, just the muscle
-outlines on near-black. The only colour on it is the training — red where a
-muscle was the exercise's target, yellow where it assisted. An untrained figure
-is entirely uncoloured, which is the honest first-run state.
-
-- `lib/figure-assets.ts` `require()`s every asset **statically**. Metro resolves
-  asset paths at build time, so a computed `require` bundles nothing and the map
-  would render no colour at all.
-- `assets/figure/figure.json` records which muscles each view carries, and
-  `lib/figure-assets.test.ts` asserts against it: every muscle in the shipped
-  exercise data is a known group, every known group has artwork on at least one
-  view, the artwork names nothing that is not a known group, and each muscle is
-  on the view it is visible from — glutes on the back, pecs on the front.
-  Drawing a muscle on the wrong view colours the wrong part of the body, which
-  is worse than not colouring it.
-- **A region is the whole muscle.** The grown region used to be clipped back to
-  its seed polygon, which left a quad half filled: the polygon is a rough guess
-  at where the muscle is, the basin is where the artwork says it ends. The clip
-  is gone, and coverage went from about half the body to 83% front / 77% back —
-  the rest being the head, hands and feet, which are not muscle groups.
-- **Background is what lies well away from a muscle**, by distance transform,
-  not "anything unclaimed". Treating every unclaimed cell as background left
-  the outer thigh and the forearm grey, because the seed polygons are narrower
-  than the muscles they name.
-- **Regions come from the artwork, not from a polygon.** Hand-drawn polygons
-  never line up: they spill over a drawn edge or stop short of one, and the
-  first version visibly did both. The masks are now built by watershed — seeded
-  inside each muscle, with the artwork's own gradient as the elevation, so a
-  region grows until it reaches a line the artist drew and stops there.
-- A watershed alone is not enough either: the detected edges have gaps, so a
-  single seed floods a whole limb. Each grown region is therefore kept only
-  where it stays inside its anatomical polygon, slightly dilated. The polygon
-  says roughly where, the watershed says exactly to which edge. Anything no
-  polygon claims is seeded as background, so nothing floods into the head,
-  hands, feet or trunks.
-- Seed polygons are authored in fractions of the figure's bounding box against
-  measured landmarks (chin 0.13, nipple 0.27, navel 0.40, crotch 0.55, knee
-  0.70, ankle 0.90). Only the left half is authored; the generator mirrors it.
-- The glutes are the one region still shaped by its polygon rather than the
-  art: the trunks are a flat area with no lines under them, so there is no
-  contour for the watershed to find.
-- **Provenance:** the base artwork was supplied by the project owner, not
-  generated here. It is third-party work and its licence has not been
-  established — that needs settling before any Play submission.
+- `shapes.ts` is the anatomy: ellipses, tapered capsules and polygons on a
+  64 × 128 canvas, left half only, mirrored. The silhouette pieces say which
+  muscle their pixels default to (an arm is triceps unless the biceps shape
+  claims it); detail shapes split groups into separately shaded pieces — three
+  quad heads, two calf heads, a six-pack — with a `:name` suffix.
+- `figure.ts` rasterises that to 96 × 192 per view (the left half is sampled
+  and copied, so the sides match exactly), then lights it once: each piece is a
+  dome as tall as it is wide on a body rounded at its edges, and the slope of
+  that height field against a lamp at the top left picks one of six tones.
+  Pieces meet at thin dark seams; the outline takes the darkest tone of the
+  body beside it on the lit side and is black on the shadow side; a rim light
+  lifts the right edge; the brightest point of each big muscle gets a glint.
+  This is built once per view and cached. `paint()` runs per tally: each
+  muscle fills **from the bottom up**, full at `FULL_SETS` (10), in the heat
+  colour for its count (`loadLevel`). Untrained is grey.
+- Colour rules from CLAUDE.md hold: the body is neutral grey, the only hues
+  are the fixed load scale (`colour.ts` mirrors `muscleHeat`), never the
+  accent. Heat ramps shift a few degrees cooler in shadow and warmer in light;
+  that keeps each ramp the same colour family, so it still means one thing.
+- `components/PixelMuscleMap.tsx` draws it with react-native-svg, one path per
+  colour, at a whole number of physical pixels per figure pixel so edges stay
+  sharp. Tapping a muscle names it and its set count.
+- It appears under the live workout and the workout summary
+  (`components/workout/WorkoutMuscleCard.tsx`, this session's sets) and on
+  Progress (the chosen window).
+- `figure.test.ts` checks every muscle group has pixels on some view, the two
+  sides match, an empty tally paints no load colour, fill grows with sets and
+  stops at the full count, the scale order, and that the SVG paths cover every
+  pixel once.
+- The drawing is original to this repo, so it carries the repo's licence. (It
+  replaced artwork whose licence was never established.)
 
 ### Logging a meal with AI
 

@@ -6,13 +6,7 @@
  * colouring a muscle from those would be inventing training that did not happen.
  */
 import { and, eq, gte, sql } from 'drizzle-orm';
-import {
-  muscleRoles,
-  tallyMuscleSets,
-  type MuscleRoles,
-  type MuscleTally,
-  type MuscleWorkEntry,
-} from '@/lib/muscle-load';
+import { tallyMuscleSets, type MuscleTally, type MuscleWorkEntry } from '@/lib/muscle-load';
 import { db } from './client';
 import { exercises, sessionExercises, sets, workoutSessions } from './schema';
 
@@ -67,9 +61,30 @@ export async function getMuscleTally(since: Date): Promise<MuscleTally> {
   return tallyMuscleSets(await workEntries(since));
 }
 
-/** What the map colours by: targeted in red, assisting in yellow. */
-export async function getMuscleRoles(since: Date): Promise<MuscleRoles> {
-  return muscleRoles(await workEntries(since));
+/**
+ * Sets per muscle in one workout, for the map under it. Counts ticked sets
+ * whatever the session's status, so a workout still in progress fills in
+ * set by set.
+ */
+export async function getSessionMuscleTally(sessionId: string): Promise<MuscleTally> {
+  const rows = await db
+    .select({
+      completedSets: sql<number>`count(${sets.id})`,
+      primaryMuscles: exercises.primaryMuscles,
+      secondaryMuscles: exercises.secondaryMuscles,
+    })
+    .from(sets)
+    .innerJoin(sessionExercises, eq(sets.sessionExerciseId, sessionExercises.id))
+    .innerJoin(exercises, eq(sessionExercises.exerciseId, exercises.id))
+    .where(and(eq(sets.completed, true), eq(sessionExercises.sessionId, sessionId)))
+    .groupBy(sessionExercises.exerciseId);
+  return tallyMuscleSets(
+    rows.map((r) => ({
+      completedSets: Number(r.completedSets) || 0,
+      primaryMuscles: parseList(r.primaryMuscles),
+      secondaryMuscles: parseList(r.secondaryMuscles),
+    }))
+  );
 }
 
 function parseList(raw: string | null): string[] {

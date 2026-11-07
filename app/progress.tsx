@@ -2,10 +2,10 @@ import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/components/ui';
 import { Stack, useFocusEffect } from 'expo-router';
-import { MuscleMap } from '@/components/MuscleMap';
+import { PixelMuscleMap } from '@/components/PixelMuscleMap';
 import { useDb } from '@/db/DatabaseProvider';
-import { getMuscleRoles, getMuscleTally, periodFor } from '@/db/muscle-queries';
-import { MUSCLE_LABELS, emptyTally, loadLevel, neglectedMuscles, rankMuscles, type MuscleTally, emptyRoles, type MuscleRoles } from '@/lib/muscle-load';
+import { getMuscleTally, periodFor } from '@/db/muscle-queries';
+import { MUSCLE_LABELS, emptyTally, loadLevel, neglectedMuscles, rankMuscles, type MuscleTally } from '@/lib/muscle-load';
 import { colors, muscleHeat, spacing, themedStyles } from '@/lib/theme';
 
 const PERIODS = [7, 30, 90] as const;
@@ -14,7 +14,6 @@ export default function ProgressScreen() {
   const { ready } = useDb();
   const [days, setDays] = useState<(typeof PERIODS)[number]>(7);
   const [tally, setTally] = useState<MuscleTally>(emptyTally());
-  const [roles, setRoles] = useState<MuscleRoles>(emptyRoles());
   const [loading, setLoading] = useState(true);
 
   useFocusEffect(
@@ -24,7 +23,6 @@ export default function ProgressScreen() {
       setLoading(true);
       void (async () => {
         const t = await getMuscleTally(periodFor(days).since);
-        setRoles(await getMuscleRoles(periodFor(days).since));
         if (alive) {
           setTally(t);
           setLoading(false);
@@ -63,7 +61,7 @@ export default function ProgressScreen() {
       ) : (
         <>
           <View style={styles.card}>
-            <MuscleMap roles={roles} width={130} />
+            <PixelMuscleMap tally={tally} empty={`No completed workouts in the last ${days} days.`} />
           </View>
 
           {trainedAnything ? (

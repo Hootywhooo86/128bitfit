@@ -49,6 +49,7 @@ import type { SetValues } from '@/components/workout/types';
 import { activeWorkoutStyles as styles } from '@/components/workout/active-styles';
 import { Elapsed } from '@/components/workout/Elapsed';
 import { ExerciseCard } from '@/components/workout/ExerciseCard';
+import { WorkoutMuscleCard } from '@/components/workout/WorkoutMuscleCard';
 
 /** A crash here shows a screen with Try again, instead of closing the app. */
 export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
@@ -244,6 +245,17 @@ export default function ActiveWorkoutScreen() {
           </Pressable>
         ) : null}
         <ScrollView contentContainerStyle={{ paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
+          {/*
+            At the top, compact, and scrolls away with the list. Its version
+            changes whenever a set is ticked or unticked, or an exercise swapped.
+          */}
+          <WorkoutMuscleCard
+            compact
+            sessionId={sessionId}
+            version={workout.exercises
+              .map((ex) => `${ex.exerciseId}:${ex.sets.filter((st) => st.completed).length}`)
+              .join(',')}
+          />
           {workout.exercises.length === 0 ? (
             <Text style={styles.empty}>
               No exercises yet. Add one from the library to start logging sets.
