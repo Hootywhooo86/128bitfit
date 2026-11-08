@@ -1,7 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Modal,
   Pressable,
@@ -27,6 +26,7 @@ import { clearNewExercise, takeNewExercise } from '@/lib/exercise-handoff';
 import { toggleById } from '@/lib/exercise-meta';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 import { defaultTrack } from '@/lib/track-mode';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 const DEFAULT_SETS = 3;
 const DEFAULT_REPS = 10;
@@ -183,7 +183,7 @@ export default function BuildRoutineScreen() {
     return (
       <Screen section={routineId ? 'Edit routine' : 'New routine'} back>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

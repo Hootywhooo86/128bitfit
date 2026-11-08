@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { StepsCard } from '@/components/StepsCard';
 import { Card, Label, Note, Screen } from '@/components/ui';
@@ -11,6 +11,7 @@ import type { NewestSteps } from '@/lib/health/types';
 import { useTodaySteps } from '@/lib/health/use-health';
 import { useHealthRefresh } from '@/lib/health/use-health-refresh';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
 
@@ -76,7 +77,7 @@ export default function StepsScreen() {
       <Screen section="Steps" back>
         {state.status === 'checking' ? (
           <View style={s.center}>
-            <ActivityIndicator color={colors.accent} />
+            <PixelSpinner color={colors.accent} />
           </View>
         ) : (
           <StepsCard />
@@ -122,7 +123,7 @@ export default function StepsScreen() {
         <Note>{`Couldn't read the last ${DAYS} days: ${error}`}</Note>
       ) : !history ? (
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       ) : (
         <Card>

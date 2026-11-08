@@ -2,7 +2,6 @@ import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'ex
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { lookupBarcode } from '@/db/barcode-queries';
 import { colors, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 export default function ScanBarcodeScreen() {
   const router = useRouter();
@@ -75,7 +75,7 @@ export default function ScanBarcodeScreen() {
   if (!permission) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }

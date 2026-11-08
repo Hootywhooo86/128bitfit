@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { checkForUpdate, installedReleaseTag, type UpdateCheck } from '@/lib/update-check';
 import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 const IOS = Platform.OS === 'ios';
 
@@ -35,7 +36,7 @@ export function UpdateCard() {
       </Text>
 
       <Pressable style={[s.btn, busy && { opacity: 0.6 }]} onPress={() => void check()} disabled={busy}>
-        {busy ? <ActivityIndicator color={colors.onAccent} /> : <Text style={s.btnT}>Check for updates</Text>}
+        {busy ? <PixelSpinner color={colors.onAccent} /> : <Text style={s.btnT}>Check for updates</Text>}
       </Pressable>
 
       {result?.status === 'current' ? (

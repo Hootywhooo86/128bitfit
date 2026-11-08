@@ -358,6 +358,8 @@ export const activeWorkoutStyles = themedStyles(() => StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.accent,
     backgroundColor: colors.surface,
+    // Keeps the confetti inside the banner.
+    overflow: 'hidden',
   },
   prBannerHead: { color: colors.text, fontFamily: fonts.pixel, fontSize: 9, letterSpacing: 1 },
   prBannerNote: { color: colors.textMuted, fontSize: 13, marginTop: 4 },

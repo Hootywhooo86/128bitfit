@@ -1,7 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Modal,
@@ -21,6 +20,7 @@ import {
   type UntaggedExercise,
 } from '@/db/workout-queries';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Say what an imported exercise actually was, so the muscle map can colour it.
@@ -78,7 +78,7 @@ export default function MatchImportedScreen() {
     return (
       <Screen section="Match" back>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

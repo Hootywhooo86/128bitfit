@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { NumberBox } from '@/components/NumberBox';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -19,6 +18,7 @@ import {
 import { MEAL_TYPES, type Food, type FoodLog, type MealType } from '@/db/schema';
 import { formatKcal, formatOptionalGrams, nutrientsForServings, nutrientsPerServing } from '@/lib/nutrition';
 import { colors, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 const MEAL_LABELS: Record<MealType, string> = {
   breakfast: 'Breakfast',
@@ -126,7 +126,7 @@ export default function EditFoodLogScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }

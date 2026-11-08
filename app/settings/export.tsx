@@ -1,7 +1,6 @@
 import { Stack } from 'expo-router';
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
@@ -13,6 +12,7 @@ import { runExport, type ExportResult } from '@/lib/export';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 import { BackupButton, RestoreButton } from '@/components/BackupRestore';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 function formatSize(bytes: number | null): string {
   if (bytes == null) return '';
@@ -79,7 +79,7 @@ export default function ExportScreen() {
 
       <Pressable style={[styles.button, busy && styles.buttonBusy]} onPress={onExport} disabled={busy}>
         {busy ? (
-          <ActivityIndicator color={colors.chipActiveText} />
+          <PixelSpinner color={colors.chipActiveText} />
         ) : (
           <Text style={styles.buttonText}>{result ? 'Export again' : 'Export my data'}</Text>
         )}

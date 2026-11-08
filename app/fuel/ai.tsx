@@ -2,7 +2,6 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   Pressable,
@@ -25,6 +24,7 @@ import { MealSlot } from '@/components/MealSlot';
 import { mealTimestamp, type MealDay } from '@/lib/meal-time';
 import { parseDayKey } from '@/lib/fuel-day';
 import { colors, fonts, radius, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Log a meal by describing it, or by photographing it.
@@ -306,7 +306,7 @@ export default function AiFoodScreen() {
         </Card>
       ) : mode === 'recipe' ? null : !permission ? (
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       ) : !permission.granted ? (
         <Card>

@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Card, Label, MenuRow, Note, Screen } from '@/components/ui';
 import { countRecentSets } from '@/db/muscle-queries';
 import { useReadiness } from '@/lib/health/use-readiness';
 import { GRADE_EMOJI, GRADE_LABEL } from '@/lib/readiness';
 import { colors, fonts, themedStyles } from '@/lib/theme';
 import { HEALTH_APP, HEALTH_UNAVAILABLE } from '@/lib/health/platform';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Train → Readiness, from prototype/app-shell.html `train:readiness`.
@@ -28,7 +29,7 @@ export default function ReadinessScreen() {
 
       {state.status === 'checking' ? (
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       ) : state.status === 'unavailable' ? (
         <Note>{HEALTH_UNAVAILABLE} There is nothing to score without it.</Note>

@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text } from 'react-native';
 import * as Sharing from 'expo-sharing';
 import { describePlan, pickBackup, restoreBackup, runBackup } from '@/lib/backup';
 import { colors, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
@@ -29,7 +30,7 @@ export function BackupButton() {
 
   return (
     <Pressable style={[s.button, busy && s.busy]} onPress={() => void onBackup()} disabled={busy}>
-      {busy ? <ActivityIndicator color={colors.chipActiveText} /> : <Text style={s.buttonText}>Back up everything</Text>}
+      {busy ? <PixelSpinner color={colors.chipActiveText} /> : <Text style={s.buttonText}>Back up everything</Text>}
     </Pressable>
   );
 }
@@ -82,7 +83,7 @@ export function RestoreButton({ onRestored, label = 'Restore from a backup' }: {
 
   return (
     <Pressable style={[s.outline, busy && s.busy]} onPress={() => void onRestore()} disabled={busy}>
-      {busy ? <ActivityIndicator color={colors.accent} /> : <Text style={s.outlineText}>{label}</Text>}
+      {busy ? <PixelSpinner color={colors.accent} /> : <Text style={s.outlineText}>{label}</Text>}
     </Pressable>
   );
 }

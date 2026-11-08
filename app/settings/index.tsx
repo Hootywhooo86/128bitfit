@@ -1,7 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   Text,
@@ -41,6 +40,7 @@ import { AiCoachCard, type AiDraft } from '@/components/settings/AiCoachCard';
 import { MaintenanceNote } from '@/components/settings/MaintenanceNote';
 import { SettingsLinks } from '@/components/settings/SettingsLinks';
 import { settingsStyles as styles } from '@/components/settings/settings-styles';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 export default function SettingsScreen() {
   const { ready } = useDb();
@@ -208,7 +208,7 @@ export default function SettingsScreen() {
   if (!ready || loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }

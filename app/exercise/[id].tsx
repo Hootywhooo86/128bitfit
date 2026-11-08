@@ -1,7 +1,6 @@
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   Linking,
   Pressable,
@@ -21,6 +20,7 @@ import {
 } from '@/lib/exercise-images';
 import { isUserExercise } from '@/lib/exercise-sources';
 import { colors, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 export default function ExerciseDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -43,7 +43,7 @@ export default function ExerciseDetailScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }

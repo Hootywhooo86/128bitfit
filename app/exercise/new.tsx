@@ -2,7 +2,6 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
   Pressable,
@@ -31,6 +30,7 @@ import {
 } from '@/lib/exercise-photo';
 import { MUSCLE_GROUPS, MUSCLE_LABELS, type MuscleGroup } from '@/lib/muscle-load';
 import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Add an exercise, optionally by photographing the machine.
@@ -321,7 +321,7 @@ export default function NewExerciseScreen() {
             </>
           ) : !permission ? (
             <View style={s.center}>
-              <ActivityIndicator color={colors.accent} />
+              <PixelSpinner color={colors.accent} />
             </View>
           ) : !permission.granted ? (
             <Card>

@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { filterHfModels, listHfModels, type HfModel } from '@/lib/hf-models';
 import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Browse the models Hugging Face's router can actually serve.
@@ -96,7 +96,7 @@ export function HfModelPicker({
 
         {models == null && !error ? (
           <View style={s.center}>
-            <ActivityIndicator color={colors.accent} />
+            <PixelSpinner color={colors.accent} />
           </View>
         ) : error ? (
           <View style={s.center}>

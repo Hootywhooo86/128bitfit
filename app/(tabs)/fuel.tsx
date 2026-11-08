@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { CalorieRing } from '@/components/CalorieRing';
 import { DayStrip } from '@/components/DayStrip';
 import { FastingCard } from '@/components/FastingCard';
@@ -24,6 +24,7 @@ import { fastProgress, formatElapsed } from '@/lib/fasting';
 import { endFast, useFast } from '@/lib/fasting-store';
 import { formatKcal } from '@/lib/nutrition';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /** A macro nobody recorded shows as a dash, never as 0. */
 const g = (v: number | null | undefined) => (v == null ? '–' : Math.round(v));
@@ -123,7 +124,7 @@ export default function FuelScreen() {
     return (
       <Screen section={describeFuelDay(day)}>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

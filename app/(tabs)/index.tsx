@@ -1,9 +1,11 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { Alert, InteractionManager, Pressable, StyleSheet, Text, View } from 'react-native';
 import { DetectedWorkouts } from '@/components/DetectedWorkouts';
 import { GameNews } from '@/components/game/GameNews';
 import { MuscleLoadCard } from '@/components/MuscleLoadCard';
+import { PixelMuscleMap } from '@/components/PixelMuscleMap';
+import { RunningHero } from '@/components/fx/RunningHero';
 import { ReadinessCard } from '@/components/ReadinessCard';
 import { StepsCard } from '@/components/StepsCard';
 import { WeeklyRecapCard } from '@/components/WeeklyRecapCard';
@@ -34,9 +36,10 @@ import { emptyTally, type MuscleTally } from '@/lib/muscle-load';
 import type { WeightUnit } from '@/db/settings-queries';
 import type { DistanceUnit } from '@/lib/cardio';
 import type { WeeklyRecap } from '@/lib/weekly-recap';
-import { cosmetic } from '@/lib/game/cosmetics';
+import { cosmetic, DEFAULT_LOOK } from '@/lib/game/cosmetics';
 import { colors, fonts, radius, spacing } from '@/lib/theme';
 import { useFamilySync } from '@/lib/family/use-family-sync';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Home, laid out as prototype/app-shell.html: the session card, TODAY tiles
@@ -183,7 +186,7 @@ export default function HomeScreen() {
     return (
       <Screen section="Home">
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );
@@ -229,7 +232,8 @@ export default function HomeScreen() {
             that does not register leaves no way to ask for fresh numbers. This
             always works.
           */}
-          <Pressable onPress={pullToRefresh} hitSlop={10}>
+          <Pressable onPress={pullToRefresh} hitSlop={10} style={s.refreshBtn}>
+            {refreshing ? <RunningHero look={game?.look ?? DEFAULT_LOOK} px={1} /> : null}
             <Text style={s.refresh}>{refreshing ? 'REFRESHING' : 'REFRESH'}</Text>
           </Pressable>
         </View>
@@ -305,6 +309,7 @@ export default function HomeScreen() {
 
         <View style={{ height: 10 }} />
         <MuscleLoadCard tally={tally} untagged={untagged} />
+        <HomeMuscleMap tally={tally} onOpen={() => router.push('/progress')} />
 
         {lastWorkout ? (
           <MenuRow
@@ -335,9 +340,45 @@ export default function HomeScreen() {
   );
 }
 
+/**
+ * The muscle man on Home: the last seven days. Drawn once Home has settled,
+ * so the figure never delays the numbers above it.
+ */
+function HomeMuscleMap({ tally, onOpen }: { tally: MuscleTally; onOpen: () => void }) {
+  const [show, setShow] = useState(false);
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => setShow(true));
+    return () => task.cancel();
+  }, []);
+  return (
+    <Pressable style={s.mapCard} onPress={onOpen} accessibilityRole="button" accessibilityLabel="Open the muscle map">
+      <View style={s.mapHead}>
+        <Text style={s.mapTitle}>MUSCLE MAP</Text>
+        <Text style={s.mapLink}>Last 7 days →</Text>
+      </View>
+      {show ? (
+        <PixelMuscleMap tally={tally} width={120} compact empty="No workouts in the last 7 days. Train and the figure fills in." />
+      ) : null}
+    </Pressable>
+  );
+}
+
 const s = StyleSheet.create({
   center: { paddingVertical: 80, alignItems: 'center' },
   todayRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  refreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  mapCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    gap: spacing.sm,
+    marginTop: 10,
+  },
+  mapHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  mapTitle: { fontFamily: fonts.pixel, fontSize: 10, color: colors.textMuted, letterSpacing: 1.5 },
+  mapLink: { fontFamily: fonts.body, fontSize: 12, color: colors.textDim },
   refresh: {
     fontFamily: fonts.pixel,
     fontSize: 9,

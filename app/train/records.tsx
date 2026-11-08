@@ -1,11 +1,12 @@
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { PixelTrophy } from '@/components/PixelTrophy';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { listPersonalRecords, type ExerciseBest } from '@/db/workout-queries';
 import { colors, fonts } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Best lifts, from the prototype's `train:prs`.
@@ -40,7 +41,7 @@ export default function RecordsScreen() {
     return (
       <Screen section="Records" back>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

@@ -2,13 +2,14 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, MenuRow, Note, Screen } from '@/components/ui';
 import { importExtras, type ExtrasOutcome } from '@/db/import-extras';
 import { importSets, type ImportOutcome } from '@/db/import-sets';
 import type { OpenGymReport } from '@/lib/import/opengym';
 import { parseImport, type ImportExtras, type ImportReport } from '@/lib/import/parse';
 import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Import a training history from another app.
@@ -97,7 +98,7 @@ export default function ImportScreen() {
 
       {busy ? (
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       ) : null}
 

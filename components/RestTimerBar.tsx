@@ -1,15 +1,22 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Hourglass } from '@/components/fx/Hourglass';
+import { useAccent } from '@/lib/accent';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { formatRestClock, useRestTimer } from '@/lib/rest-timer';
 
 export function RestTimerBar() {
   const timer = useRestTimer();
+  const accent = useAccent();
   if (!timer.running && timer.endsAt == null) return null;
+  const left = timer.totalSeconds > 0 ? timer.remainingSeconds / timer.totalSeconds : 0;
 
   return (
     <View style={styles.bar}>
       <View style={styles.left}>
+        <View style={styles.glass}>
+          <Hourglass left={left} color={accent} />
+        </View>
         <Text style={styles.label}>Rest</Text>
         <Text style={styles.clock}>{formatRestClock(timer.remainingSeconds)}</Text>
       </View>
@@ -47,6 +54,7 @@ const styles = themedStyles(() => StyleSheet.create({
     marginBottom: spacing.sm,
   },
   left: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  glass: { alignSelf: 'center' },
   label: { color: colors.accent, fontWeight: '700', fontSize: 13, letterSpacing: 1 },
   clock: { color: colors.text, fontWeight: '800', fontSize: 28, fontVariant: ['tabular-nums'] },
   actions: { flexDirection: 'row', gap: 8 },

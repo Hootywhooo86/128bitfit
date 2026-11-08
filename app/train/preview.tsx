@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { getRoutinePreview, type RoutinePreview } from '@/db/start-queries';
 import { getInProgressSession, startRoutineWorkout } from '@/db/workout-queries';
 import { routineSummary } from '@/lib/routine-summary';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * See the whole routine before committing to it.
@@ -67,7 +68,7 @@ export default function RoutinePreviewScreen() {
     return (
       <Screen section="Start workout" back>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

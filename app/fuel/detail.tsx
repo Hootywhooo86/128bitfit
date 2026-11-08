@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { getAverageNutrition, getDayNutrition } from '@/db/nutrition-queries';
@@ -14,6 +14,7 @@ import {
 } from '@/lib/micronutrients';
 import { describeFuelDay, parseDayKey } from '@/lib/fuel-day';
 import { colors, fonts, muscleHeat, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 type Window = 'day' | 'week' | 'month';
 /**
@@ -90,7 +91,7 @@ export default function DetailedNutritionScreen() {
 
       {!ready || loading || !data ? (
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       ) : data.itemCount === 0 ? (
         <Note>

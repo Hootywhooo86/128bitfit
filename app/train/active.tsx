@@ -11,7 +11,6 @@ import {
   useState,
 } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   ScrollView,
@@ -19,6 +18,9 @@ import {
   View,
 } from 'react-native';
 import { PixelTrophy } from '@/components/PixelTrophy';
+import { Bounce } from '@/components/fx/Bounce';
+import { PixelConfetti } from '@/components/fx/PixelConfetti';
+import { useAccent } from '@/lib/accent';
 import { RestTimerBar } from '@/components/RestTimerBar';
 import {
   addSet,
@@ -50,6 +52,7 @@ import { activeWorkoutStyles as styles } from '@/components/workout/active-style
 import { Elapsed } from '@/components/workout/Elapsed';
 import { ExerciseCard } from '@/components/workout/ExerciseCard';
 import { WorkoutMuscleCard } from '@/components/workout/WorkoutMuscleCard';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /** A crash here shows a screen with Try again, instead of closing the app. */
 export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
@@ -65,7 +68,8 @@ export default function ActiveWorkoutScreen() {
   const [currentExerciseId, setCurrentExerciseId] = useState<string | null>(null);
   /** Sets ticked this visit that were records, for the trophy on the row. */
   const [prSets, setPrSets] = useState<ReadonlySet<string>>(new Set());
-  const [prBanner, setPrBanner] = useState<{ name: string; note: string } | null>(null);
+  const [prBanner, setPrBanner] = useState<{ name: string; note: string; at: number } | null>(null);
+  const accent = useAccent();
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => () => {
     if (bannerTimer.current) clearTimeout(bannerTimer.current);
@@ -132,7 +136,7 @@ export default function ActiveWorkoutScreen() {
       .then((pr) => {
         if (pr.kinds.length === 0 || !pr.note) return;
         setPrSets((prev) => new Set(prev).add(set.id));
-        setPrBanner({ name: se.exerciseName, note: pr.note });
+        setPrBanner({ name: se.exerciseName, note: pr.note, at: Date.now() });
         if (bannerTimer.current) clearTimeout(bannerTimer.current);
         bannerTimer.current = setTimeout(() => setPrBanner(null), 5000);
       })
@@ -183,7 +187,7 @@ export default function ActiveWorkoutScreen() {
   if (loading && !workout) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }
@@ -236,8 +240,11 @@ export default function ActiveWorkoutScreen() {
         </View>
         <RestTimerBar />
         {prBanner ? (
-          <Pressable style={styles.prBanner} onPress={() => setPrBanner(null)}>
-            <PixelTrophy size={32} />
+          <Pressable key={prBanner.at} style={styles.prBanner} onPress={() => setPrBanner(null)}>
+            <PixelConfetti color={accent} height={70} />
+            <Bounce>
+              <PixelTrophy size={32} />
+            </Bounce>
             <View style={{ flex: 1 }}>
               <Text style={styles.prBannerHead}>NEW PR · {prBanner.name.toUpperCase()}</Text>
               <Text style={styles.prBannerNote}>{prBanner.note}</Text>

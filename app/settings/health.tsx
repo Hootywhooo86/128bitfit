@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { Card, Note, Screen } from '@/components/ui';
 import { diagnoseDetected } from '@/db/detected-queries';
 import { diagnoseHealth, health } from '@/lib/health';
 import { formatReport, type DiagnosticStep } from '@/lib/health/diagnose';
 import { colors, fonts, spacing } from '@/lib/theme';
 import { HEALTH_APP } from '@/lib/health/platform';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * What Health Connect actually reports, step by step.
@@ -57,7 +58,7 @@ export default function HealthDiagnosticsScreen() {
 
       {steps == null ? (
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       ) : (
         <>
