@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { Label, MenuRow, Screen, SessionCard } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { listActiveInjuries } from '@/db/injury-queries';
@@ -17,6 +17,7 @@ import type { Routine, WorkoutSession } from '@/db/schema';
 import { planFor, sessionsPerWeek, type WeekPlan } from '@/lib/schedule';
 import { parsePass } from '@/lib/gym-pass';
 import { colors } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 function gymPassSaved(raw: string | null): boolean {
   const p = parsePass(raw);
@@ -86,7 +87,7 @@ export default function TrainScreen() {
     return (
       <Screen section="Train">
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

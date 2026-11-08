@@ -1,9 +1,10 @@
 import { usePathname, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useDb } from '@/db/DatabaseProvider';
 import { isOnboardingComplete } from '@/db/settings-queries';
 import { colors } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * After DB import, redirect to /onboarding when profile incomplete.
@@ -37,7 +38,7 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
   if (!ready || !checked) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }
@@ -46,7 +47,7 @@ export function OnboardingGate({ children }: { children: React.ReactNode }) {
   if (!complete && !pathname?.includes('onboarding')) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }

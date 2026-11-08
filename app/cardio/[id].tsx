@@ -2,7 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Sharing from 'expo-sharing';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { EnergyCard } from '@/components/EnergyCard';
 import { HeartRateCard } from '@/components/HeartRateCard';
 import { RouteMap } from '@/components/RouteMap';
@@ -28,6 +28,7 @@ import { MAP_ROUTE_BLUE, type MapStyleId } from '@/lib/map-style';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 import { GameNews } from '@/components/game/GameNews';
 import { useFamilySync } from '@/lib/family/use-family-sync';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /** A finished cardio session: the route, the totals and the splits. */
 export default function CardioSummaryScreen() {
@@ -78,7 +79,7 @@ export default function CardioSummaryScreen() {
   if (session === undefined) {
     return (
       <Screen section="Cardio" back>
-        <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
+        <PixelSpinner color={colors.accent} style={{ marginTop: 40 }} />
       </Screen>
     );
   }

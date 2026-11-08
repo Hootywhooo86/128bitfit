@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { NumberBox } from '@/components/NumberBox';
 import { PixelTrophy } from '@/components/PixelTrophy';
+import { PixelBurst } from '@/components/fx/PixelBurst';
+import { useAccent } from '@/lib/accent';
 import type { WorkoutSet } from '@/db/schema';
 import { type WeightUnit } from '@/db/settings-queries';
 import { type TrackMode } from '@/lib/track-mode';
@@ -59,6 +61,16 @@ export function SetRow({
   if (shownRepsFor !== repsKey) {
     setShownRepsFor(repsKey);
     setReps(show(repsSource));
+  }
+
+  // Sparks when a set turns ticked — after the save, when the reload says
+  // so, never on the tap itself. Each tick replays them with a new key.
+  const accent = useAccent();
+  const [burst, setBurst] = useState(0);
+  const [wasDone, setWasDone] = useState(set.completed);
+  if (wasDone !== set.completed) {
+    setWasDone(set.completed);
+    if (set.completed) setBurst((b) => b + 1);
   }
 
   const saveWeight = (next: number | null) => {
@@ -141,6 +153,7 @@ export function SetRow({
         }
       >
         <Text style={[styles.tickText, set.completed && styles.tickTextOn]}>✓</Text>
+        {burst > 0 ? <PixelBurst key={burst} color={accent} /> : null}
         {isPr && set.completed ? (
           <View style={styles.prBadge} pointerEvents="none">
             <PixelTrophy size={16} />

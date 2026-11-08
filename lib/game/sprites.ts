@@ -307,3 +307,35 @@ export function trophyPixels(id: TrophyId, earned: boolean): (Tone | null)[][] {
     : { '#': 'dark', '+': 'outline', '*': 'mid' };
   return TROPHY_SPRITES[id].map((row) => [...row].map((c) => (c === '.' ? null : (map[c] ?? null))));
 }
+
+/**
+ * The hero mid-stride, for the pull-to-refresh run: frame `k` of four. The
+ * legs scissor below the shorts, the arms swing against them, and the body
+ * dips on the passing frames. Built from the standing hero, so it wears the
+ * same look.
+ */
+export function heroRunFrame(look: Look, k: number): (Tone | null)[][] {
+  const stand = heroPixels(look);
+  const STRIDE: [number, number, number][] = [
+    [-1, 1, 0],
+    [0, 0, 1],
+    [1, -1, 0],
+    [0, 0, 1],
+  ];
+  const [left, right, dip] = STRIDE[((k % 4) + 4) % 4];
+  const out: (Tone | null)[][] = stand.map((row) => row.map(() => null));
+  const put = (x: number, y: number, t: Tone | null) => {
+    if (t && out[y] && x >= 0 && x < HERO_WIDTH) out[y][x] = t;
+  };
+  stand.forEach((row, y) =>
+    row.forEach((t, x) => {
+      if (!t) return;
+      // Legs and feet move apart; everything above them only dips.
+      if (y >= 19) put(x + (x < HERO_WIDTH / 2 ? left : right), y, t);
+      // Arms (the outer columns) swing, each against the leg on its side.
+      else if ((x <= 1 || x >= HERO_WIDTH - 2) && y >= 12 && y <= 15) put(x, y + (x <= 1 ? left : right), t);
+      else put(x, y + dip, t);
+    })
+  );
+  return out;
+}

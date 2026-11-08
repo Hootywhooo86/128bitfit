@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { getDefaultRestSeconds } from '@/db/rest-settings';
@@ -8,6 +8,7 @@ import { suggestWorkout, type WorkoutSuggestion } from '@/db/gap-queries';
 import { createRoutine, startRoutineWorkout } from '@/db/workout-queries';
 import { MUSCLE_LABELS, type MuscleGroup } from '@/lib/muscle-load';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 const SETS = 3;
 const REPS = 10;
@@ -68,7 +69,7 @@ export default function SuggestedWorkoutScreen() {
     return (
       <Screen section="Suggested" back>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

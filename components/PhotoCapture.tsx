@@ -1,7 +1,8 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Camera sheet for taking a photo that stays on the phone.
@@ -57,7 +58,7 @@ export function PhotoCapture({
       <View style={styles.container}>
         {!permission ? (
           <View style={styles.center}>
-            <ActivityIndicator color={colors.accent} />
+            <PixelSpinner color={colors.accent} />
           </View>
         ) : !permission.granted ? (
           <View style={styles.pad}>

@@ -1,7 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -39,6 +38,7 @@ import {
 } from '@/lib/coach-thread';
 import { consumeAutoAsk } from '@/lib/ai-breakdown';
 import { colors, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 function isCoachMode(v: string): v is CoachMode {
   return v === 'debrief' || v === 'ask' || v === 'checkin';
@@ -202,7 +202,7 @@ export default function CoachSessionScreen() {
   if (!ready || (!ctx && !loadError)) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
         <Text style={styles.muted}>Building local context…</Text>
       </View>
     );
@@ -287,7 +287,7 @@ export default function CoachSessionScreen() {
           disabled={asking}
         >
           {asking ? (
-            <ActivityIndicator color={colors.chipActiveText} />
+            <PixelSpinner color={colors.chipActiveText} />
           ) : (
             <Text style={styles.askBtnText}>
               {!hasKey ? 'Configure API key in Settings' : turns.length > 0 ? 'Send' : askLabel}
@@ -304,7 +304,7 @@ export default function CoachSessionScreen() {
 
         {asking ? (
           <View style={styles.loadingCard}>
-            <ActivityIndicator color={colors.accent} />
+            <PixelSpinner color={colors.accent} />
             <Text style={styles.muted}>Waiting on provider…</Text>
           </View>
         ) : null}

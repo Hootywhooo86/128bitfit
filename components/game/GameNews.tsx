@@ -14,6 +14,7 @@ import { playBlip } from '@/lib/game/blip';
 import type { Look } from '@/lib/game/cosmetics';
 import { TROPHIES } from '@/lib/game/trophies';
 import { colors, fonts, spacing } from '@/lib/theme';
+import { LevelUpTitle } from '@/components/fx/LevelUpTitle';
 import { Hero } from './Hero';
 import { TrophyIcon } from './TrophyIcon';
 
@@ -90,7 +91,7 @@ export function GameNews({ onView }: { onView?: (view: GameView | null) => void 
       <Modal visible={news.levelUp != null} transparent animationType="fade" onRequestClose={closeBanner}>
         <Pressable style={s.scrim} onPress={closeBanner} accessibilityRole="button" accessibilityLabel="Close">
           <View style={[s.banner, { borderColor: accent }]}>
-            <Text style={[s.levelUp, { color: accent }]}>LEVEL UP!</Text>
+            <LevelUpTitle color={accent} />
             <Text style={s.levelLine}>
               LV {news.levelUp?.from} → LV {news.levelUp?.to}
             </Text>
@@ -148,7 +149,6 @@ const s = StyleSheet.create({
     padding: spacing.lg,
     alignItems: 'center',
   },
-  levelUp: { fontFamily: fonts.pixelBold, fontSize: 28, letterSpacing: 2 },
   levelLine: { fontFamily: fonts.pixel, fontSize: 14, color: colors.text, marginTop: 6 },
   heroBox: { marginVertical: spacing.lg },
   unlocks: { alignSelf: 'stretch', borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },

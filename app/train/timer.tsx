@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { BigStepper } from '@/components/BigStepper';
 import { ToggleRow } from '@/components/ToggleRow';
 import { Label, Note, Screen } from '@/components/ui';
@@ -13,6 +13,7 @@ import {
 import { REST_SOUNDS } from '@/lib/rest-sounds';
 import { testRestAlert } from '@/lib/rest-timer-notifications';
 import { colors, fonts, radius, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /** Train → Rest timer, from prototype/app-shell.html `train:timer`. */
 export default function RestTimerSettingsScreen() {
@@ -41,7 +42,7 @@ export default function RestTimerSettingsScreen() {
   if (!prefs) {
     return (
       <Screen section="Rest timer" back>
-        {error ? <Note>{error}</Note> : <ActivityIndicator color={colors.accent} />}
+        {error ? <Note>{error}</Note> : <PixelSpinner color={colors.accent} />}
       </Screen>
     );
   }

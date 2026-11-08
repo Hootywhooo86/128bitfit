@@ -1,7 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Image,
   Pressable,
@@ -17,6 +16,7 @@ import { EQUIPMENT_GROUPS, type EquipmentGroup } from '@/lib/equipment-groups';
 import { exerciseImageSource, parseJsonArray } from '@/lib/exercise-images';
 import { capitalise, exerciseMetaLine } from '@/lib/exercise-meta';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * The exercise library's search, filters and list, shared by the library and
@@ -176,7 +176,7 @@ export function ExerciseBrowser({
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       {loading && items.length === 0 ? (
-        <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+        <PixelSpinner color={colors.accent} style={{ marginTop: 24 }} />
       ) : (
         <FlatList
           data={items}

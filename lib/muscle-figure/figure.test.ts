@@ -75,3 +75,23 @@ describe('muscle figure', () => {
     expect(muscleAt('front', 0, 0)).toBeNull();
   });
 });
+
+describe('muscle figure animation frames', () => {
+  it('flashes the muscles that just grew white, and only their lit pixels', () => {
+    const t = tally({ chest: 3, biceps: 3 });
+    const plain = paint('front', t);
+    const flashed = paint('front', t, { flash: new Set(['chest'] as const) });
+    const whites = (px: (string | null)[]) => px.filter((c) => c === '#ffffff').length;
+    expect(whites(flashed)).toBeGreaterThan(whites(plain));
+    // Biceps did not flash, so it still carries its load colour.
+    expect(countHeat(flashed)).toBeGreaterThan(0);
+  });
+
+  it('moves the eyes when the empty figure glances about', () => {
+    const ahead = paint('front', emptyTally(), { eyes: 'ahead' });
+    expect(paint('front', emptyTally(), { eyes: 'left' })).not.toEqual(ahead);
+    expect(paint('front', emptyTally(), { eyes: 'closed' })).not.toEqual(ahead);
+    // The back of the head has no face.
+    expect(paint('back', emptyTally(), { eyes: 'left' })).toEqual(paint('back', emptyTally()));
+  });
+});

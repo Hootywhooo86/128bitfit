@@ -1,7 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   StyleSheet,
@@ -24,6 +23,7 @@ import { Screen } from '@/components/ui';
 import { healthWeight } from '@/lib/health/use-weight';
 import { formatKg, latestWeight, type WeightReading } from '@/lib/weight-source';
 import { HEALTH_APP } from '@/lib/health/platform';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 export default function WeightLogScreen() {
   const { ready } = useDb();
@@ -99,7 +99,7 @@ export default function WeightLogScreen() {
   if (!ready || loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }

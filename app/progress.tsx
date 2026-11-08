@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Screen } from '@/components/ui';
 import { Stack, useFocusEffect } from 'expo-router';
 import { PixelMuscleMap } from '@/components/PixelMuscleMap';
@@ -7,6 +7,7 @@ import { useDb } from '@/db/DatabaseProvider';
 import { getMuscleTally, periodFor } from '@/db/muscle-queries';
 import { MUSCLE_LABELS, emptyTally, loadLevel, neglectedMuscles, rankMuscles, type MuscleTally } from '@/lib/muscle-load';
 import { colors, muscleHeat, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 const PERIODS = [7, 30, 90] as const;
 
@@ -56,7 +57,7 @@ export default function ProgressScreen() {
 
       {loading ? (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       ) : (
         <>

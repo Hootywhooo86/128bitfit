@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { GameNews } from '@/components/game/GameNews';
 import { Hero } from '@/components/game/Hero';
 import { TrophyIcon } from '@/components/game/TrophyIcon';
@@ -18,6 +18,7 @@ import {
 } from '@/lib/game/xp';
 import { HARD_QUEST_XP, QUEST_XP } from '@/lib/game/quests';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
 
@@ -89,7 +90,7 @@ export default function GameScreen() {
     return (
       <Screen section="Trophies" back>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

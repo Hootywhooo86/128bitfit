@@ -1,6 +1,6 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   getInProgressSession,
   getWorkoutSummary,
@@ -13,9 +13,17 @@ import { PixelTrophy } from '@/components/PixelTrophy';
 import { HeartRateCard } from '@/components/HeartRateCard';
 import { WorkoutMuscleCard } from '@/components/workout/WorkoutMuscleCard';
 import { offerBreakdown } from '@/lib/ai-breakdown';
-import { colors, spacing, themedStyles } from '@/lib/theme';
+import { useAccent } from '@/lib/accent';
+import { useFrames, useReduceMotion } from '@/lib/motion';
+import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
 import { GameNews } from '@/components/game/GameNews';
 import { useFamilySync } from '@/lib/family/use-family-sync';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
+
+const STAGE_CLEAR = 'STAGE CLEAR';
+const TYPE_FRAMES = STAGE_CLEAR.length + 2;
+const COUNT_FRAMES = 16;
+const CLEAR_FRAMES = TYPE_FRAMES + COUNT_FRAMES + 1;
 
 function formatDuration(ms: number): string {
   const sec = Math.floor(ms / 1000);
@@ -34,6 +42,15 @@ export default function WorkoutSummaryScreen() {
   const [summary, setSummary] = useState<WorkoutSummary | null>(null);
   const [prs, setPrs] = useState<SessionPr[]>([]);
   const [loading, setLoading] = useState(true);
+  // Straight after Finish the summary arrives as a STAGE CLEAR: the banner
+  // types itself in, then the numbers count up like a score. Opened again
+  // from history it is just the summary.
+  const accent = useAccent();
+  const still = useReduceMotion();
+  const celebrate = fresh === '1' && !still;
+  const tick = useFrames(CLEAR_FRAMES, 45, celebrate && summary != null, false);
+  const typed = celebrate ? Math.min(STAGE_CLEAR.length, tick + 1) : STAGE_CLEAR.length;
+  const score = celebrate ? Math.max(0, Math.min(1, (tick - TYPE_FRAMES) / COUNT_FRAMES)) : 1;
 
   // The session's own window, so heart rate is the workout's and not the day's.
   const window = React.useMemo(() => {
@@ -79,7 +96,7 @@ export default function WorkoutSummaryScreen() {
   if (loading) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }
@@ -96,15 +113,24 @@ export default function WorkoutSummaryScreen() {
     <>
       <Stack.Screen options={{ title: 'Workout complete', headerBackVisible: false }} />
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 48 }}>
-        <Text style={styles.hero}>Nice work</Text>
+        {fresh === '1' ? (
+          <View style={[styles.clear, { borderColor: accent }]}>
+            <Text style={[styles.clearText, { color: accent }]} accessibilityLabel="Stage clear">
+              {STAGE_CLEAR.slice(0, typed)}
+              <Text style={styles.clearHidden}>{STAGE_CLEAR.slice(typed)}</Text>
+            </Text>
+          </View>
+        ) : (
+          <Text style={styles.hero}>Nice work</Text>
+        )}
         <Text style={styles.muted}>Session saved offline.</Text>
 
         <View style={styles.stats}>
-          <Stat label="Duration" value={formatDuration(summary.durationMs)} />
-          <Stat label="Exercises" value={String(summary.exerciseCount)} />
+          <Stat label="Duration" value={formatDuration(summary.durationMs * score)} />
+          <Stat label="Exercises" value={String(Math.round(summary.exerciseCount * score))} />
           <Stat
             label="Sets"
-            value={`${summary.completedSets}/${summary.totalSets}`}
+            value={`${Math.round(summary.completedSets * score)}/${summary.totalSets}`}
           />
         </View>
 
@@ -191,6 +217,10 @@ const styles = themedStyles(() => StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg, padding: spacing.lg },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' },
   hero: { color: colors.accent, fontSize: 28, fontWeight: '800' },
+  clear: { borderTopWidth: 3, borderBottomWidth: 3, paddingVertical: spacing.sm, alignItems: 'center' },
+  clearText: { fontFamily: fonts.pixelBold, fontSize: 30, letterSpacing: 3 },
+  // The untyped letters hold their space, so the banner never reflows.
+  clearHidden: { color: 'transparent' },
   muted: { color: colors.textMuted, marginTop: 4, marginBottom: spacing.lg },
   stats: { flexDirection: 'row', gap: 8, marginBottom: spacing.lg },
   stat: {

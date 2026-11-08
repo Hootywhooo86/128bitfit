@@ -1,7 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Pressable,
@@ -36,6 +35,7 @@ import { OFF_LICENSE_NOTE } from '@/lib/open-food-facts';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 import { NumberBox } from '@/components/NumberBox';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 type RecentItem = RecentFood;
 
@@ -366,7 +366,7 @@ export default function AddFoodScreen() {
             {searching ? 'Searching…' : `${results.length} result${results.length === 1 ? '' : 's'}`}
           </Text>
           {searching && results.length === 0 ? (
-            <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+            <PixelSpinner color={colors.accent} style={{ marginTop: 24 }} />
           ) : (
             <FlatList
               data={results}

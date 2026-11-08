@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { Label, MenuRow, Note, Screen } from '@/components/ui';
 import { useDb } from '@/db/DatabaseProvider';
 import { listStartableRoutines, type StartableRoutine } from '@/db/start-queries';
@@ -13,6 +13,7 @@ import {
 } from '@/db/workout-queries';
 import { describeLastRun, routineSummary } from '@/lib/routine-summary';
 import { colors } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Pick what to run before anything is written.
@@ -83,7 +84,7 @@ export default function StartWorkoutScreen() {
     return (
       <Screen section="Start workout" back>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

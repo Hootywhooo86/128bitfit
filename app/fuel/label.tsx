@@ -1,12 +1,13 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { describeReading, parseNutritionLabel, type LabelField } from '@/lib/nutrition-label';
 import { ocrAvailable, readTextFromImage } from '@/lib/ocr';
 import { guessProductName } from '@/lib/package-label';
 import { Screen } from '@/components/ui';
 import { colors, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 const FIELD_LABELS: Record<LabelField, string> = {
   calories: 'Calories',
@@ -163,7 +164,7 @@ export default function ScanLabelScreen() {
   if (!permission) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator color={colors.accent} />
+        <PixelSpinner color={colors.accent} />
       </View>
     );
   }

@@ -1,6 +1,6 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, MenuRow, Note, Screen } from '@/components/ui';
 import { listUserFoods } from '@/db/barcode-queries';
 import { useDb } from '@/db/DatabaseProvider';
@@ -15,6 +15,7 @@ import {
   optionalNutrientsPerServing,
 } from '@/lib/nutrition';
 import { colors, fonts, spacing } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 /**
  * Everything the user made, in one place.
@@ -82,7 +83,7 @@ export default function CustomHubScreen() {
     return (
       <Screen section="Custom" back>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

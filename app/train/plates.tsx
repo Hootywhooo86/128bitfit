@@ -5,6 +5,7 @@ import { BigStepper } from '@/components/BigStepper';
 import { Card, Note, Screen } from '@/components/ui';
 import { getAppSettings, type WeightUnit } from '@/db/settings-queries';
 import { BARS, PLATES, STEP, countPlates, platesFor } from '@/lib/plates';
+import { useFrames, useReduceMotion } from '@/lib/motion';
 import { colors, fonts, radius, spacing, themedStyles } from '@/lib/theme';
 
 /**
@@ -54,11 +55,10 @@ export default function PlatesScreen() {
       <Card style={s.viz}>
         <View style={s.barLine} />
         {r.status === 'ok' && r.perSide.length > 0 ? (
-          <View style={s.stack}>
-            {r.perSide.map((p, i) => (
-              <View key={i} style={[s.plate, { height: heightOf(p), backgroundColor: colourOf(p) }]} />
-            ))}
-          </View>
+          <PlateStack
+            key={`${unit}:${r.perSide.join(',')}`}
+            plates={r.perSide.map((p) => ({ height: heightOf(p), colour: colourOf(p) }))}
+          />
         ) : (
           <Text style={s.barOnly}>{r.status === 'ok' ? 'Bar only' : ''}</Text>
         )}
@@ -104,6 +104,34 @@ export default function PlatesScreen() {
   );
 }
 
+/**
+ * The plates on one side, sliding onto the bar one after another, heaviest
+ * first, then the collar. Replays whenever the load changes (the key does
+ * that); with Reduce motion on they are simply there.
+ */
+function PlateStack({ plates }: { plates: { height: number; colour: string }[] }) {
+  const still = useReduceMotion();
+  const last = plates.length * 2 + 4;
+  const f = useFrames(last + 1, 40, !still, false);
+  const frame = still ? last : f;
+  // Plate i starts sliding on frame 2i and lands three frames later.
+  const offset = (i: number) => Math.max(0, 3 - (frame - i * 2)) * 14;
+  return (
+    <View style={s.stack}>
+      {plates.map((p, i) =>
+        frame >= i * 2 ? (
+          <View key={i} style={[s.plate, { height: p.height, backgroundColor: p.colour, transform: [{ translateX: offset(i) }] }]}>
+            {/* A lit edge and a shaded edge, so each plate reads as a pixel disc. */}
+            <View style={s.plateLit} />
+            <View style={s.plateShade} />
+          </View>
+        ) : null
+      )}
+      {frame >= plates.length * 2 + 1 ? <View style={s.collar} /> : null}
+    </View>
+  );
+}
+
 const s = themedStyles(() =>
   StyleSheet.create({
     seg: { flexDirection: 'row', gap: 6, marginBottom: 10 },
@@ -122,7 +150,10 @@ const s = themedStyles(() =>
     viz: { height: 110, justifyContent: 'center', overflow: 'hidden' },
     barLine: { position: 'absolute', left: 0, right: 0, height: 8, backgroundColor: colors.borderBright, top: 50 },
     stack: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 30 },
-    plate: { width: 14, borderRadius: 3 },
+    plate: { width: 14, flexDirection: 'row', justifyContent: 'space-between' },
+    plateLit: { width: 3, backgroundColor: 'rgba(255,255,255,0.35)' },
+    plateShade: { width: 3, backgroundColor: 'rgba(0,0,0,0.3)' },
+    collar: { width: 6, height: 16, backgroundColor: colors.textMuted },
     barOnly: { color: colors.textDim, fontSize: 12, marginLeft: 30, fontFamily: fonts.body },
     legend: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: 10 },
     legendItem: {

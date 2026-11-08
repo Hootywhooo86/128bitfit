@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { ToggleRow } from '@/components/ToggleRow';
 import { Card, Label, Note, Screen } from '@/components/ui';
@@ -14,6 +14,7 @@ import {
 } from '@/lib/family';
 import { HEALTH_APP } from '@/lib/health/platform';
 import { colors, fonts, spacing, themedStyles } from '@/lib/theme';
+import { PixelSpinner } from '@/components/fx/PixelSpinner';
 
 export { ErrorScreen as ErrorBoundary } from '@/components/ErrorScreen';
 
@@ -91,7 +92,7 @@ export default function FamilyScreen() {
     return (
       <Screen section="128bit family" back>
         <View style={s.center}>
-          <ActivityIndicator color={colors.accent} />
+          <PixelSpinner color={colors.accent} />
         </View>
       </Screen>
     );

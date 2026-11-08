@@ -228,9 +228,22 @@ function litPixels(fig: Figure, tally: Partial<MuscleTally>): Map<number, Paint>
  * body beside it, so the edge glows; on the shadow side it is black. A rim
  * light lifts the right-hand edge, as if a second lamp sits behind.
  */
-export function paint(view: View, tally: Partial<MuscleTally>): (string | null)[] {
+export type Eyes = 'ahead' | 'left' | 'right' | 'closed';
+
+export type PaintOptions = {
+  /** Muscles whose lit pixels show white for one frame, when a set lands. */
+  flash?: ReadonlySet<MuscleGroup>;
+  /** Where the front figure is looking; the empty map glances about. */
+  eyes?: Eyes;
+};
+
+export function paint(view: View, tally: Partial<MuscleTally>, options: PaintOptions = {}): (string | null)[] {
   const fig = figure(view);
   const lit = litPixels(fig, tally);
+  const flashing = (i: number) => {
+    const m = fig.cells[i]?.muscle;
+    return !!m && !!options.flash?.has(m) && lit.has(i);
+  };
   const out: (string | null)[] = new Array(IMAGE_W * IMAGE_H).fill(null);
   const set = (x: number, y: number, c: string) => {
     const ix = x + 1;
@@ -278,6 +291,10 @@ export function paint(view: View, tally: Partial<MuscleTally>): (string | null)[
         continue;
       }
       const p = paintOf(i);
+      if (flashing(i)) {
+        set(x, y, GLINT);
+        continue;
+      }
       if (fig.glint[i]) {
         set(x, y, p === 'muscle' ? GLINT_GREY : GLINT);
         continue;
@@ -293,8 +310,14 @@ export function paint(view: View, tally: Partial<MuscleTally>): (string | null)[
     const eye = Math.round((11 * GRID_H) / CANVAS_H);
     const l = Math.round(29 * u);
     const r = GRID_W - 1 - l;
-    set(l, eye, '#111111');
-    set(r, eye, '#111111');
+    const look = options.eyes ?? 'ahead';
+    if (look === 'closed') {
+      for (const x of [l - 1, l, r, r + 1]) set(x, eye, '#454545');
+    } else {
+      const dx = look === 'left' ? -1 : look === 'right' ? 1 : 0;
+      set(l + dx, eye, '#111111');
+      set(r + dx, eye, '#111111');
+    }
     for (let k = 0; k < Math.max(2, Math.round(2 * u)); k++) {
       set(l - k, eye - 1, '#2a2a2a');
       set(r + k, eye - 1, '#2a2a2a');
