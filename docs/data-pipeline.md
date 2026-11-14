@@ -545,6 +545,30 @@ The figure is pixel art drawn in code, not an image: `lib/muscle-figure/`.
 - The drawing is original to this repo, so it carries the repo's licence. (It
   replaced artwork whose licence was never established.)
 
+### Picking today's workout (Train → Pick today's workout)
+
+- Choose a split (Push, Pull, Upper, Lower, Full body, Arms, Chest & back,
+  Shoulders & arms, Glutes & hamstrings, Core, Coach's pick), 4/6/8/10
+  exercises, and equipment (Full gym, Dumbbells, Home, Bodyweight). The
+  choices are remembered.
+- `lib/workout-pick.ts` (pure) narrows the library to strength exercises that
+  fit, at most 60, round-robin across the split's muscles, familiar lifts and
+  compounds first. Each gets a ref (`e1`…); the model answers with refs, and
+  `parsePick` drops any it was not given, so it cannot invent an exercise.
+- **Gemini first, always.** `lib/workout-pick-client.ts` asks Gemini when it is
+  the coach's provider or a separate Gemini key has been saved on the picker
+  screen (SecureStore `bitfit_gemini_api_key`, read back like the coach key).
+  Then the coach's own provider. Then `offlinePick`, the app's own rules (most
+  rested muscles first), so the button always produces a workout, and the
+  screen says which happened. A short model answer is topped up from the
+  offline pick. If Gemini answers 404 (a retired model name), the client reads
+  Google's model list and retries once on the newest Flash.
+- The prompt carries recent sets and days since each muscle, and active
+  injuries only if the user has chosen to tell the coach. Same limits as the
+  coach: no diagnosis, no rehab, and it may say a normal session is fine.
+- Start saves the pick as a routine and opens it like any other, so last
+  time's weights pre-fill.
+
 ### Logging a meal with AI
 
 Fuel's first action is **AI**, with two ways in:

@@ -7,9 +7,15 @@ import { Platform } from 'react-native';
 import { sanitizeApiKey } from './api-key';
 
 const STORE_KEY = 'bitfit_ai_api_key';
+/**
+ * A second, optional key used only by the workout picker, which always asks
+ * Gemini first. Kept apart from the coach key so the coach can stay on any
+ * provider while picks still go to Gemini.
+ */
+const GEMINI_STORE_KEY = 'bitfit_gemini_api_key';
 
-/** In-memory fallback for web / SecureStore-unavailable environments. */
-let memoryKey: string | null = null;
+/** In-memory fallback for web / SecureStore-unavailable environments, per key. */
+const memory = new Map<string, string | null>();
 
 async function secureAvailable(): Promise<boolean> {
   if (Platform.OS === 'web') return false;
@@ -28,13 +34,17 @@ async function secureAvailable(): Promise<boolean> {
  * it here repairs those without the user having to notice and re-paste.
  */
 export async function getAiApiKey(): Promise<string | null> {
+  return readKey(STORE_KEY);
+}
+
+async function readKey(storeKey: string): Promise<string | null> {
   try {
     if (await secureAvailable()) {
-      return sanitizeApiKey(await SecureStore.getItemAsync(STORE_KEY));
+      return sanitizeApiKey(await SecureStore.getItemAsync(storeKey));
     }
-    return sanitizeApiKey(memoryKey);
+    return sanitizeApiKey(memory.get(storeKey));
   } catch {
-    return sanitizeApiKey(memoryKey);
+    return sanitizeApiKey(memory.get(storeKey));
   }
 }
 
@@ -49,7 +59,7 @@ export class AiKeyStoreError extends Error {}
 /**
  * Saves the key, and proves it saved.
  *
- * This used to swallow a failed write: the key stayed in `memoryKey`, the app
+ * This used to swallow a failed write: the key stayed only in memory, the app
  * looked fine until it was killed, and the key was gone next launch with
  * nothing ever having said so. That is the silent no-op the house style
  * forbids, and it is exactly what a user hitting Save and finding no key later
@@ -61,10 +71,14 @@ export class AiKeyStoreError extends Error {}
  * distinguishes that from success.
  */
 export async function setAiApiKey(key: string): Promise<void> {
+  return writeKey(STORE_KEY, key);
+}
+
+async function writeKey(storeKey: string, key: string): Promise<void> {
   // Not trim(): a pasted key routinely carries a whole extra line, and trim
   // cannot see a newline with text behind it. See lib/api-key.ts.
   const trimmed = sanitizeApiKey(key) ?? '';
-  memoryKey = trimmed || null;
+  memory.set(storeKey, trimmed || null);
 
   if (!(await secureAvailable())) {
     // Web and anywhere without a keystore: in-memory only, and the caller has
@@ -76,10 +90,10 @@ export async function setAiApiKey(key: string): Promise<void> {
 
   try {
     if (!trimmed) {
-      await SecureStore.deleteItemAsync(STORE_KEY);
+      await SecureStore.deleteItemAsync(storeKey);
       return;
     }
-    await SecureStore.setItemAsync(STORE_KEY, trimmed);
+    await SecureStore.setItemAsync(storeKey, trimmed);
   } catch (e) {
     throw new AiKeyStoreError(
       `The device keystore refused the key: ${e instanceof Error ? e.message : String(e)}`
@@ -90,7 +104,7 @@ export async function setAiApiKey(key: string): Promise<void> {
   // is indistinguishable from a working save until the next launch.
   let readBack: string | null = null;
   try {
-    readBack = await SecureStore.getItemAsync(STORE_KEY);
+    readBack = await SecureStore.getItemAsync(storeKey);
   } catch (e) {
     throw new AiKeyStoreError(
       `Saved, but the key could not be read back: ${e instanceof Error ? e.message : String(e)}`
@@ -104,10 +118,14 @@ export async function setAiApiKey(key: string): Promise<void> {
 }
 
 export async function clearAiApiKey(): Promise<void> {
-  memoryKey = null;
+  return clearKey(STORE_KEY);
+}
+
+async function clearKey(storeKey: string): Promise<void> {
+  memory.set(storeKey, null);
   try {
     if (await secureAvailable()) {
-      await SecureStore.deleteItemAsync(STORE_KEY);
+      await SecureStore.deleteItemAsync(storeKey);
     }
   } catch {
     // ignore
@@ -117,4 +135,15 @@ export async function clearAiApiKey(): Promise<void> {
 export async function hasAiApiKey(): Promise<boolean> {
   const k = await getAiApiKey();
   return !!k;
+}
+
+/** The workout picker's own Gemini key, if one was saved. */
+export async function getGeminiKey(): Promise<string | null> {
+  return readKey(GEMINI_STORE_KEY);
+}
+
+/** Saves it, read back the same way as the coach key. Empty clears it. */
+export async function setGeminiKey(key: string): Promise<void> {
+  if (!key.trim()) return clearKey(GEMINI_STORE_KEY);
+  return writeKey(GEMINI_STORE_KEY, key);
 }

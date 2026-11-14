@@ -188,6 +188,12 @@ export default function TrainScreen() {
         onPress={() => router.push('/train/schedule')}
       />
       <MenuRow
+        icon="✦"
+        name="Pick today's workout"
+        sub="Push, pull, upper, lower, full body… Gemini picks 4–10 exercises"
+        onPress={() => router.push('/train/pick')}
+      />
+      <MenuRow
         icon="◈"
         name="What have I skipped?"
         sub="Builds a session from muscles with no sets in 30 days"
