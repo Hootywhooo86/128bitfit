@@ -110,3 +110,31 @@ describe('family client', () => {
     expect(base64url('a+b/c==')).toBe('a-b_c');
   });
 });
+
+describe('family client select', () => {
+  const live: Session = { access: 'a1', refresh: 'r1', expires: future, email: 'me@x.com', userId: 'u1' };
+
+  it('reads a table as the signed-in user with a GET', async () => {
+    const methods: string[] = [];
+    const { f, calls } = server(() => ({ status: 200, json: [{ id: 'r1' }] }));
+    const spy: Fetch = (url, init) => {
+      methods.push(init.method);
+      return f(url, init);
+    };
+    const rows = await createFamilyClient(spy, memory(live)).select('bitrecipe_items?kind=eq.recipe');
+    expect(rows).toEqual([{ id: 'r1' }]);
+    expect(methods).toEqual(['GET']);
+    expect(calls[0].url).toBe(`${FAMILY.url}/rest/v1/bitrecipe_items?kind=eq.recipe`);
+    expect(calls[0].headers.Authorization).toBe('Bearer a1');
+  });
+
+  it('says when the table was never set up', async () => {
+    const { f } = server(() => ({ status: 404, json: { message: "Could not find the table 'public.bitrecipe_items'" } }));
+    await expect(createFamilyClient(f, memory(live)).select('bitrecipe_items')).rejects.toMatchObject({ code: 'missing-feed' });
+  });
+
+  it('says it is offline in one sentence', async () => {
+    const { f } = server(() => 'offline');
+    await expect(createFamilyClient(f, memory(live)).select('bitrecipe_items')).rejects.toMatchObject({ code: 'offline' });
+  });
+});

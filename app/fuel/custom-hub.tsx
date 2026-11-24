@@ -3,6 +3,10 @@ import React, { useCallback, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card, Label, MenuRow, Note, Screen } from '@/components/ui';
 import { listUserFoods } from '@/db/barcode-queries';
+import { existingFoodIds, getBitrecipeState } from '@/db/bitrecipe-queries';
+import { inbox, type InboxEntry } from '@/lib/bitrecipe/source';
+import { pullBitrecipe } from '@/lib/bitrecipe/sync';
+import { family } from '@/lib/family';
 import { useDb } from '@/db/DatabaseProvider';
 import { logFoodFromCatalog } from '@/db/food-queries';
 import type { Food } from '@/db/schema';
@@ -38,17 +42,44 @@ export default function CustomHubScreen() {
   const [customs, setCustoms] = useState<Food[]>([]);
   const [loading, setLoading] = useState(true);
   const [logging, setLogging] = useState<string | null>(null);
+  /** null while unknown; the cookbook from bitrecipe as last pulled. */
+  const [fromBitrecipe, setFromBitrecipe] = useState<{
+    signedIn: boolean;
+    entries: InboxEntry[];
+    pulling: boolean;
+    error: string | null;
+  } | null>(null);
 
+  const readLocal = useCallback(async () => {
+    const [r, c, st, auth] = await Promise.all([
+      listUserFoods('recipe'),
+      listUserFoods('custom'),
+      getBitrecipeState(),
+      family.status(),
+    ]);
+    setRecipes(r);
+    setCustoms(c);
+    const live = await existingFoodIds(Object.values(st.added).map((a) => a.foodId));
+    return { signedIn: auth.signedIn, entries: inbox(st.recipes, st.added, live), error: st.lastError };
+  }, []);
+
+  /**
+   * Shows what is on the phone at once, then pulls bitrecipe in the
+   * background: the list never waits on the network.
+   */
   const refresh = useCallback(async () => {
     if (!ready) return;
     try {
-      const [r, c] = await Promise.all([listUserFoods('recipe'), listUserFoods('custom')]);
-      setRecipes(r);
-      setCustoms(c);
+      const local = await readLocal();
+      setFromBitrecipe({ ...local, pulling: local.signedIn });
+      setLoading(false);
+      if (!local.signedIn) return;
+      await pullBitrecipe();
+      setFromBitrecipe({ ...(await readLocal()), pulling: false });
     } finally {
       setLoading(false);
     }
-  }, [ready]);
+  }, [ready, readLocal]);
 
   useFocusEffect(
     useCallback(() => {
@@ -115,6 +146,13 @@ export default function CustomHubScreen() {
         recipes.map((f) => <FoodRow key={f.id} food={f} busy={logging === f.id} onLog={logOne} />)
       )}
 
+      <Label>FROM BITRECIPE</Label>
+      <BitrecipeSection
+        state={fromBitrecipe}
+        onOpen={(id) => router.push(`/fuel/bitrecipe?id=${encodeURIComponent(id)}`)}
+        onSignIn={() => router.push('/settings/family')}
+      />
+
       <Label>MY FOODS</Label>
       {customs.length === 0 ? (
         <Note>Foods you add by hand or from a barcode miss land here.</Note>
@@ -122,6 +160,62 @@ export default function CustomHubScreen() {
         customs.map((f) => <FoodRow key={f.id} food={f} busy={logging === f.id} onLog={logOne} />)
       )}
     </Screen>
+  );
+}
+
+/**
+ * Your bitrecipe cookbook, read from the 128bit family account. Adding one
+ * prices it from the food database first and the AI only for what is not
+ * there; it then lives in My recipes above.
+ */
+function BitrecipeSection({
+  state,
+  onOpen,
+  onSignIn,
+}: {
+  state: { signedIn: boolean; entries: InboxEntry[]; pulling: boolean; error: string | null } | null;
+  onOpen: (id: string) => void;
+  onSignIn: () => void;
+}) {
+  if (!state) return null;
+  if (!state.signedIn) {
+    return (
+      <>
+        <Note>
+          Recipes you save in bitrecipe show up here. Sign in to the same 128bit account in both apps.
+        </Note>
+        <MenuRow icon="⌂" name="Sign in to the 128bit family account" onPress={onSignIn} />
+      </>
+    );
+  }
+  const waiting = state.entries.filter((e) => e.status !== 'added');
+  const done = state.entries.length - waiting.length;
+  return (
+    <>
+      {state.pulling && state.entries.length === 0 ? <Note>Checking bitrecipe…</Note> : null}
+      {!state.pulling && state.error ? <Note>{state.error}</Note> : null}
+      {!state.pulling && !state.error && state.entries.length === 0 ? (
+        <Note>No recipes saved in bitrecipe yet.</Note>
+      ) : null}
+      {waiting.map((e) => (
+        <MenuRow
+          key={e.recipe.id}
+          icon={e.status === 'changed' ? '↻' : '+'}
+          name={e.recipe.title}
+          sub={
+            e.status === 'changed'
+              ? 'Changed in bitrecipe since you added it — add the new version'
+              : `${e.recipe.ingredients.length} ingredients · makes ${e.recipe.servings} — tap to add`
+          }
+          onPress={() => onOpen(e.recipe.id)}
+        />
+      ))}
+      {done > 0 ? (
+        <Note>
+          {done} already in My recipes{waiting.length === 0 ? ' — that is all of them.' : '.'}
+        </Note>
+      ) : null}
+    </>
   );
 }
 
@@ -150,7 +244,9 @@ function FoodRow({
           <Text style={s.meta}>
             {per.calories == null
               ? 'No calories saved'
-              : `${formatOptionalKcal(per.calories)} kcal per ${unit}`}
+              : unit === 'g'
+                ? `${formatOptionalKcal(per.calories)} kcal per ${food.servingSize ?? 100} g serving`
+                : `${formatOptionalKcal(per.calories)} kcal per ${unit}`}
             {macros ? ` · ${macros}` : ''}
           </Text>
         </View>

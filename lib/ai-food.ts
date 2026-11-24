@@ -36,6 +36,10 @@ export type AiFoodItem = {
    * enough on its own: a model with no search can still write "hellofresh.com".
    */
   estimated: boolean;
+  /** Estimated weight of the portion, when the prompt asked for it (recipe lines). */
+  grams?: number | null;
+  /** For a numbered list of recipe lines: which line (1-based) this answers. */
+  line?: number | null;
 };
 
 export type AiFoodResult =
@@ -111,6 +115,25 @@ export function recipeLinkPrompt(url: string, servings: number): string {
   );
 }
 
+/**
+ * The ingredient lines of a saved recipe that the food database could not
+ * price. Numbered, so each answer maps back to its line; asked for the whole
+ * amount on the line (the app divides by servings itself) and for a weight,
+ * so a database food measured in cups or "2 breasts" can use USDA figures.
+ */
+export function recipeLinesPrompt(lines: readonly string[], servings: number): string {
+  const list = lines.map((l, i) => `${i + 1}. ${l.trim()}`).join('\n');
+  return (
+    `These are ingredient lines from one recipe that makes ${servings} serving${servings === 1 ? '' : 's'}:\n` +
+    `${list}\n\n` +
+    `Return exactly one item per numbered line. Add "line" (the number) and "grams" ` +
+    `(your estimate of the weight of the whole amount on that line). calories, protein, ` +
+    `fat and carb are for that whole amount, not per serving. If a line gives no amount, ` +
+    `assume what this recipe would normally use and say so in "portion". ` +
+    `Item shape: {"line":1,"name":"…","portion":"…","grams":<number>,"calories":<number>,"protein":<number>,"fat":<number>,"carb":<number>}`
+  );
+}
+
 export function systemPrompt(webSearch = false): string {
   return webSearch ? SYSTEM + WEB : SYSTEM;
 }
@@ -131,6 +154,12 @@ function unfence(raw: string): string {
 function macro(v: unknown): number | null {
   if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) return null;
   return Math.round(v * 10) / 10;
+}
+
+/** A weight in grams; a few kilos is already a very large recipe line. */
+function grams(v: unknown): number | null {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0 || v > 10000) return null;
+  return Math.round(v);
 }
 
 function calories(v: unknown): number | null {
@@ -191,6 +220,9 @@ export function parseAiFood(
       carb: macro(e.carb),
       source,
       estimated: !(searched && source),
+      // Only recipe-line replies carry these; an ordinary item keeps its old shape.
+      ...('grams' in e ? { grams: grams(e.grams) } : {}),
+      ...('line' in e ? { line: typeof e.line === 'number' && Number.isInteger(e.line) && e.line > 0 ? e.line : null } : {}),
     });
   }
 

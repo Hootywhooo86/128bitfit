@@ -24,6 +24,7 @@ import {
   PHOTO_PROMPT,
   describePrompt,
   parseAiFood,
+  recipeLinesPrompt,
   recipeLinkPrompt,
   recipePhotosPrompt,
   systemPrompt,
@@ -36,7 +37,8 @@ export type AiFoodRequest =
   | { kind: 'describe'; text: string }
   | { kind: 'photo'; base64: string; mimeType: string }
   | { kind: 'recipe-photos'; photos: AiPhoto[]; servings: number }
-  | { kind: 'recipe-link'; url: string; servings: number };
+  | { kind: 'recipe-link'; url: string; servings: number }
+  | { kind: 'recipe-lines'; lines: string[]; servings: number };
 
 /** More than this and the request gets large enough to time out on mobile data. */
 export const MAX_RECIPE_PHOTOS = 5;
@@ -148,6 +150,8 @@ function userMessages(req: AiFoodRequest): ChatMessage[] {
       ];
     case 'recipe-link':
       return [{ role: 'user', content: recipeLinkPrompt(req.url, req.servings) }];
+    case 'recipe-lines':
+      return [{ role: 'user', content: recipeLinesPrompt(req.lines, req.servings) }];
     case 'recipe-photos':
       return req.photos.map((p, i) => ({
         role: 'user' as const,

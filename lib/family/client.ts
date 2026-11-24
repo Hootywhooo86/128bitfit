@@ -161,6 +161,39 @@ export function createFamilyClient(fetchImpl: Fetch, store: SessionStore) {
       }
     },
 
+    /**
+     * Reads a table through Supabase's REST API as the signed-in user, e.g.
+     * bitrecipe's `bitrecipe_items`. Row-level security limits it to this
+     * account's rows. `path` is everything after /rest/v1/.
+     */
+    async select<T = unknown>(path: string): Promise<T> {
+      const s = await current();
+      let res;
+      try {
+        res = await fetchImpl(`${FAMILY.url}/rest/v1/${path}`, {
+          method: 'GET',
+          headers: { apikey: FAMILY.key, Authorization: `Bearer ${s.access}` },
+        });
+      } catch {
+        throw new FamilyError('No connection to the 128bit family account. It will try again when you are online.', 'offline');
+      }
+      const text = await res.text();
+      let json: unknown = null;
+      try {
+        json = text ? JSON.parse(text) : null;
+      } catch {
+        json = null;
+      }
+      if (!res.ok) {
+        const msg = (json as { message?: string } | null)?.message ?? '';
+        if (/does not exist|Could not find the table/i.test(msg)) {
+          throw new FamilyError('That table is not set up on this 128bit account yet.', 'missing-feed');
+        }
+        throw new FamilyError(msg || `The 128bit account answered ${res.status}.`, 'server');
+      }
+      return json as T;
+    },
+
     /** Calls a family function as the signed-in user. */
     async rpc<T = unknown>(fn: string, args: unknown): Promise<T> {
       const s = await current();

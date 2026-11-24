@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAiFood, totalsOf, type AiFoodItem } from './ai-food';
+import { parseAiFood, recipeLinesPrompt, totalsOf, type AiFoodItem } from './ai-food';
 
 const REPLY = JSON.stringify({
   items: [
@@ -152,5 +152,25 @@ describe('totals', () => {
 
   it('stays null for a macro nothing supplied, rather than reporting 0 g', () => {
     expect(totalsOf(items).fat).toBeNull();
+  });
+});
+
+describe('recipe lines', () => {
+  it('numbers the lines and asks for whole amounts with a weight', () => {
+    const p = recipeLinesPrompt(['2 chicken breasts', '1 packet taco seasoning'], 4);
+    expect(p).toContain('makes 4 servings');
+    expect(p).toContain('1. 2 chicken breasts\n2. 1 packet taco seasoning');
+    expect(p).toContain('"grams"');
+    expect(p).toContain('not per serving');
+  });
+
+  it('reads line numbers and grams, dropping nonsense', () => {
+    const r = parseAiFood(
+      '{"items":[{"line":2,"name":"Taco seasoning","portion":"1 packet","grams":28,"calories":90,"protein":2,"fat":1,"carb":18},{"line":"x","name":"Chicken","portion":"2","grams":-5,"calories":300,"protein":60,"fat":6,"carb":0}]}'
+    );
+    expect(r.status).toBe('ok');
+    if (r.status !== 'ok') return;
+    expect(r.items[0]).toMatchObject({ line: 2, grams: 28 });
+    expect(r.items[1]).toMatchObject({ line: null, grams: null });
   });
 });
