@@ -8,6 +8,10 @@
  *   node scripts/build-food-db.mjs                  # Foundation + SR Legacy (default)
  *   node scripts/build-food-db.mjs --survey          # also FNDDS
  *   node scripts/build-food-db.mjs --branded --max=N # branded (labelNutrients)
+ *   node scripts/build-food-db.mjs --survey-file=PATH
+ *       adds FNDDS survey foods from USDA's bulk download (no API key) to the
+ *       existing foods.json: FoodData_Central_survey_food_json_<date>.zip from
+ *       https://fdc.nal.usda.gov/download-datasets, unzipped.
  *   node scripts/build-food-db.mjs --debug
  *
  * Important USDA constraints handled here:
@@ -19,7 +23,7 @@
  * - Skip foods with no usable energy; report skip counts.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { config as loadDotenv } from "dotenv";
@@ -39,6 +43,7 @@ const includeSurvey = args.includes("--survey");
 const includeBranded = args.includes("--branded");
 const debug = args.includes("--debug");
 const maxArg = args.find((a) => a.startsWith("--max="));
+const surveyFileArg = args.find((a) => a.startsWith("--survey-file="));
 const maxFoods = maxArg ? Number(maxArg.split("=")[1]) : Infinity;
 
 /** nutrientId → our key. Mapped client-side; never sent as >25 filter IDs. */
@@ -260,7 +265,12 @@ function pickServing(food) {
 
   const portions = food.foodPortions || [];
   if (portions.length) {
-    const p = portions.find((x) => x.gramWeight) || portions[0];
+    // A real household portion ("1 large") beats FNDDS's "Quantity not
+    // specified", which is a statistical average, not something you eat.
+    const p =
+      portions.find((x) => x.gramWeight > 0 && !/not specified/i.test(x.portionDescription ?? "")) ||
+      portions.find((x) => x.gramWeight) ||
+      portions[0];
     if (p.gramWeight != null) {
       return {
         serving_size: Number(p.gramWeight),
@@ -366,7 +376,38 @@ async function fetchFoodsByIds(apiKey, ids) {
   return res.json();
 }
 
+/**
+ * Adds survey (FNDDS) foods from the bulk download to the foods.json already
+ * on disk. Same normalising as the API path; existing entries are kept, and a
+ * survey food already present by id is not added twice.
+ */
+async function addSurveyFile(path) {
+  const existing = JSON.parse(await readFile(OUT_JSON, "utf8"));
+  const bulk = JSON.parse(await readFile(path, "utf8"));
+  const list = bulk.SurveyFoods ?? bulk.FoodData ?? [];
+  const have = new Set(existing.map((f) => String(f.id)));
+  let added = 0;
+  let noEnergy = 0;
+  for (const raw of list) {
+    const norm = normalizeFood({ ...raw, dataType: "Survey (FNDDS)" });
+    if (have.has(String(norm.id))) continue;
+    if (norm.nutrients.calories == null) {
+      noEnergy++;
+      continue;
+    }
+    have.add(String(norm.id));
+    existing.push(norm);
+    added++;
+  }
+  const json = JSON.stringify(existing, null, 2) + "\n";
+  await writeFile(OUT_JSON, json, "utf8");
+  log(`Survey foods added: ${added} (skipped ${noEnergy} with no energy). Total: ${existing.length}`);
+  log(`  file size: ${(Buffer.byteLength(json) / 1024 / 1024).toFixed(2)} MB`);
+  log("  Update db/data-manifest.ts (count, checksum, bytes) and run npm run verify:import.");
+}
+
 async function main() {
+  if (surveyFileArg) return addSurveyFile(surveyFileArg.split("=").slice(1).join("="));
   const apiKey = process.env.FDC_API_KEY?.trim();
   if (!apiKey) {
     console.error(

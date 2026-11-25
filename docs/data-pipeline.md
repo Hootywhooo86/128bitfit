@@ -8,7 +8,7 @@ Reference for the offline databases and where things live. The product brief is
 | File | Source | Size | Contents |
 |------|--------|------|----------|
 | `assets/data/exercises.json` | [yuhonas/free-exercise-db](https://github.com/yuhonas/free-exercise-db) (public domain) | ~982 KB | 876 exercises |
-| `assets/data/foods.json` | [USDA FoodData Central](https://fdc.nal.usda.gov/) API (public domain) | ~8.6 MB | 8,114 foods (Foundation + SR Legacy) |
+| `assets/data/foods.json` | [USDA FoodData Central](https://fdc.nal.usda.gov/) (public domain) | ~14.2 MB | 13,545 foods: Foundation + SR Legacy (API) and 5,431 FNDDS survey foods (bulk download) |
 
 Optional and gitignored: `assets/exercises/` image files (~120 MB). Paths in the
 JSON still reference relative image names, so the app works without them.
@@ -55,7 +55,8 @@ npm run build:exercises:images       # also download images into assets/exercise
 
 npm run check:usda                   # verify API key + ping FDC
 npm run build:foods                  # Foundation + SR Legacy → foods.json
-npm run build:foods -- --survey      # also FNDDS survey foods
+npm run build:foods -- --survey      # also FNDDS survey foods (API)
+npm run build:foods -- --survey-file=surveyDownload.json   # FNDDS from the bulk download, no key
 npm run build:foods -- --branded --max=5000
 npm run build:foods -- --debug
 
@@ -544,6 +545,32 @@ The figure is pixel art drawn in code, not an image: `lib/muscle-figure/`.
   pixel once.
 - The drawing is original to this repo, so it carries the repo's licence. (It
   replaced artwork whose licence was never established.)
+
+### Finding food (Fuel → Add food)
+
+- **Offline search** (`lib/food-search.ts`, pure): every word must appear, in
+  any order ("egg large" finds "Eggs, Grade A, Large, egg whole"); plurals
+  count as the singular; a short list of synonyms covers UK and US names
+  (yoghurt, prawn, courgette, mince…); a typo of one or two letters matches
+  only when nothing matches exactly. Ranking puts the food itself above
+  dishes that mention it (a name whose first or second part is exactly what
+  was typed), favours whole/raw/plain forms, sinks baby food and dry mixes
+  unless asked for, and lifts your own foods and ones you have logged in the
+  last 180 days. `searchFoods` builds the index once and rebuilds it when the
+  catalogue changes (count, last rowid, and total name length, so a rename
+  counts). About 5–15 ms a search over 13.5k foods; the tests run on the real
+  bundled catalogue.
+- **FNDDS survey foods** are bundled for everyday foods as eaten ("Egg, whole,
+  fried with butter", "Pizza, cheese"). Their serving is the first real
+  household portion (one large egg, 50 g), not FNDDS's "quantity not
+  specified" average.
+- **Search online** (`lib/food-online.ts`), only when tapped: Open Food Facts
+  (`search.openfoodfacts.org`, millions of products incl. Canada; ODbL, so
+  only the one picked is kept, as with barcodes) and USDA FoodData Central
+  branded foods (public domain; `DEMO_KEY` until it is rate-limited, then the
+  screen offers to save a free api.data.gov key in SecureStore). Each source
+  fails on its own with one sentence. A picked food is saved as
+  `open_food_facts` or `usda_branded`, both preserved across re-imports.
 
 ### Picking today's workout (Train → Pick today's workout)
 

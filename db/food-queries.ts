@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, like, lt, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, like, lt, sql } from 'drizzle-orm';
 import { db } from './client';
 import { getSetting, setSetting } from './settings-store';
 import { newId } from './id';
@@ -21,6 +21,7 @@ import {
   mirrorWaterRemoved,
 } from '@/lib/health/mirror';
 import { widgetsChanged } from '@/lib/widget-refresh';
+import { buildIndex, searchIndex, type FoodIndex } from '@/lib/food-search';
 
 export const DEFAULT_GOALS = {
   calorie_target: 2200,
@@ -98,15 +99,57 @@ export async function ensureDefaultGoals(): Promise<DailyGoals> {
   return goals;
 }
 
+/**
+ * The search index, built once and rebuilt only when the catalogue changes
+ * (a re-import, a new or renamed custom food, a cached barcode). The key is cheap to
+ * read; building the index is the part worth not repeating per keystroke.
+ */
+let searchCache: { key: string; index: FoodIndex } | null = null;
+
+async function foodIndex(): Promise<FoodIndex> {
+  const [k] = await db
+    .select({
+      n: sql<number>`count(*)`,
+      top: sql<string>`coalesce(max(rowid), 0)`,
+      // Catches a rename, which changes neither the count nor the rowids.
+      len: sql<number>`coalesce(sum(length(${foods.name}) + length(coalesce(${foods.brand}, ''))), 0)`,
+    })
+    .from(foods);
+  const key = `${k?.n ?? 0}:${k?.top ?? 0}:${k?.len ?? 0}`;
+  if (searchCache?.key === key) return searchCache.index;
+  const rows = await db
+    .select({ id: foods.id, name: foods.name, brand: foods.brand, source: foods.source })
+    .from(foods);
+  const index = buildIndex(rows);
+  searchCache = { key, index };
+  return index;
+}
+
+/**
+ * Foods for a search box: every word must match, in any order, with plurals,
+ * common synonyms and small typos forgiven, best match first. See
+ * lib/food-search.ts for the rules.
+ */
 export async function searchFoods(query: string, limit = 40): Promise<Food[]> {
   const q = query.trim();
   if (!q) return [];
-  return db
-    .select()
-    .from(foods)
-    .where(like(foods.name, `%${q}%`))
-    .orderBy(asc(foods.name))
-    .limit(limit);
+  const since = new Date(Date.now() - 180 * 86_400_000);
+  const [index, logged] = await Promise.all([
+    foodIndex(),
+    db
+      .select({ id: foodLogs.foodId, n: sql<number>`count(*)` })
+      .from(foodLogs)
+      .where(and(gte(foodLogs.loggedAt, since), sql`${foodLogs.foodId} is not null`))
+      .groupBy(foodLogs.foodId),
+  ]);
+  const ids = searchIndex(index, q, {
+    limit,
+    logged: new Map(logged.filter((r) => r.id).map((r) => [r.id as string, Number(r.n)])),
+  });
+  if (ids.length === 0) return [];
+  const rows = await db.select().from(foods).where(inArray(foods.id, ids));
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return ids.map((id) => byId.get(id)).filter((f): f is Food => !!f);
 }
 
 export async function getFoodById(id: string): Promise<Food | null> {

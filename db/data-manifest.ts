@@ -7,8 +7,8 @@ export const DATA_MANIFEST = {
     "bytes": 1005327
   },
   "foods": {
-    "count": 8114,
-    "checksum": "c3f6bc258a2cf9a4",
-    "bytes": 9059423
+    "count": 13545,
+    "checksum": "ef29ffb751a8bbd9",
+    "bytes": 14900006
   }
 } as const;
