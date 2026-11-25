@@ -32,6 +32,9 @@ import {
   scaleLoggedPortion,
 } from '@/lib/nutrition';
 import { OFF_LICENSE_NOTE } from '@/lib/open-food-facts';
+import { cacheOffFood, saveUsdaBrandedFood } from '@/db/barcode-queries';
+import { getUsdaKey, setUsdaKey } from '@/lib/ai-secure';
+import { searchOpenFoodFacts, searchUsdaBranded, type OnlineFood, type SourceResult } from '@/lib/food-online';
 import { colors, spacing, themedStyles } from '@/lib/theme';
 import { Screen } from '@/components/ui';
 import { NumberBox } from '@/components/NumberBox';
@@ -65,6 +68,10 @@ export default function AddFoodScreen() {
   // the AI), being logged again from its last log.
   const [again, setAgain] = useState<RecentItem | null>(null);
   const [portions, setPortions] = useState('1');
+  // Online search: only on request, for the query it was asked for.
+  const [online, setOnline] = useState<{ query: string; loading: boolean; off?: SourceResult; usda?: SourceResult } | null>(null);
+  const [usdaKeyDraft, setUsdaKeyDraft] = useState('');
+  const [picking, setPicking] = useState<string | null>(null);
 
   useEffect(() => {
     void listRecentFoods(15).then(setRecent);
@@ -101,6 +108,39 @@ export default function AddFoodScreen() {
     const t = setTimeout(runSearch, 200);
     return () => clearTimeout(t);
   }, [runSearch]);
+
+  const searchOnline = async () => {
+    const q = search.trim();
+    if (!q) return;
+    setOnline({ query: q, loading: true });
+    const key = await getUsdaKey();
+    const [off, usda] = await Promise.all([searchOpenFoodFacts(q), searchUsdaBranded(q, key)]);
+    setOnline((o) => (o?.query === q ? { query: q, loading: false, off, usda } : o));
+  };
+
+  /** Keeps the one picked online, then opens it like a local food. */
+  const pickOnline = async (item: OnlineFood) => {
+    if (picking) return;
+    setPicking(item.key);
+    try {
+      const food = item.kind === 'off' ? await cacheOffFood(item.off) : await saveUsdaBrandedFood(item.usda);
+      pickFood(food);
+    } catch (e) {
+      Alert.alert('Could not add that food', e instanceof Error ? e.message : String(e));
+    } finally {
+      setPicking(null);
+    }
+  };
+
+  const saveUsdaKey = async () => {
+    try {
+      await setUsdaKey(usdaKeyDraft);
+      setUsdaKeyDraft('');
+      void searchOnline();
+    } catch (e) {
+      Alert.alert('Key not saved', e instanceof Error ? e.message : String(e));
+    }
+  };
 
   const servingsNum = useMemo(() => {
     const n = Number(servings);
@@ -394,8 +434,48 @@ export default function AddFoodScreen() {
                 );
               }}
               ListEmptyComponent={
-                !searching ? (
-                  <Text style={styles.empty}>No foods match. Try another name.</Text>
+                !searching && search.trim() ? (
+                  <Text style={styles.empty}>Nothing in the offline database. Try searching online.</Text>
+                ) : null
+              }
+              ListFooterComponent={
+                search.trim() ? (
+                  <View style={styles.onlineBox}>
+                    {online?.query !== search.trim() ? (
+                      <Pressable style={styles.onlineBtn} onPress={() => void searchOnline()}>
+                        <Text style={styles.onlineBtnText}>SEARCH ONLINE</Text>
+                        <Text style={styles.rowMeta}>Open Food Facts and USDA branded foods</Text>
+                      </Pressable>
+                    ) : online.loading ? (
+                      <PixelSpinner color={colors.accent} style={{ marginTop: 12 }} />
+                    ) : (
+                      <>
+                        <OnlineSection title="OPEN FOOD FACTS" result={online.off} picking={picking} onPick={pickOnline} />
+                        <OnlineSection title="USDA BRANDED" result={online.usda} picking={picking} onPick={pickOnline} />
+                        {online.usda?.rateLimited ? (
+                          <View style={styles.keyBox}>
+                            <Text style={styles.rowMeta}>
+                              Free key, takes a minute: api.data.gov/signup. It stays on this phone and goes only to USDA.
+                            </Text>
+                            <TextInput
+                              style={styles.keyInput}
+                              value={usdaKeyDraft}
+                              onChangeText={setUsdaKeyDraft}
+                              placeholder="Paste USDA key"
+                              placeholderTextColor={colors.textDim}
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              secureTextEntry
+                            />
+                            <Pressable style={[styles.onlineBtn, !usdaKeyDraft.trim() && styles.saveBtnDisabled]} disabled={!usdaKeyDraft.trim()} onPress={() => void saveUsdaKey()}>
+                              <Text style={styles.onlineBtnText}>SAVE KEY AND SEARCH</Text>
+                            </Pressable>
+                          </View>
+                        ) : null}
+                        <Text style={styles.license}>{OFF_LICENSE_NOTE} USDA data is public domain.</Text>
+                      </>
+                    )}
+                  </View>
                 ) : null
               }
             />
@@ -406,7 +486,60 @@ export default function AddFoodScreen() {
   );
 }
 
+function OnlineSection({
+  title,
+  result,
+  picking,
+  onPick,
+}: {
+  title: string;
+  result?: SourceResult;
+  picking: string | null;
+  onPick: (f: OnlineFood) => void;
+}) {
+  if (!result) return null;
+  return (
+    <View style={{ marginTop: spacing.md }}>
+      <Text style={styles.count}>
+        {title} · {result.error ? 'not available' : `${result.foods.length} found`}
+      </Text>
+      {result.error ? <Text style={styles.muted}>{result.error}</Text> : null}
+      {result.foods.map((f) => (
+        <Pressable key={f.key} style={styles.row} onPress={() => onPick(f)} disabled={picking != null}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rowTitle}>{f.name}</Text>
+            <Text style={styles.rowMeta}>
+              {[f.brand, f.caloriesText].filter(Boolean).join(' · ')}
+            </Text>
+          </View>
+          {picking === f.key ? <PixelSpinner color={colors.accent} /> : <Text style={styles.chevron}>›</Text>}
+        </Pressable>
+      ))}
+    </View>
+  );
+}
+
 const styles = themedStyles(() => StyleSheet.create({
+  onlineBox: { marginTop: spacing.md, gap: 4 },
+  onlineBtn: {
+    borderWidth: 1,
+    borderColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: spacing.sm,
+  },
+  onlineBtnText: { color: colors.accent, fontWeight: '800', letterSpacing: 1 },
+  keyBox: { marginTop: spacing.md, gap: 6 },
+  keyInput: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 10,
+    color: colors.text,
+  },
   search: {
     backgroundColor: colors.surface,
     borderWidth: 1,

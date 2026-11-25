@@ -13,6 +13,8 @@ const STORE_KEY = 'bitfit_ai_api_key';
  * provider while picks still go to Gemini.
  */
 const GEMINI_STORE_KEY = 'bitfit_gemini_api_key';
+/** A free api.data.gov key for searching USDA's branded foods online. */
+const USDA_STORE_KEY = 'bitfit_usda_api_key';
 
 /** In-memory fallback for web / SecureStore-unavailable environments, per key. */
 const memory = new Map<string, string | null>();
@@ -146,4 +148,15 @@ export async function getGeminiKey(): Promise<string | null> {
 export async function setGeminiKey(key: string): Promise<void> {
   if (!key.trim()) return clearKey(GEMINI_STORE_KEY);
   return writeKey(GEMINI_STORE_KEY, key);
+}
+
+/** The api.data.gov key for USDA online search, if one was saved. */
+export async function getUsdaKey(): Promise<string | null> {
+  return readKey(USDA_STORE_KEY);
+}
+
+/** Saves it, read back like the others. Empty clears it. */
+export async function setUsdaKey(key: string): Promise<void> {
+  if (!key.trim()) return clearKey(USDA_STORE_KEY);
+  return writeKey(USDA_STORE_KEY, key);
 }

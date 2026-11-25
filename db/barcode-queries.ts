@@ -1,3 +1,4 @@
+import type { UsdaBrandedFood } from '@/lib/food-online';
 import { and, desc, eq, inArray, notInArray, or, sql } from 'drizzle-orm';
 import {
   PRESERVED_FOOD_SOURCES,
@@ -351,4 +352,30 @@ export async function countBundledFoods(): Promise<number> {
     .from(foods)
     .where(notInArray(sql`coalesce(${foods.source}, '')`, [...PRESERVED_FOOD_SOURCES]));
   return Number(row?.n ?? 0);
+}
+
+/**
+ * Keeps a food picked from USDA's online branded search, so it is logged and
+ * searched like any other from then on. Public domain, so nothing else to
+ * respect; source `usda_branded` survives a bundled re-import.
+ */
+export async function saveUsdaBrandedFood(f: UsdaBrandedFood): Promise<Food> {
+  const values = {
+    id: `usda-${f.fdcId}`,
+    sourceId: f.fdcId,
+    name: f.name,
+    description: f.brand,
+    source: 'usda_branded',
+    barcode: f.barcode,
+    gtin: f.barcode,
+    brand: f.brand,
+    // Per 100 g, so the serving is in grams (or ml) of that 100.
+    servingSize: f.servingSize ?? 100,
+    servingUnit: f.servingUnit ?? 'g',
+    nutritionBasis: 'per_100g',
+    nutrients: JSON.stringify(f.nutrients),
+  };
+  await db.insert(foods).values(values).onConflictDoUpdate({ target: foods.id, set: values });
+  const row = await db.select().from(foods).where(eq(foods.id, values.id)).limit(1);
+  return row[0];
 }

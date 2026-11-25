@@ -14,8 +14,11 @@
 export const USER_FOOD_SOURCES = ['custom', 'recipe'] as const;
 export type UserFoodSource = (typeof USER_FOOD_SOURCES)[number];
 
-/** Cached barcode lookups — not bundled, and expensive to fetch again. */
-export const CACHED_FOOD_SOURCES = ['open_food_facts'] as const;
+/**
+ * Foods fetched online and kept once picked — barcode lookups and online
+ * search results. Not bundled, and expensive to fetch again.
+ */
+export const CACHED_FOOD_SOURCES = ['open_food_facts', 'usda_branded'] as const;
 
 /** Everything a bundled re-import must leave alone. */
 export const PRESERVED_FOOD_SOURCES = [
